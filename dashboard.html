@@ -743,8 +743,8 @@
   <!-- Top Navbar -->
   <header class="navbar">
     <div class="nav-brand">
-      <div class="nav-logo-box">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#fff" stroke-width="2.5"><path d="M3 3v18h18"/><path d="M7 16l4-6 4 3 6-8"/></svg>
+      <div class="nav-logo-box" style="padding:0; overflow:hidden; border:1px solid rgba(255,255,255,0.25);">
+        <img src="logo.jpg" alt="MEEG" style="width:100%;height:100%;object-fit:cover;border-radius:7px;">
       </div>
       <span class="nav-title">MEEG Analytics & Operations Dashboard</span>
     </div>
@@ -762,7 +762,7 @@
   <!-- Login View -->
   <div class="login-wrapper" id="loginView">
     <div class="login-card">
-      <div class="login-icon">🔒</div>
+      <img src="logo.jpg" alt="MEEG" style="width:72px;height:72px;border-radius:18px;margin:0 auto 16px;display:block;box-shadow:0 8px 24px rgba(13,148,136,0.3);border:1.5px solid rgba(13,148,136,0.25);object-fit:cover;">
       <h2 class="login-title">Dashboard Login</h2>
       <p class="login-subtitle">Enter your authorized credentials to access live telemetry and admin controls</p>
       
@@ -860,6 +860,10 @@
             </button>
             <button class="btn-action secondary" onclick="resetAllFilters()" title="Reset all filters">🧹 Clear</button>
             <button class="btn-action" onclick="fetchLiveData()">🔄 Refresh</button>
+            <button class="btn-action" id="btnSyncSheets" onclick="syncGoogleSheetsClient()" title="Auto-Sync data from Google Sheets into Database" style="background: linear-gradient(135deg, #0d9488 0%, #0284c7 100%); color:#fff; border:none; display:inline-flex; align-items:center; gap:6px;">
+              <span id="syncIcon">⚡</span>
+              <span id="syncText">Sync Sheets</span>
+            </button>
             <button class="btn-action success" onclick="exportFilteredData()">📥 Export Excel (CSV)</button>
           </div>
         </div>
@@ -2630,6 +2634,129 @@
 
     // Auto-init on page load
     initAuth();
-  </script>
+  
+// ============================================================
+// CLIENT-SIDE GOOGLE SHEETS SYNC
+// ============================================================
+async function syncGoogleSheetsClient() {
+  const btn = document.getElementById('btnSyncSheets');
+  const icon = document.getElementById('syncIcon');
+  const text = document.getElementById('syncText');
+  if (!btn) return;
+  btn.disabled = true;
+  if (icon) icon.innerHTML = '⏳';
+  if (text) text.innerText = 'Syncing...';
+
+  try {
+    const sheetUrls = [
+      { name: 'Daily Sheet', url: 'https://docs.google.com/spreadsheets/d/1vpsYtvoZSKLsUeKj-FTXVGJmyFygSSck8DUIODJha_A/export?format=csv&gid=0', idCol: 'Task ID', qtcCol: 'QTC Name', pcCol: 'PC No', natCol: 'National ID' }
+    ];
+
+    let totalProcessed = 0;
+    for (const s of sheetUrls) {
+      let csvData = '';
+      try {
+        const resp = await fetch(s.url);
+        if (resp.ok) csvData = await resp.text();
+      } catch(e) {
+        try {
+          const proxyResp = await fetch('https://api.allorigins.win/raw?url=' + encodeURIComponent(s.url));
+          if (proxyResp.ok) csvData = await proxyResp.text();
+        } catch(e2) {
+          console.warn('Proxy fetch failed', e2);
+        }
+      }
+
+      if (!csvData) continue;
+      const lines = csvData.split(/\r?\n/).filter(l => l.trim().length > 0);
+      if (lines.length < 2) continue;
+
+      const parseLine = (line) => {
+        const res = [];
+        let cur = '', inQ = false;
+        for (let i = 0; i < line.length; i++) {
+          const c = line[i];
+          if (c === '"') {
+            if (inQ && line[i+1] === '"') { cur += '"'; i++; }
+            else { inQ = !inQ; }
+          } else if (c === ',' && !inQ) {
+            res.push(cur.trim());
+            cur = '';
+          } else {
+            cur += c;
+          }
+        }
+        res.push(cur.trim());
+        return res;
+      };
+
+      const headers = parseLine(lines[0]);
+      const idIdx = headers.findIndex(h => h.toLowerCase() === s.idCol.toLowerCase() || h.toLowerCase() === 'task id' || h.toLowerCase() === 'id');
+      const qtcIdx = headers.findIndex(h => h.toLowerCase() === s.qtcCol.toLowerCase() || h.toLowerCase().includes('qtc'));
+      const shiftIdx = headers.findIndex(h => h.toLowerCase() === 'shift');
+      const unitIdx = headers.findIndex(h => h.toLowerCase() === 'unit');
+      const pcIdx = headers.findIndex(h => h.toLowerCase() === s.pcCol.toLowerCase() || h.toLowerCase() === 'pc no');
+      const nameIdx = headers.findIndex(h => h.toLowerCase() === 'labeler name');
+      const natIdx = headers.findIndex(h => h.toLowerCase() === s.natCol.toLowerCase() || h.toLowerCase().includes('national'));
+      const emailIdx = headers.findIndex(h => h.toLowerCase() === 'yubikey email');
+      const stageIdx = headers.findIndex(h => h.toLowerCase() === 'stage');
+      const linkIdx = headers.findIndex(h => h.toLowerCase() === 'task link');
+      const passIdx = headers.findIndex(h => h.toLowerCase() === 'pass');
+      const modIdx = headers.findIndex(h => h.toLowerCase() === 'modality');
+      const qIdx = headers.findIndex(h => h.toLowerCase() === 'queue name');
+      const objIdx = headers.findIndex(h => h.toLowerCase().includes('object'));
+      const tsIdx = headers.findIndex(h => h.toLowerCase() === 'timestamp');
+
+      const statements = [];
+      for (let i = 1; i < lines.length; i++) {
+        const row = parseLine(lines[i]);
+        const taskId = idIdx >= 0 ? (row[idIdx] || '') : '';
+        const pass = passIdx >= 0 ? (row[passIdx] || '') : '';
+        const email = emailIdx >= 0 ? (row[emailIdx] || '').toLowerCase() : '';
+        if (!taskId) continue;
+
+        const sql = `INSERT OR IGNORE INTO task_submissions (timestamp, shift, unit, pc_no, labeler_name, national_id, qtc_shift, yubikey_email, qtc_name, stage, task_link, task_id, pass, modality, queue_name, object_count, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+        const args = [
+          { type: 'text', value: tsIdx >= 0 ? (row[tsIdx] || '') : '' },
+          { type: 'text', value: shiftIdx >= 0 ? (row[shiftIdx] || '') : '' },
+          { type: 'text', value: unitIdx >= 0 ? (row[unitIdx] || '') : '' },
+          { type: 'text', value: pcIdx >= 0 ? (row[pcIdx] || '') : '' },
+          { type: 'text', value: nameIdx >= 0 ? (row[nameIdx] || '') : '' },
+          { type: 'text', value: natIdx >= 0 ? (row[natIdx] || '') : '' },
+          { type: 'text', value: shiftIdx >= 0 ? (row[shiftIdx] || '') : '' },
+          { type: 'text', value: email },
+          { type: 'text', value: qtcIdx >= 0 ? (row[qtcIdx] || '') : '' },
+          { type: 'text', value: stageIdx >= 0 ? (row[stageIdx] || '') : '' },
+          { type: 'text', value: linkIdx >= 0 ? (row[linkIdx] || '') : '' },
+          { type: 'text', value: taskId },
+          { type: 'text', value: pass },
+          { type: 'text', value: modIdx >= 0 ? (row[modIdx] || '') : '' },
+          { type: 'text', value: qIdx >= 0 ? (row[qIdx] || '') : '' },
+          { type: 'integer', value: String(parseInt(objIdx >= 0 ? (row[objIdx] || '0') : '0', 10) || 0) },
+          { type: 'text', value: tsIdx >= 0 ? (row[tsIdx] || '') : '' }
+        ];
+        statements.push({ type: 'execute', stmt: { sql, args } });
+      }
+
+      for (let b = 0; b < statements.length; b += 50) {
+        const chunk = statements.slice(b, b + 50);
+        await executePipeline(chunk);
+        totalProcessed += chunk.length;
+      }
+    }
+
+    alert('✅ تم مزامنة بيانات Google Sheets بنجاح مع قاعدة البيانات!');
+    await fetchLiveData();
+  } catch(err) {
+    console.error('Sync error:', err);
+    alert('⚠️ حدث خطأ أثناء المزامنة: ' + (err.message || err));
+  } finally {
+    btn.disabled = false;
+    if (icon) icon.innerHTML = '⚡';
+    if (text) text.innerText = 'Sync Sheets';
+  }
+}
+
+</script>
 </body>
 </html>

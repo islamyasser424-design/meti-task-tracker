@@ -7,22 +7,22 @@
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>METI Tasks Tracker</title>
+<title>MEEG · Operations & Tasks Tracker</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root {
-  --primary: #1e40af;
+  --primary: #0d9488;
   --primary-dark: #0f172a;
-  --primary-light: #3b82f6;
-  --primary-xlight: #eff6ff;
-  --primary-glow: rgba(59, 130, 246, 0.25);
-  --accent: #6366f1;
-  --accent-light: #818cf8;
+  --primary-light: #14b8a6;
+  --primary-xlight: #f0fdfa;
+  --primary-glow: rgba(20, 184, 166, 0.25);
+  --accent: #0284c7;
+  --accent-light: #38bdf8;
   --surface: #ffffff;
-  --surface-glass: rgba(255, 255, 255, 0.92);
+  --surface-glass: rgba(255, 255, 255, 0.94);
   --bg: #f8fafc;
   --border: #e2e8f0;
-  --border-focus: #3b82f6;
+  --border-focus: #0d9488;
   --border-hover: #cbd5e1;
   --text: #0f172a;
   --text-secondary: #475569;
@@ -38,9 +38,9 @@
   --shadow-md: 0 12px 30px -6px rgba(15, 23, 42, 0.08), 0 4px 12px -2px rgba(15, 23, 42, 0.03);
   --shadow-lg: 0 24px 50px -12px rgba(15, 23, 42, 0.14), 0 8px 20px -4px rgba(15, 23, 42, 0.06);
   --radius-sm: 8px;
-  --radius: 11px;
-  --radius-lg: 18px;
-  --radius-xl: 24px;
+  --radius: 12px;
+  --radius-lg: 20px;
+  --radius-xl: 26px;
 }
 
 *, *::before, *::after {
@@ -171,16 +171,17 @@ body {
 /* MAIN HEADER */
 header.main-header {
   width: 100%;
-  background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 60%, #1d4ed8 100%);
-  padding: 16px 20px;
+  background: linear-gradient(135deg, #09131f 0%, #0d2838 55%, #0b3746 100%);
+  padding: 14px 24px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
   flex-wrap: wrap;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid rgba(20, 184, 166, 0.25);
   position: relative;
   overflow: hidden;
+  box-shadow: 0 4px 25px rgba(15, 23, 42, 0.25);
 }
 
 header.main-header::before {
@@ -188,9 +189,9 @@ header.main-header::before {
   position: absolute;
   top: -50%;
   right: -10%;
-  width: 350px;
-  height: 350px;
-  background: radial-gradient(circle, rgba(59, 130, 246, 0.18) 0%, transparent 70%);
+  width: 380px;
+  height: 380px;
+  background: radial-gradient(circle, rgba(20, 184, 166, 0.2) 0%, transparent 70%);
   pointer-events: none;
 }
 
@@ -203,41 +204,87 @@ header.main-header::before {
   z-index: 1;
 }
 
+.header-brand-link {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  text-decoration: none;
+  color: inherit;
+  transition: transform 0.2s ease;
+}
+
+.header-brand-link:hover {
+  transform: translateY(-1px);
+}
+
+.brand-logo-img {
+  width: 50px;
+  height: 50px;
+  border-radius: 12px;
+  object-fit: cover;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.15), 0 4px 14px rgba(20, 184, 166, 0.35);
+  border: 1px solid rgba(94, 234, 212, 0.35);
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.header-brand-link:hover .brand-logo-img {
+  box-shadow: 0 0 0 2px rgba(94, 234, 212, 0.5), 0 6px 20px rgba(20, 184, 166, 0.5);
+  transform: scale(1.04);
+}
+
+.header-brand-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.header-brand-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .header-meti {
   font-family: 'Plus Jakarta Sans', sans-serif;
-  font-size: 2.3rem;
+  font-size: 1.85rem;
   font-weight: 800;
-  background: linear-gradient(135deg, #ffffff 30%, #93c5fd 100%);
+  background: linear-gradient(135deg, #ffffff 40%, #5eead4 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  letter-spacing: -1px;
+  letter-spacing: -0.5px;
   line-height: 1;
-  filter: drop-shadow(0 2px 10px rgba(59, 130, 246, 0.3));
+  filter: drop-shadow(0 2px 10px rgba(20, 184, 166, 0.3));
+}
+
+.header-badge-tag {
+  background: rgba(20, 184, 166, 0.2);
+  color: #5eead4;
+  border: 1px solid rgba(94, 234, 212, 0.35);
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 6px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
 }
 
 .header-divider {
   width: 1.5px;
-  height: 36px;
-  background: linear-gradient(to bottom, transparent, rgba(255, 255, 255, 0.3), transparent);
-}
-
-.header-info {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
+  height: 38px;
+  background: linear-gradient(to bottom, transparent, rgba(20, 184, 166, 0.4), transparent);
 }
 
 .header-full-name {
   font-family: 'Plus Jakarta Sans', sans-serif;
-  font-size: 0.78rem;
+  font-size: 0.8rem;
   font-weight: 700;
-  color: #e2e8f0;
-  letter-spacing: 1.4px;
+  color: #f1f5f9;
+  letter-spacing: 1.2px;
   text-transform: uppercase;
 }
 
 .header-dept {
-  font-size: 0.7rem;
+  font-size: 0.72rem;
   color: #94a3b8;
   font-weight: 500;
   display: flex;
@@ -251,8 +298,59 @@ header.main-header::before {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #10b981;
-  box-shadow: 0 0 8px #10b981;
+  background: #14b8a6;
+  box-shadow: 0 0 8px #14b8a6;
+}
+
+.header-right-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  z-index: 1;
+  flex-wrap: wrap;
+}
+
+.header-admin-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  padding: 8px 14px;
+  border-radius: 999px;
+  color: #f8fafc;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-decoration: none;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.header-admin-pill svg {
+  width: 15px;
+  height: 15px;
+  stroke: #5eead4;
+}
+
+.header-admin-pill .admin-badge {
+  background: linear-gradient(135deg, #0d9488 0%, #0284c7 100%);
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  padding: 2px 7px;
+  border-radius: 6px;
+  text-transform: uppercase;
+}
+
+.header-admin-pill:hover {
+  background: rgba(20, 184, 166, 0.22);
+  border-color: rgba(94, 234, 212, 0.5);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(20, 184, 166, 0.35);
+  color: #fff;
 }
 
 /* INSTRUCTIONS BUTTON WITH AMBER GLOW */
@@ -1583,37 +1681,54 @@ input[type=number] { -moz-appearance: textfield; }
   <div class="sticky-wrap">
   <header class="main-header">
     <div class="header-left">
-      <a href="dashboard.html" style="text-decoration:none; color:inherit;" title="Operational Analytics Dashboard"><div class="header-meti">METI</div></a>
-      <div class="header-divider"></div>
-      <div class="header-info">
-        <div class="header-full-name">Micro Engineering</div>
-        <div class="header-dept">Labeling Operations · Internal System</div>
-      </div>
-    </div>
-    <div class="instructions-btn-wrap">
-      <span class="instructions-arabic-label">
-        لو متلغبط اقرا
-        <span class="arrow-down-anim">👇</span>
-      </span>
-      <a href="#"
-         class="instructions-btn-new"
-         id="instructionsBtn"
-         onclick="(function(){
-           var base = 'https://sites.google.com/meti.ai/training-material/home/welcome-to-meti/work-fundamentals-and-problems';
-           var anchor = '#h.l1sb0t4yvymp';
-           var w = window.open(base, '_blank');
-           setTimeout(function(){
-             try { w.location.href = base + anchor; } catch(e) {}
-           }, 1500);
-           return false;
-         })(); return false;">
-        <span class="btn-icon">📋</span>
-        <span class="btn-text-wrap">
-          <span class="btn-main-text">Form Filling Instructions</span>
-          <span class="btn-sub-text">Read Me First 🦉</span>
-        </span>
-        <span class="btn-arrow-big">➜</span>
+      <a href="dashboard.html" class="header-brand-link" title="Open Operations Dashboard">
+        <img src="logo.jpg" alt="MEEG Logo" class="brand-logo-img">
+        <div class="header-brand-text">
+          <div class="header-brand-row">
+            <span class="header-meti">MEEG</span>
+            <span class="header-badge-tag">Operations</span>
+          </div>
+          <div class="header-full-name">Micro Engineering Egypt</div>
+          <div class="header-dept">Labeling Operations · Task Tracker</div>
+        </div>
       </a>
+    </div>
+    <div class="header-right-actions">
+      <a href="dashboard.html" class="header-admin-pill" title="Open Management Dashboard">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="7" height="7" rx="1.5"></rect>
+          <rect x="14" y="3" width="7" height="7" rx="1.5"></rect>
+          <rect x="14" y="14" width="7" height="7" rx="1.5"></rect>
+          <rect x="3" y="14" width="7" height="7" rx="1.5"></rect>
+        </svg>
+        <span>Dashboard</span>
+        <span class="admin-badge">Admin</span>
+      </a>
+      <div class="instructions-btn-wrap">
+        <span class="instructions-arabic-label">
+          لو متلغبط اقرا
+          <span class="arrow-down-anim">👇</span>
+        </span>
+        <a href="#"
+           class="instructions-btn-new"
+           id="instructionsBtn"
+           onclick="(function(){
+             var base = 'https://sites.google.com/meti.ai/training-material/home/welcome-to-meti/work-fundamentals-and-problems';
+             var anchor = '#h.l1sb0t4yvymp';
+             var w = window.open(base, '_blank');
+             setTimeout(function(){
+               try { w.location.href = base + anchor; } catch(e) {}
+             }, 1500);
+             return false;
+           })(); return false;">
+          <span class="btn-icon">📋</span>
+          <span class="btn-text-wrap">
+            <span class="btn-main-text">Form Instructions</span>
+            <span class="btn-sub-text">Read Me First 🦉</span>
+          </span>
+          <span class="btn-arrow-big">➜</span>
+        </a>
+      </div>
     </div>
   </header>
 
