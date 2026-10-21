@@ -964,6 +964,7 @@
                 <th>Yubikey Email</th>
                 <th>QTC Name</th>
                 <th>Task ID</th>
+                <th>Task Link</th>
                 <th>Modality</th>
                 <th>Queue Name</th>
                 <th>Pass</th>
@@ -1118,6 +1119,7 @@
             <select id="newUserRole" style="padding:9px 12px; border:1.5px solid var(--border); border-radius:6px; font-size:0.85rem; background:#fff;">
               <option value="admin">ADMIN (Full Control + Manage Users + Edit/Delete Data)</option>
               <option value="sv">SV (View Tasks + Manage Queues & QTC)</option>
+              <option value="wla">WLA (Same as SV: View Tasks + Manage Queues & QTC)</option>
               <option value="qt">QT (View Tasks Only)</option>
             </select>
             <button class="btn-action" onclick="addNewUser()">Create User</button>
@@ -1388,7 +1390,7 @@
       if (role === "qt" && tabName !== "telemetry") {
         tabName = "telemetry";
       }
-      if (role === "sv" && tabName === "users") {
+      if ((role === "sv" || role === "wla") && tabName === "users") {
         tabName = "telemetry";
       }
 
@@ -1457,7 +1459,7 @@
         btnQueues.style.display = "inline-flex";
         btnQTC.style.display = "inline-flex";
         btnUsers.style.display = "inline-flex";
-      } else if (role === "sv") {
+      } else if (role === "sv" || role === "wla") {
         btnTelemetry.style.display = "inline-flex";
         btnQueues.style.display = "inline-flex";
         btnQTC.style.display = "inline-flex";
@@ -1475,7 +1477,7 @@
       // Switch to initial tab if requested and permitted
       if (role === "qt") {
         switchMainTab("telemetry");
-      } else if (role === "sv") {
+      } else if (role === "sv" || role === "wla") {
         if (initialTab === "queues" || initialTab === "admin") {
           switchMainTab("queues");
         } else if (initialTab === "qtc") {
@@ -1603,7 +1605,7 @@
       }
 
       var role = (_currentUser && _currentUser.role ? _currentUser.role : "qt").toLowerCase();
-      var canManage = (role === "admin" || role === "sv");
+      var canManage = (role === "admin" || role === "sv" || role === "wla");
 
       var html = "";
       list.forEach(function(q, idx) {
@@ -1759,7 +1761,7 @@
           + '<td style="font-weight:700; color:var(--primary-dark); font-size:0.88rem;">' + m.name + '</td>'
           + '<td><span style="color:var(--primary); font-weight:600;">' + (m.role || "QTC") + '</span></td>'
           + '<td style="color:var(--text-secondary); font-size:0.75rem;">' + m.created_at + '</td>'
-          + '<td style="text-align:center;"><button class="del-btn" onclick="deleteQTCFromDashboard(' + m.id + ')">🗑️ Delete</button></td>'
+          + '' + ((_currentUser && (_currentUser.role === "admin" || _currentUser.role === "sv" || _currentUser.role === "wla")) ? '<td style="text-align:center;"><button class="del-btn" onclick="deleteQTCFromDashboard(' + m.id + ')">🗑️ Delete</button></td>' : '<td style="text-align:center; color:var(--text-muted); font-size:0.75rem;">View Only</td>') + ''
           + '</tr>';
       });
       tbody.innerHTML = html;
@@ -1963,7 +1965,7 @@
       var sync = document.getElementById("syncStatus");
       sync.textContent = "Syncing with Turso...";
 
-      var sql = "SELECT id, timestamp, shift, unit, pc_no, labeler_name, national_id, yubikey_email, qtc_name, task_id, pass, modality, queue_name, object_count, stage, created_at FROM task_submissions ORDER BY id DESC LIMIT 5000;";
+      var sql = "SELECT id, timestamp, shift, unit, pc_no, labeler_name, national_id, yubikey_email, qtc_name, task_id, pass, modality, queue_name, object_count, stage, created_at, task_link FROM task_submissions ORDER BY id DESC LIMIT 5000;";
       tursoQuery(sql, [], function(err, res) {
         if (err) {
           sync.textContent = "Sync error: " + err.message;
@@ -1989,7 +1991,8 @@
             queue_name: r[12] ? String(r[12].value) : "",
             object_count: r[13] ? parseInt(r[13].value, 10) || 0 : 0,
             stage: r[14] ? String(r[14].value) : "",
-            created_at: r[15] ? String(r[15].value) : ""
+            created_at: r[15] ? String(r[15].value) : "",
+            task_link: r[16] ? String(r[16].value) : ""
           };
         });
 
@@ -2184,7 +2187,7 @@
         if (cStage !== "all" && r.stage.toLowerCase() !== cStage.toLowerCase()) return false;
 
         if (q) {
-          var combined = (r.labeler_name + " " + r.task_id + " " + r.pc_no + " " + r.national_id + " " + r.queue_name + " " + r.yubikey_email + " " + r.qtc_name).toLowerCase();
+          var combined = (r.labeler_name + " " + r.task_id + " " + (r.task_link || "") + " " + r.pc_no + " " + r.national_id + " " + r.queue_name + " " + r.yubikey_email + " " + r.qtc_name).toLowerCase();
           if (combined.indexOf(q) === -1) return false;
         }
 
@@ -2205,7 +2208,7 @@
         thAction.style.display = isAdmin ? "table-cell" : "none";
       }
 
-      var totalCols = isAdmin ? 16 : 15;
+      var totalCols = isAdmin ? 17 : 16;
 
       if (!_filteredSubmissions.length) {
         tbody.innerHTML = '<tr><td colspan="' + totalCols + '" style="text-align:center; padding:32px; color:var(--text-muted);">No records match the selected filters.</td></tr>';
@@ -2230,6 +2233,14 @@
             + '</td>'
           : '';
 
+        var taskLinkBtn = r.task_link
+          ? '<a href="' + r.task_link + '" target="_blank" rel="noopener noreferrer" class="btn-action secondary" style="padding:2px 8px; font-size:0.72rem; text-decoration:none; display:inline-flex; align-items:center; gap:4px; font-weight:700; white-space:nowrap; border-radius:5px;" title="' + r.task_link + '">🔗 Open</a>'
+          : '<span style="color:var(--text-muted); font-size:0.75rem;">—</span>';
+
+        var taskDisplayHtml = r.task_link
+          ? '<a href="' + r.task_link + '" target="_blank" rel="noopener noreferrer" style="text-decoration:none; color:inherit;" title="' + r.task_id + '"><code style="cursor:pointer; color:var(--primary); font-weight:700;">' + taskDisplay + ' ↗</code></a>'
+          : '<code title="' + r.task_id + '">' + taskDisplay + '</code>';
+
         html += '<tr>'
           + '<td style="font-weight:700; color:var(--primary-dark);">#' + r.id + '</td>'
           + '<td style="color:var(--text-secondary);">' + r.timestamp + '</td>'
@@ -2240,7 +2251,8 @@
           + '<td style="font-family:monospace; color:var(--text-secondary);">' + (r.national_id || "-") + '</td>'
           + '<td style="color:var(--text-secondary);">' + (r.yubikey_email || "-") + '</td>'
           + '<td style="font-weight:600; color:var(--primary);">' + (r.qtc_name || "-") + '</td>'
-          + '<td><code title="' + r.task_id + '">' + taskDisplay + '</code></td>'
+          + '<td>' + taskDisplayHtml + '</td>'
+          + '<td>' + taskLinkBtn + '</td>'
           + '<td>' + r.modality + '</td>'
           + '<td style="max-width:200px; overflow:hidden; text-overflow:ellipsis;" title="' + r.queue_name + '">' + r.queue_name + '</td>'
           + '<td>' + passBadge + '</td>'
@@ -2470,6 +2482,7 @@
         "Yubikey Email",
         "QTC Name",
         "Task ID",
+        "Task Link",
         "Pass",
         "Modality",
         "Queue Name",
@@ -2490,6 +2503,7 @@
           '"' + (r.yubikey_email || "").replace(/"/g, '""') + '"',
           '"' + (r.qtc_name || "").replace(/"/g, '""') + '"',
           '"' + (r.task_id || "").replace(/"/g, '""') + '"',
+          '"' + (r.task_link || "").replace(/"/g, '""') + '"',
           '"' + (r.pass || "").replace(/"/g, '""') + '"',
           '"' + (r.modality || "").replace(/"/g, '""') + '"',
           '"' + (r.queue_name || "").replace(/"/g, '""') + '"',
@@ -2546,6 +2560,8 @@
             roleBadge = '<span style="color:#b91c1c; background:#fee2e2; border:1px solid #fecaca; border-radius:6px; padding:2px 8px; font-size:0.75rem; font-weight:700;">ADMIN</span>';
           } else if (role === 'sv') {
             roleBadge = '<span style="color:#047857; background:#d1fae5; border:1px solid #a7f3d0; border-radius:6px; padding:2px 8px; font-size:0.75rem; font-weight:700;">SV</span>';
+          } else if (role === 'wla') {
+            roleBadge = '<span style="color:#6b21a8; background:#f3e8ff; border:1px solid #e9d5ff; border-radius:6px; padding:2px 8px; font-size:0.75rem; font-weight:700;">WLA</span>';
           } else if (role === 'qt') {
             roleBadge = '<span style="color:#1d4ed8; background:#dbeafe; border:1px solid #bfdbfe; border-radius:6px; padding:2px 8px; font-size:0.75rem; font-weight:700;">QT</span>';
           }
