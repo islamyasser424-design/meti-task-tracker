@@ -2332,7 +2332,7 @@
 
         <div class="form-group">
           <label class="form-label">Google Apps Script Mailer Webhook URL</label>
-          <input type="url" id="mailerWebhookUrl" class="form-input" style="font-family:monospace; font-size:0.8rem;" placeholder="https://script.google.com/macros/s/.../exec">
+          <input type="url" id="mailerWebhookUrl" class="form-input" style="font-family:monospace; font-size:0.8rem;" placeholder="https://script.google.com/macros/s/AKfycbwU6RQpM9OwOPfc6OVNts2x6mOpHMwGr6Px5T_HxN-h0grQsqVegw-MOYgvyXeTAtdbig/exec">
           <div style="font-size:0.73rem; color:var(--text-muted); margin-top:4px; line-height:1.4;">
             الملف البرمجي الجاهز للإرسال موجود في المشروع: <code style="color:var(--primary); font-weight:700;">scripts/google_apps_script_mailer.gs</code>. انشره كـ Web App وانسخ رابطه هنا.
           </div>
@@ -4596,7 +4596,13 @@
     // ============================================================
     // AUTOMATED EMAIL DISPATCHER ENGINE
     // ============================================================
-    var GAS_MAILER_URL = localStorage.getItem("meti_mailer_webhook") || "https://script.google.com/macros/s/AKfycbxa-Id35-ob1ZCgajX-NLKtz6xPLJVqBd20v7rXdlsoTmeP6nhfvl0of2U2j1RKo3A/exec";
+    var DEFAULT_GAS_MAILER_URL = "https://script.google.com/macros/s/AKfycbwU6RQpM9OwOPfc6OVNts2x6mOpHMwGr6Px5T_HxN-h0grQsqVegw-MOYgvyXeTAtdbig/exec";
+    var storedWebhook = localStorage.getItem("meti_mailer_webhook");
+    if (!storedWebhook || storedWebhook.indexOf("AKfycbxa-Id35") !== -1) {
+      localStorage.setItem("meti_mailer_webhook", DEFAULT_GAS_MAILER_URL);
+      storedWebhook = DEFAULT_GAS_MAILER_URL;
+    }
+    var GAS_MAILER_URL = storedWebhook;
 
     function dispatchResetEmail(toEmail, fullName, username, code) {
       if (!toEmail) return;
