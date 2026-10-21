@@ -765,35 +765,343 @@
       color: #fff;
       border-color: var(--primary);
     }
+  
+    /* ============================================================ */
+    /* UNIFIED SIDEBAR & WORKSPACE LAYOUT (EXECUTIVE DESIGN)        */
+    /* ============================================================ */
+    body {
+      margin: 0;
+      padding: 0;
+      overflow-x: hidden;
+    }
+    .app-layout {
+      display: flex;
+      min-height: 100vh;
+      width: 100%;
+      background: var(--bg);
+    }
+    .side-nav {
+      position: fixed;
+      inset: 0 auto 0 0;
+      width: 245px;
+      background: #ffffff;
+      border-right: 1.5px solid var(--border);
+      z-index: 200;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 2px 0 16px rgba(15, 23, 42, 0.04);
+      user-select: none;
+    }
+    .side-brand {
+      padding: 18px 16px 14px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border-bottom: 1px solid var(--border);
+      background: #ffffff;
+    }
+    .side-brand-logo {
+      width: 38px;
+      height: 38px;
+      border-radius: 9px;
+      overflow: hidden;
+      border: 1px solid rgba(13, 148, 136, 0.25);
+      flex-shrink: 0;
+      box-shadow: 0 4px 10px rgba(13, 148, 136, 0.18);
+    }
+    .side-brand-logo img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .side-brand-meta {
+      display: flex;
+      flex-direction: column;
+    }
+    .side-brand-title {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 1.15rem;
+      font-weight: 800;
+      color: var(--primary-dark);
+      letter-spacing: -0.5px;
+      line-height: 1.1;
+    }
+    .side-brand-tag {
+      font-size: 0.58rem;
+      font-weight: 800;
+      color: var(--primary);
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      margin-top: 2px;
+    }
+    .side-nav-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .side-section-heading {
+      font-size: 0.62rem;
+      font-weight: 800;
+      color: var(--text-muted);
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      padding: 10px 10px 4px;
+    }
+    .side-nav-btn {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      padding: 9px 12px;
+      border: none;
+      background: transparent;
+      border-radius: 9px;
+      color: var(--text-secondary);
+      font-size: 0.82rem;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.15s ease;
+      position: relative;
+    }
+    .side-nav-btn:hover {
+      background: #f1f5f9;
+      color: var(--primary-dark);
+    }
+    .side-nav-btn.active {
+      background: #e6fffa;
+      color: var(--primary);
+      font-weight: 700;
+    }
+    .side-nav-btn.active::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 6px;
+      bottom: 6px;
+      width: 3.5px;
+      background: var(--primary);
+      border-radius: 0 4px 4px 0;
+    }
+    .side-nav-icon {
+      font-size: 0.95rem;
+      width: 20px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+    .side-nav-label {
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .side-nav-badge {
+      background: var(--primary);
+      color: #fff;
+      font-size: 0.68rem;
+      font-weight: 700;
+      padding: 1px 7px;
+      border-radius: 10px;
+      line-height: 1.4;
+    }
+    .side-footer {
+      padding: 12px 14px;
+      border-top: 1px solid var(--border);
+      background: #f8fafc;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .side-user-card {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+    }
+    .side-user-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: var(--primary);
+      color: #fff;
+      font-weight: 700;
+      font-size: 0.85rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .side-user-info {
+      flex: 1;
+      min-width: 0;
+    }
+    .side-user-name {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--primary-dark);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .side-user-role {
+      font-size: 0.62rem;
+      font-weight: 700;
+      color: var(--primary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .side-footer-actions {
+      display: flex;
+      gap: 5px;
+    }
+    .side-action-btn {
+      flex: 1;
+      padding: 5px 3px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: #ffffff;
+      color: var(--text-secondary);
+      cursor: pointer;
+      text-align: center;
+      text-decoration: none;
+      transition: all 0.15s;
+    }
+    .side-action-btn:hover {
+      background: #f1f5f9;
+      color: var(--primary-dark);
+      border-color: var(--border-hover);
+    }
+    .main-workspace {
+      margin-left: 245px;
+      flex: 1;
+      min-width: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+    }
+    .workspace-top-bar {
+      position: sticky;
+      top: 0;
+      z-index: 90;
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .workspace-title-box {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .workspace-title {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 1.12rem;
+      font-weight: 800;
+      color: var(--primary-dark);
+      letter-spacing: -0.3px;
+    }
+    .workspace-subtitle {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      margin-top: 1px;
+    }
+    .workspace-top-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .workspace-sync-badge {
+      font-size: 0.72rem;
+      color: #059669;
+      background: #ecfdf5;
+      border: 1px solid #a7f3d0;
+      border-radius: 20px;
+      padding: 4px 11px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .workspace-action-btn {
+      padding: 6px 12px;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      background: #fff;
+      color: var(--text-secondary);
+      font-size: 0.76rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .workspace-action-btn:hover {
+      background: #f8fafc;
+      border-color: var(--primary);
+      color: var(--primary);
+    }
+    .workspace-content-body {
+      padding: 20px 24px;
+      flex: 1;
+    }
+    .mobile-toggle-btn {
+      display: none;
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 5px 9px;
+      font-size: 1.1rem;
+      cursor: pointer;
+    }
+    .badge-perm-tag {
+      display: inline-block;
+      padding: 2px 7px;
+      border-radius: 5px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      background: #eaeffb;
+      color: var(--primary-dark);
+      border: 1px solid var(--border);
+    }
+    @media (max-width: 1024px) {
+      .side-nav {
+        transform: translateX(-100%);
+        transition: transform 0.25s ease;
+      }
+      .side-nav.open {
+        transform: translateX(0);
+      }
+      .main-workspace {
+        margin-left: 0;
+      }
+      .mobile-toggle-btn {
+        display: inline-flex;
+      }
+      .workspace-top-bar {
+        padding: 10px 14px;
+      }
+      .workspace-content-body {
+        padding: 14px;
+      }
+    }
+
   </style>
 </head>
 <body>
-
-  <!-- Top Navbar -->
-  <header class="navbar">
-    <div class="nav-brand">
-      <div class="nav-logo-box" style="padding:0; overflow:hidden; border:1px solid rgba(255,255,255,0.25);">
-        <img src="logo.jpg" alt="MEEG" style="width:100%;height:100%;object-fit:cover;border-radius:7px;">
-      </div>
-      <span class="nav-title">MEEG Analytics & Operations Dashboard</span>
-    </div>
-    <div class="nav-actions" id="navActions" style="display:none;">
-      <div class="nav-user-badge" id="currentUserBadge">
-        <span>👤</span>
-        <span id="currentUserName">Admin</span>
-      </div>
-      <button class="nav-btn" onclick="openChangePasswordModal()" title="Change your login password">🔑 Change Password</button>
-      <a href="index.html" class="nav-btn">📝 Task Entry Form</a>
-      <button class="nav-btn" onclick="logout()">🚪 Logout</button>
-    </div>
-  </header>
 
   <!-- Login View -->
   <div class="login-wrapper" id="loginView">
     <div class="login-card">
       <img src="logo.jpg" alt="MEEG" style="width:72px;height:72px;border-radius:18px;margin:0 auto 16px;display:block;box-shadow:0 8px 24px rgba(13,148,136,0.3);border:1.5px solid rgba(13,148,136,0.25);object-fit:cover;">
       <h2 class="login-title">Dashboard Login</h2>
-      <p class="login-subtitle">Enter your authorized credentials to access live telemetry and admin controls</p>
+      <p class="login-subtitle">Enter your authorized credentials to access live telemetry and operations</p>
       
       <form onsubmit="handleLogin(event); return false;">
         <div class="form-group">
@@ -813,39 +1121,111 @@
     </div>
   </div>
 
-  <!-- Main Dashboard View Container -->
-  <main class="container" id="dashView" style="display:none;">
-    
-    <!-- Top Navigation Tabs Bar -->
-    <nav class="dash-tabs-bar">
-      <button class="dash-tab-btn active" id="tabBtnTelemetry" onclick="switchMainTab('telemetry')">
-        <span>📊</span>
-        <span>Task Telemetry</span>
-      </button>
-      <button class="dash-tab-btn" id="tabBtnQueues" onclick="switchMainTab('queues')">
-        <span>🗂️</span>
-        <span>Manage Queues</span>
-        <span class="dash-tab-badge" id="tabQueuesBadge">0</span>
-      </button>
-      <button class="dash-tab-btn" id="tabBtnQTC" onclick="switchMainTab('qtc')">
-        <span>👥</span>
-        <span>Manage QTC Names</span>
-        <span class="dash-tab-badge" id="tabQTCBadge">0</span>
-      </button>
-      <button class="dash-tab-btn" id="tabBtnUsers" onclick="switchMainTab('users')" style="display:none;">
-        <span>🔐</span>
-        <span>Manage Users</span>
-      </button>
-      <button class="dash-tab-btn" id="tabBtnAnalytics" onclick="switchMainTab('analytics')" style="display:none;">
-        <span>📈</span>
-        <span>Executive Intelligence</span>
-      </button>
-    </nav>
+  <!-- Main Dashboard App Layout -->
+  <div class="app-layout" id="dashView" style="display:none;">
 
-    <!-- ============================================================ -->
-    <!-- TAB 1: OPERATIONAL TELEMETRY & KPIS -->
-    <!-- ============================================================ -->
-    <div id="panelTelemetry">
+    <!-- Left Sidebar Navigation -->
+    <aside class="side-nav" id="mainSidebar">
+      <!-- Brand Card -->
+      <div class="side-brand">
+        <div class="side-brand-logo">
+          <img src="logo.jpg" alt="MEEG">
+        </div>
+        <div class="side-brand-meta">
+          <span class="side-brand-title">MEEG</span>
+          <span class="side-brand-tag">WORKSPACE</span>
+        </div>
+      </div>
+
+      <!-- Navigation Links Container -->
+      <div class="side-nav-content">
+        <!-- Section: OPERATIONS -->
+        <div class="side-section-heading">OPERATIONS</div>
+        <button class="side-nav-btn active" id="navBtn_tasks" onclick="switchMainTab('tasks')">
+          <span class="side-nav-icon">📋</span>
+          <span class="side-nav-label">Tasks</span>
+        </button>
+        <button class="side-nav-btn" id="navBtn_queues" onclick="switchMainTab('queues')">
+          <span class="side-nav-icon">🗂️</span>
+          <span class="side-nav-label">Manage QA</span>
+          <span class="side-nav-badge" id="tabQueuesBadge">0</span>
+        </button>
+        <button class="side-nav-btn" id="navBtn_qtc" onclick="switchMainTab('qtc')">
+          <span class="side-nav-icon">👥</span>
+          <span class="side-nav-label">Manage QTC</span>
+          <span class="side-nav-badge" id="tabQTCBadge">0</span>
+        </button>
+        <button class="side-nav-btn" id="navBtn_users" onclick="switchMainTab('users')" style="display:none;">
+          <span class="side-nav-icon">🔐</span>
+          <span class="side-nav-label">Manage Users</span>
+        </button>
+
+        <!-- Section: EXECUTIVE ANALYTICS -->
+        <div class="side-section-heading">EXECUTIVE ANALYTICS</div>
+        <button class="side-nav-btn" id="navBtn_overview" onclick="switchMainTab('overview')">
+          <span class="side-nav-icon">▦</span>
+          <span class="side-nav-label">Overview</span>
+        </button>
+        <button class="side-nav-btn" id="navBtn_analysis" onclick="switchMainTab('analysis')">
+          <span class="side-nav-icon">◈</span>
+          <span class="side-nav-label">Analysis</span>
+        </button>
+        <button class="side-nav-btn" id="navBtn_queues_analysis" onclick="switchMainTab('queues_analysis')">
+          <span class="side-nav-icon">☷</span>
+          <span class="side-nav-label">Queues Analysis</span>
+        </button>
+        <button class="side-nav-btn" id="navBtn_performance" onclick="switchMainTab('performance')">
+          <span class="side-nav-icon">▤</span>
+          <span class="side-nav-label">Performance per Labelers</span>
+        </button>
+        <button class="side-nav-btn" id="navBtn_qtcfloor" onclick="switchMainTab('qtcfloor')">
+          <span class="side-nav-icon">🏢</span>
+          <span class="side-nav-label">Performance per QTC & Floor</span>
+        </button>
+        <button class="side-nav-btn" id="navBtn_daily" onclick="switchMainTab('daily')">
+          <span class="side-nav-icon">▦</span>
+          <span class="side-nav-label">Daily Report</span>
+        </button>
+      </div>
+
+      <!-- Footer User Card & Actions -->
+      <div class="side-footer">
+        <div class="side-user-card">
+          <div class="side-user-avatar" id="sidebarAvatar">A</div>
+          <div class="side-user-info">
+            <div class="side-user-name" id="sidebarName">Admin</div>
+            <div class="side-user-role" id="sidebarRole">ADMIN</div>
+          </div>
+        </div>
+        <div class="side-footer-actions">
+          <button class="side-action-btn" onclick="openChangePasswordModal()" title="Change password">🔑 Password</button>
+          <a href="index.html" class="side-action-btn" title="Open task entry form">📝 Form</a>
+          <button class="side-action-btn" onclick="logout()" title="Logout">🚪 Logout</button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Workspace Area -->
+    <div class="main-workspace" id="mainWorkspace">
+      <!-- Top Bar of Workspace -->
+      <header class="workspace-top-bar">
+        <div class="workspace-title-box">
+          <button class="mobile-toggle-btn" onclick="toggleMobileSidebar()">☰</button>
+          <div>
+            <h1 class="workspace-title" id="workspaceTitle">📋 Tasks Telemetry</h1>
+            <p class="workspace-subtitle" id="workspaceSubtitle">Real-time task submissions, QA verification logs & full database search</p>
+          </div>
+        </div>
+        <div class="workspace-top-actions">
+          <span class="workspace-sync-badge" id="liveSyncStatus">● Live Edge Synced</span>
+          <button class="workspace-action-btn" onclick="refreshCurrentWorkspace()">🔄 Refresh</button>
+          <a href="index.html" class="workspace-action-btn" style="text-decoration:none;">📝 Task Form</a>
+        </div>
+      </header>
+
+      <!-- Workspace Content Body -->
+      <div class="workspace-content-body">
+        <div id="panelTelemetry">
 
       <!-- Filters & Actions Card -->
       <section class="filter-card">
@@ -1231,11 +1611,12 @@
           <table>
             <thead>
               <tr>
-                <th style="width:50px;">#</th>
+                <th style="width:45px;">#</th>
                 <th>Username</th>
                 <th>Full Name</th>
                 <th>Role</th>
-                <th style="text-align:center; width:100px;">Action</th>
+                <th>Allowed Workspace Pages</th>
+                <th style="text-align:center; width:170px;">Actions</th>
               </tr>
             </thead>
             <tbody id="usersTableBody">
@@ -1249,79 +1630,91 @@
     <!-- ============================================================ -->
     <!-- TAB 5: EXECUTIVE INTELLIGENCE & DEEP ANALYTICS (ADMIN ONLY) -->
     <!-- ============================================================ -->
-    <div id="panelAnalytics" style="display:none;">
-      <div style="background:#fff; border-radius:12px; border:1px solid var(--border); box-shadow:var(--shadow-sm); overflow:hidden; margin-bottom:24px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 18px; background:#f8fafc; border-bottom:1px solid var(--border); flex-wrap:wrap; gap:10px;">
-          <div style="display:flex; align-items:center; gap:10px;">
-            <span style="font-size:1.3rem;">📈</span>
-            <div>
-              <strong style="color:var(--primary-dark); font-size:0.95rem;">Executive Intelligence & Performance Workspace</strong>
-              <div style="color:var(--text-muted); font-size:0.75rem;">Deep analytics, cross-modality matrices, queue telemetry & floor reports powered directly by Turso DB</div>
-            </div>
-          </div>
-          <div style="display:flex; gap:8px;">
-            <button class="btn-action" onclick="reloadAnalyticsFrame()" style="padding:6px 12px; font-size:0.8rem;">🔄 Reload View</button>
-            <a href="analytics.html" target="_blank" class="btn-action" style="padding:6px 12px; font-size:0.8rem; text-decoration:none; display:inline-flex; align-items:center; gap:4px;">↗️ Fullscreen Mode</a>
+    <div id="panelAnalytics" style="display:none; width:100%; height:100%;">
+          <div style="background:#fff; border-radius:12px; border:1px solid var(--border); box-shadow:var(--shadow-sm); overflow:hidden;">
+            <iframe id="analyticsFrame" src="about:blank" style="width:100%; height:calc(100vh - 120px); min-height:850px; border:none; display:block;" title="Executive Analytics"></iframe>
           </div>
         </div>
-        <div style="position:relative; width:100%; height:calc(100vh - 170px); min-height:800px; background:#f1f5f9;">
-          <iframe id="analyticsFrame" src="about:blank" style="width:100%; height:100%; border:none; display:block;" title="Executive Analytics"></iframe>
-        </div>
-      </div>
-    </div>
 
-  <!-- Edit Task Modal (Admin Only) -->
-  <div class="modal-overlay" id="modalEditTask" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.6); backdrop-filter:blur(4px); z-index:9999; align-items:center; justify-content:center; padding:16px;" onclick="if(event.target===this)closeEditTaskModal()">
-    <div style="background:#fff; border-radius:12px; width:100%; max-width:540px; box-shadow:0 20px 40px rgba(0,0,0,0.2); overflow:hidden; border:1px solid var(--border);">
+      </div> <!-- end workspace-content-body -->
+    </div> <!-- end main-workspace -->
+  </div> <!-- end app-layout -->
+
+  <!-- Modal: Set User Page Permissions -->
+  <div class="modal-overlay" id="modalUserPermissions" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.6); backdrop-filter:blur(4px); z-index:9999; align-items:center; justify-content:center; padding:16px;" onclick="if(event.target===this)closePermissionsModal()">
+    <div style="background:#fff; border-radius:14px; width:100%; max-width:540px; box-shadow:0 20px 40px rgba(0,0,0,0.2); overflow:hidden; border:1px solid var(--border);">
       <div style="display:flex; justify-content:space-between; align-items:center; padding:14px 20px; background:#f8fafc; border-bottom:1px solid var(--border);">
-        <h3 style="font-size:1rem; color:var(--primary-dark); font-weight:700;">✏️ Edit Task Submission <span id="editTaskModalId" style="color:var(--primary);">#</span></h3>
-        <button type="button" onclick="closeEditTaskModal()" style="background:none; border:none; font-size:1.2rem; cursor:pointer; color:var(--text-secondary);">&times;</button>
+        <div>
+          <h3 style="font-size:1rem; color:var(--primary-dark); font-weight:700;">⚙️ Custom Page Permissions</h3>
+          <div style="font-size:0.75rem; color:var(--text-muted);" id="permModalSubtitle">Configuring for user: Admin</div>
+        </div>
+        <button type="button" onclick="closePermissionsModal()" style="background:none; border:none; font-size:1.3rem; cursor:pointer; color:var(--text-secondary);">&times;</button>
       </div>
-      <div style="padding:20px; display:grid; grid-template-columns:1fr 1fr; gap:14px;">
-        <div>
-          <label style="font-size:0.75rem; font-weight:700; color:var(--text-secondary); display:block; margin-bottom:4px;">Labeler Name</label>
-          <input type="text" id="editTaskLabeler" style="width:100%; padding:8px 12px; border:1.5px solid var(--border); border-radius:6px; font-size:0.85rem;">
+
+      <div style="padding:18px 20px; max-height:480px; overflow-y:auto;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
+          <span style="font-size:0.8rem; font-weight:700; color:var(--primary-dark);">Select Allowed Pages:</span>
+          <div style="display:flex; gap:6px;">
+            <button type="button" onclick="setAllPermChecks(true)" style="background:#eaeffb; border:1px solid var(--border); border-radius:6px; padding:3px 8px; font-size:0.7rem; font-weight:600; cursor:pointer;">Select All</button>
+            <button type="button" onclick="setAllPermChecks(false)" style="background:#f1f5f9; border:1px solid var(--border); border-radius:6px; padding:3px 8px; font-size:0.7rem; font-weight:600; cursor:pointer;">Deselect All</button>
+          </div>
         </div>
-        <div>
-          <label style="font-size:0.75rem; font-weight:700; color:var(--text-secondary); display:block; margin-bottom:4px;">PC No</label>
-          <input type="text" id="editTaskPcNo" style="width:100%; padding:8px 12px; border:1.5px solid var(--border); border-radius:6px; font-size:0.85rem;">
+
+        <div style="font-size:0.7rem; font-weight:800; color:var(--text-muted); letter-spacing:1px; margin:10px 0 6px;">OPERATIONS PAGES</div>
+        <div style="display:grid; grid-template-columns:1fr; gap:8px; margin-bottom:16px;">
+          <label style="display:flex; align-items:center; gap:10px; padding:8px 12px; background:#f8fafc; border:1px solid var(--border); border-radius:8px; font-size:0.82rem; cursor:pointer;">
+            <input type="checkbox" id="permCheck_tasks" value="tasks" style="accent-color:var(--primary); width:16px; height:16px;">
+            <span>📋 <strong>Tasks</strong> (Task Telemetry, Live Table, Search & Export)</span>
+          </label>
+          <label style="display:flex; align-items:center; gap:10px; padding:8px 12px; background:#f8fafc; border:1px solid var(--border); border-radius:8px; font-size:0.82rem; cursor:pointer;">
+            <input type="checkbox" id="permCheck_queues" value="queues" style="accent-color:var(--primary); width:16px; height:16px;">
+            <span>🗂️ <strong>Manage QA</strong> (Add & Manage Queues)</span>
+          </label>
+          <label style="display:flex; align-items:center; gap:10px; padding:8px 12px; background:#f8fafc; border:1px solid var(--border); border-radius:8px; font-size:0.82rem; cursor:pointer;">
+            <input type="checkbox" id="permCheck_qtc" value="qtc" style="accent-color:var(--primary); width:16px; height:16px;">
+            <span>👥 <strong>Manage QTC</strong> (Add & Manage QTC Supervisors by shift)</span>
+          </label>
+          <label style="display:flex; align-items:center; gap:10px; padding:8px 12px; background:#f8fafc; border:1px solid var(--border); border-radius:8px; font-size:0.82rem; cursor:pointer;">
+            <input type="checkbox" id="permCheck_users" value="users" style="accent-color:var(--primary); width:16px; height:16px;">
+            <span>🔐 <strong>Manage Users</strong> (Users & Permissions Control - Admin only)</span>
+          </label>
         </div>
-        <div>
-          <label style="font-size:0.75rem; font-weight:700; color:var(--text-secondary); display:block; margin-bottom:4px;">Pass (FP / QA)</label>
-          <select id="editTaskPass" style="width:100%; padding:8px 12px; border:1.5px solid var(--border); border-radius:6px; font-size:0.85rem; background:#fff;">
-            <option value="FP">FP</option>
-            <option value="QA">QA</option>
-          </select>
-        </div>
-        <div>
-          <label style="font-size:0.75rem; font-weight:700; color:var(--text-secondary); display:block; margin-bottom:4px;">Object Count</label>
-          <input type="number" id="editTaskObjects" min="0" style="width:100%; padding:8px 12px; border:1.5px solid var(--border); border-radius:6px; font-size:0.85rem;">
-        </div>
-        <div style="grid-column: 1 / -1;">
-          <label style="font-size:0.75rem; font-weight:700; color:var(--text-secondary); display:block; margin-bottom:4px;">Queue Name</label>
-          <input type="text" id="editTaskQueue" style="width:100%; padding:8px 12px; border:1.5px solid var(--border); border-radius:6px; font-size:0.85rem;">
-        </div>
-        <div>
-          <label style="font-size:0.75rem; font-weight:700; color:var(--text-secondary); display:block; margin-bottom:4px;">Modality</label>
-          <select id="editTaskModality" style="width:100%; padding:8px 12px; border:1.5px solid var(--border); border-radius:6px; font-size:0.85rem; background:#fff;">
-            <option value="Lidar">Lidar</option>
-            <option value="Lane Line">Lane Line</option>
-            <option value="Relabeling">Relabeling</option>
-          </select>
-        </div>
-        <div>
-          <label style="font-size:0.75rem; font-weight:700; color:var(--text-secondary); display:block; margin-bottom:4px;">Stage</label>
-          <input type="text" id="editTaskStage" style="width:100%; padding:8px 12px; border:1.5px solid var(--border); border-radius:6px; font-size:0.85rem;">
+
+        <div style="font-size:0.7rem; font-weight:800; color:var(--text-muted); letter-spacing:1px; margin:10px 0 6px;">EXECUTIVE ANALYTICS PAGES</div>
+        <div style="display:grid; grid-template-columns:1fr; gap:8px;">
+          <label style="display:flex; align-items:center; gap:10px; padding:8px 12px; background:#f8fafc; border:1px solid var(--border); border-radius:8px; font-size:0.82rem; cursor:pointer;">
+            <input type="checkbox" id="permCheck_overview" value="overview" style="accent-color:var(--primary); width:16px; height:16px;">
+            <span>▦ <strong>Overview</strong> (Executive KPI cards, targets, sparklines)</span>
+          </label>
+          <label style="display:flex; align-items:center; gap:10px; padding:8px 12px; background:#f8fafc; border:1px solid var(--border); border-radius:8px; font-size:0.82rem; cursor:pointer;">
+            <input type="checkbox" id="permCheck_analysis" value="analysis" style="accent-color:var(--primary); width:16px; height:16px;">
+            <span>◈ <strong>Analysis</strong> (Modality analysis, category breakdown)</span>
+          </label>
+          <label style="display:flex; align-items:center; gap:10px; padding:8px 12px; background:#f8fafc; border:1px solid var(--border); border-radius:8px; font-size:0.82rem; cursor:pointer;">
+            <input type="checkbox" id="permCheck_queues_analysis" value="queues_analysis" style="accent-color:var(--primary); width:16px; height:16px;">
+            <span>☷ <strong>Queues Analysis</strong> (Deep queue breakdown across shifts & rooms)</span>
+          </label>
+          <label style="display:flex; align-items:center; gap:10px; padding:8px 12px; background:#f8fafc; border:1px solid var(--border); border-radius:8px; font-size:0.82rem; cursor:pointer;">
+            <input type="checkbox" id="permCheck_performance" value="performance" style="accent-color:var(--primary); width:16px; height:16px;">
+            <span>▤ <strong>Performance per Labelers</strong> (Productivity ranking & metrics)</span>
+          </label>
+          <label style="display:flex; align-items:center; gap:10px; padding:8px 12px; background:#f8fafc; border:1px solid var(--border); border-radius:8px; font-size:0.82rem; cursor:pointer;">
+            <input type="checkbox" id="permCheck_qtcfloor" value="qtcfloor" style="accent-color:var(--primary); width:16px; height:16px;">
+            <span>🏢 <strong>Performance per QTC & Floor</strong> (Room and supervisor metrics)</span>
+          </label>
+          <label style="display:flex; align-items:center; gap:10px; padding:8px 12px; background:#f8fafc; border:1px solid var(--border); border-radius:8px; font-size:0.82rem; cursor:pointer;">
+            <input type="checkbox" id="permCheck_daily" value="daily" style="accent-color:var(--primary); width:16px; height:16px;">
+            <span>▦ <strong>Daily Report</strong> (Daily output, trends & period comparison)</span>
+          </label>
         </div>
       </div>
-      <div style="display:flex; justify-content:flex-end; gap:10px; padding:14px 20px; background:#f8fafc; border-top:1px solid var(--border);">
-        <button type="button" class="btn-action secondary" onclick="closeEditTaskModal()">Cancel</button>
-        <button type="button" class="btn-action" id="btnSaveTaskEdit" onclick="saveTaskEdit()">💾 Save Changes</button>
+
+      <div style="padding:12px 20px; background:#f8fafc; border-top:1px solid var(--border); display:flex; justify-content:flex-end; gap:10px;">
+        <button type="button" onclick="closePermissionsModal()" style="padding:8px 16px; border:1px solid var(--border); border-radius:8px; background:#fff; font-size:0.85rem; font-weight:600; cursor:pointer;">Cancel</button>
+        <button type="button" onclick="saveUserPermissions()" style="padding:8px 20px; border:none; border-radius:8px; background:var(--primary); color:#fff; font-size:0.85rem; font-weight:700; cursor:pointer;">💾 Save Permissions</button>
       </div>
     </div>
   </div>
-
-  </main>
 
   <!-- ============================================================ -->
   <!-- ADVANCED DATE FILTER MODAL -->
@@ -1585,58 +1978,134 @@
     }
 
     // ============================================================
+    // APPLICATION PAGES & PERMISSIONS CONFIGURATION
+    // ============================================================
+    var PAGE_KEYS = [
+      { key: "tasks", label: "Tasks", title: "📋 Operational Tasks & Telemetry", sub: "Real-time task submissions, QA verification logs & full database search" },
+      { key: "queues", label: "Manage QA", title: "🗂️ Manage Queues (QA)", sub: "Add new queues or manage active ones in Turso database" },
+      { key: "qtc", label: "Manage QTC", title: "👥 Manage QTC Members", sub: "Add new QTC members or remove existing ones by shift" },
+      { key: "users", label: "Manage Users", title: "🔐 Manage Users & Permissions", sub: "Create accounts, set passwords, and customize page visibility per user", adminOnly: true },
+      { key: "overview", label: "Overview", title: "▦ Executive Overview", sub: "High-level KPIs, sparklines, categories, and submission targets", isAnalytics: true, hash: "#dashboard" },
+      { key: "analysis", label: "Analysis", title: "◈ Modality & Attribute Analysis", sub: "Deep dive across modalities, pass rates, and attribute metrics", isAnalytics: true, hash: "#analysis-overview" },
+      { key: "queues_analysis", label: "Queues Analysis", title: "☷ Queues Analysis", sub: "Submission volume, shifts, floors, and QTC distribution per queue", isAnalytics: true, hash: "#queues-analysis" },
+      { key: "performance", label: "Performance per Labelers", title: "▤ Performance per Labelers", sub: "Labeler productivity, ranking, task counts, and velocity", isAnalytics: true, hash: "#performance-labelers" },
+      { key: "qtcfloor", label: "Performance per QTC & Floor", title: "🏢 Performance per QTC & Floor", sub: "Throughput and active shifts broken down by QC & Floor rooms", isAnalytics: true, hash: "#performance-qtc-floor" },
+      { key: "daily", label: "Daily Report", title: "▦ Daily Performance Report", sub: "Daily submission breakdowns, weekly trends, and period comparisons", isAnalytics: true, hash: "#daily-report" }
+    ];
+
+    function getUserAllowedPages(user) {
+      if (!user) return ["tasks"];
+      if (user.allowed_pages && typeof user.allowed_pages === "string" && user.allowed_pages.trim()) {
+        return user.allowed_pages.split(",").map(function(s){ return s.trim().toLowerCase(); }).filter(Boolean);
+      }
+      var role = (user.role || "qt").toLowerCase();
+      if (role === "admin") {
+        return ["tasks", "queues", "qtc", "users", "overview", "analysis", "queues_analysis", "performance", "qtcfloor", "daily"];
+      }
+      if (role === "sv" || role === "wla") {
+        return ["tasks", "queues", "qtc", "overview", "analysis", "queues_analysis", "performance", "qtcfloor", "daily"];
+      }
+      return ["tasks"];
+    }
+
+    function isPageAllowed(key) {
+      if (!_currentUser) return false;
+      var role = (_currentUser.role || "qt").toLowerCase();
+      if (key === "users" && role !== "admin") return false;
+      var allowed = getUserAllowedPages(_currentUser);
+      return allowed.indexOf(key) > -1;
+    }
+
+    function applyUserPermissions() {
+      if (!_currentUser) return;
+      PAGE_KEYS.forEach(function(p) {
+        var btn = document.getElementById("navBtn_" + p.key);
+        if (btn) {
+          btn.style.display = isPageAllowed(p.key) ? "flex" : "none";
+        }
+      });
+    }
+
+    // ============================================================
     // TAB SWITCHER
     // ============================================================
     function switchMainTab(tabName) {
-      var role = (_currentUser && _currentUser.role ? _currentUser.role : "qt").toLowerCase();
-      if (role === "qt" && tabName !== "telemetry") {
-        tabName = "telemetry";
-      }
-      if ((role === "sv" || role === "wla") && (tabName === "users" || tabName === "analytics")) {
-        tabName = "telemetry";
-      }
-      if (tabName === "analytics" && role !== "admin") {
-        tabName = "telemetry";
+      if (tabName === "telemetry") tabName = "tasks";
+      if (!isPageAllowed(tabName)) {
+        var first = PAGE_KEYS.find(function(p) { return isPageAllowed(p.key); });
+        tabName = first ? first.key : "tasks";
       }
 
       _activeTab = tabName;
-      document.getElementById("panelTelemetry").style.display = (tabName === "telemetry") ? "block" : "none";
+      var cfg = PAGE_KEYS.find(function(p) { return p.key === tabName; }) || PAGE_KEYS[0];
+
+      // Update active state in sidebar buttons
+      PAGE_KEYS.forEach(function(p) {
+        var btn = document.getElementById("navBtn_" + p.key);
+        if (btn) btn.classList.toggle("active", p.key === tabName);
+      });
+
+      // Update workspace title and subtitle
+      var tEl = document.getElementById("workspaceTitle");
+      if (tEl) tEl.textContent = cfg.title;
+      var sEl = document.getElementById("workspaceSubtitle");
+      if (sEl) sEl.textContent = cfg.sub;
+
+      // Show/hide workspace panels
+      document.getElementById("panelTelemetry").style.display = (tabName === "tasks") ? "block" : "none";
       document.getElementById("panelQueues").style.display = (tabName === "queues") ? "block" : "none";
       document.getElementById("panelQTC").style.display = (tabName === "qtc") ? "block" : "none";
       document.getElementById("panelUsers").style.display = (tabName === "users") ? "block" : "none";
-      var panelAnalytics = document.getElementById("panelAnalytics");
-      if (panelAnalytics) panelAnalytics.style.display = (tabName === "analytics") ? "block" : "none";
-
-      document.getElementById("tabBtnTelemetry").classList.toggle("active", tabName === "telemetry");
-      document.getElementById("tabBtnQueues").classList.toggle("active", tabName === "queues");
-      document.getElementById("tabBtnQTC").classList.toggle("active", tabName === "qtc");
-      document.getElementById("tabBtnUsers").classList.toggle("active", tabName === "users");
-      var btnAnalytics = document.getElementById("tabBtnAnalytics");
-      if (btnAnalytics) btnAnalytics.classList.toggle("active", tabName === "analytics");
+      var pAna = document.getElementById("panelAnalytics");
+      if (pAna) pAna.style.display = cfg.isAnalytics ? "block" : "none";
 
       if (tabName === "queues") loadLiveQueuesAdmin();
       if (tabName === "qtc") loadLiveQTCAdmin();
-      if (tabName === "users" && role === "admin") loadUsersList();
-      if (tabName === "analytics" && role === "admin") {
+      if (tabName === "users" && (_currentUser && _currentUser.role === "admin")) loadUsersList();
+
+      if (cfg.isAnalytics) {
         var frame = document.getElementById("analyticsFrame");
-        if (frame && (frame.src === "about:blank" || !frame.src || frame.src.endsWith("about:blank"))) {
-          frame.src = "analytics.html";
+        var targetSrc = "analytics.html?embedded=1" + (cfg.hash || "#dashboard");
+        if (!frame.src || frame.src === "about:blank" || !frame.src.includes("analytics.html")) {
+          frame.src = targetSrc;
+        } else {
+          try {
+            if (frame.contentWindow) frame.contentWindow.location.hash = (cfg.hash || "#dashboard");
+          } catch(e) {
+            frame.src = targetSrc;
+          }
         }
       }
     }
 
+    function refreshCurrentWorkspace() {
+      if (_activeTab === "tasks") fetchLiveData();
+      else if (_activeTab === "queues") loadLiveQueuesAdmin();
+      else if (_activeTab === "qtc") loadLiveQTCAdmin();
+      else if (_activeTab === "users") loadUsersList();
+      else reloadAnalyticsFrame();
+    }
+
     function reloadAnalyticsFrame() {
       var frame = document.getElementById("analyticsFrame");
-      if (frame) frame.src = "analytics.html?_t=" + Date.now();
+      if (frame) {
+        var cfg = PAGE_KEYS.find(function(p) { return p.key === _activeTab; });
+        var h = (cfg && cfg.hash) ? cfg.hash : "#dashboard";
+        frame.src = "analytics.html?embedded=1&_t=" + Date.now() + h;
+      }
+    }
+
+    function toggleMobileSidebar() {
+      var sb = document.getElementById("mainSidebar");
+      if (sb) sb.classList.toggle("open");
     }
 
     // ============================================================
     // AUTHENTICATION
     // ============================================================
     function initAuth() {
-      // Check URL tab parameter
       var params = new URLSearchParams(window.location.search);
-      var targetTab = params.get("tab") || window.location.hash.replace("#", "");
+      var targetTab = params.get("tab") || window.location.hash.replace("#", "") || "tasks";
 
       try {
         var saved = sessionStorage.getItem("meti_dash_user");
@@ -1653,75 +2122,34 @@
     function showLogin() {
       document.getElementById("loginView").style.display = "flex";
       document.getElementById("dashView").style.display = "none";
-      document.getElementById("navActions").style.display = "none";
     }
 
     function showDashboard(initialTab) {
       document.getElementById("loginView").style.display = "none";
-      document.getElementById("dashView").style.display = "block";
-      document.getElementById("navActions").style.display = "flex";
+      document.getElementById("dashView").style.display = "flex";
 
       var role = (_currentUser && _currentUser.role ? _currentUser.role : "qt").toLowerCase();
-      document.getElementById("currentUserName").textContent = _currentUser.full_name + " (" + role.toUpperCase() + ")";
+      var uName = _currentUser.full_name || _currentUser.username || "User";
+
+      var sName = document.getElementById("sidebarName");
+      if (sName) sName.textContent = uName;
+      var sRole = document.getElementById("sidebarRole");
+      if (sRole) sRole.textContent = role.toUpperCase();
+      var sAv = document.getElementById("sidebarAvatar");
+      if (sAv) sAv.textContent = (uName.charAt(0) || "U").toUpperCase();
 
       var thAction = document.getElementById("thTaskAction");
       if (thAction) {
         thAction.style.display = (role === "admin") ? "table-cell" : "none";
       }
 
-      var btnTelemetry = document.getElementById("tabBtnTelemetry");
-      var btnQueues = document.getElementById("tabBtnQueues");
-      var btnQTC = document.getElementById("tabBtnQTC");
-      var btnUsers = document.getElementById("tabBtnUsers");
-      var btnAnalytics = document.getElementById("tabBtnAnalytics");
-
-      if (role === "admin") {
-        btnTelemetry.style.display = "inline-flex";
-        btnQueues.style.display = "inline-flex";
-        btnQTC.style.display = "inline-flex";
-        btnUsers.style.display = "inline-flex";
-        if (btnAnalytics) btnAnalytics.style.display = "inline-flex";
-      } else if (role === "sv" || role === "wla") {
-        btnTelemetry.style.display = "inline-flex";
-        btnQueues.style.display = "inline-flex";
-        btnQTC.style.display = "inline-flex";
-        btnUsers.style.display = "none";
-        if (btnAnalytics) btnAnalytics.style.display = "none";
-      } else { // qt
-        btnTelemetry.style.display = "inline-flex";
-        btnQueues.style.display = "none";
-        btnQTC.style.display = "none";
-        btnUsers.style.display = "none";
-        if (btnAnalytics) btnAnalytics.style.display = "none";
-      }
-
+      applyUserPermissions();
       loadDropdownMeta();
       fetchLiveData();
 
-      // Switch to initial tab if requested and permitted
-      if (role === "qt") {
-        switchMainTab("telemetry");
-      } else if (role === "sv" || role === "wla") {
-        if (initialTab === "queues" || initialTab === "admin") {
-          switchMainTab("queues");
-        } else if (initialTab === "qtc") {
-          switchMainTab("qtc");
-        } else {
-          switchMainTab("telemetry");
-        }
-      } else { // admin
-        if (initialTab === "queues" || initialTab === "admin") {
-          switchMainTab("queues");
-        } else if (initialTab === "qtc") {
-          switchMainTab("qtc");
-        } else if (initialTab === "users") {
-          switchMainTab("users");
-        } else if (initialTab === "analytics") {
-          switchMainTab("analytics");
-        } else {
-          switchMainTab("telemetry");
-        }
-      }
+      var target = initialTab || "tasks";
+      if (target === "telemetry") target = "tasks";
+      switchMainTab(target);
     }
 
     function toggleLoginPassword() {
@@ -1747,7 +2175,7 @@
       btn.textContent = "Verifying...";
       errEl.textContent = "";
 
-      var sql = "SELECT id, username, full_name, role FROM dashboard_users WHERE LOWER(TRIM(username)) = LOWER(TRIM(?)) AND TRIM(password) = TRIM(?) LIMIT 1;";
+      var sql = "SELECT id, username, full_name, role, allowed_pages FROM dashboard_users WHERE LOWER(TRIM(username)) = LOWER(TRIM(?)) AND TRIM(password) = TRIM(?) LIMIT 1;";
       tursoQuery(sql, [u, p], function(err, result) {
         btn.disabled = false;
         btn.textContent = "Sign In to Dashboard";
@@ -1769,7 +2197,8 @@
             id: row[0].value,
             username: row[1].value,
             full_name: row[2].value,
-            role: row[3].value
+            role: row[3].value,
+            allowed_pages: row[4] ? String(row[4].value) : ""
           };
           sessionStorage.setItem("meti_dash_user", JSON.stringify(_currentUser));
 
@@ -2872,30 +3301,49 @@
     // ============================================================
     // USER MANAGEMENT
     // ============================================================
+    var _usersCache = [];
+    var _editingPermissionsUserId = null;
+
     function loadUsersList() {
       var tbody = document.getElementById("usersTableBody");
-      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:14px; color:var(--text-muted);">Loading users...</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:14px; color:var(--text-muted);">Loading users...</td></tr>';
 
-      tursoQuery("SELECT id, username, full_name, role, created_at FROM dashboard_users ORDER BY id ASC;", [], function(err, res) {
+      tursoQuery("SELECT id, username, full_name, role, allowed_pages, created_at FROM dashboard_users ORDER BY id ASC;", [], function(err, res) {
         if (err) {
-          tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:14px; color:var(--error);">Failed: ' + err.message + '</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:14px; color:var(--error);">Failed: ' + err.message + '</td></tr>';
           return;
         }
 
         var rows = res ? res.rows : [];
         if (!rows.length) {
-          tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:14px; color:var(--text-muted);">No users found.</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:14px; color:var(--text-muted);">No users found.</td></tr>';
           return;
         }
 
+        _usersCache = rows.map(function(r) {
+          return {
+            id: r[0] ? r[0].value : "",
+            username: r[1] ? String(r[1].value) : "",
+            full_name: r[2] ? String(r[2].value) : "",
+            role: r[3] ? String(r[3].value) : "",
+            allowed_pages: r[4] ? String(r[4].value) : ""
+          };
+        });
+
         var html = "";
-        rows.forEach(function(r, idx) {
-          var uId = r[0].value;
-          var uName = r[1].value;
-          var fName = r[2].value;
-          var role = r[3].value;
+        _usersCache.forEach(function(u, idx) {
+          var uId = u.id;
+          var uName = u.username;
+          var fName = u.full_name;
+          var role = u.role;
           var isMe = _currentUser && (_currentUser.id == uId);
 
+          var allowedList = getUserAllowedPages(u);
+          var permSummary = (allowedList.length === PAGE_KEYS.length)
+            ? '<span class="badge-perm-tag" style="background:#ecfdf5; color:#047857; border-color:#a7f3d0;">All ' + allowedList.length + ' Pages</span>'
+            : '<span class="badge-perm-tag">' + allowedList.length + ' / ' + PAGE_KEYS.length + ' Pages</span>';
+
+          var permBtn = '<button class="btn-action" style="padding:4px 8px; font-size:0.75rem; margin-right:6px;" onclick="openPermissionsModal(' + uId + ')">⚙️ Permissions</button>';
           var delBtn = isMe
             ? '<span style="font-size:0.7rem; color:var(--text-muted);">(Current)</span>'
             : '<button class="del-btn" onclick="deleteUser(' + uId + ', \'' + uName + '\')">Delete</button>';
@@ -2916,10 +3364,66 @@
             + '<td><code>' + uName + '</code></td>'
             + '<td>' + fName + '</td>'
             + '<td>' + roleBadge + '</td>'
-            + '<td style="text-align:center;">' + delBtn + '</td>'
+            + '<td>' + permSummary + '</td>'
+            + '<td style="text-align:center;">' + permBtn + delBtn + '</td>'
             + '</tr>';
         });
         tbody.innerHTML = html;
+      });
+    }
+
+    function openPermissionsModal(userId) {
+      _editingPermissionsUserId = userId;
+      var user = _usersCache.find(function(u) { return u.id == userId; });
+      if (!user) return;
+
+      var sub = document.getElementById("permModalSubtitle");
+      if (sub) sub.textContent = "Configuring page visibility for " + user.full_name + " (@" + user.username + ") - Role: " + user.role.toUpperCase();
+
+      var allowed = getUserAllowedPages(user);
+      PAGE_KEYS.forEach(function(p) {
+        var cb = document.getElementById("permCheck_" + p.key);
+        if (cb) cb.checked = allowed.indexOf(p.key) > -1;
+      });
+
+      document.getElementById("modalUserPermissions").style.display = "flex";
+    }
+
+    function closePermissionsModal() {
+      document.getElementById("modalUserPermissions").style.display = "none";
+      _editingPermissionsUserId = null;
+    }
+
+    function setAllPermChecks(status) {
+      PAGE_KEYS.forEach(function(p) {
+        var cb = document.getElementById("permCheck_" + p.key);
+        if (cb) cb.checked = status;
+      });
+    }
+
+    function saveUserPermissions() {
+      if (!_editingPermissionsUserId) return;
+      var selected = [];
+      PAGE_KEYS.forEach(function(p) {
+        var cb = document.getElementById("permCheck_" + p.key);
+        if (cb && cb.checked) selected.push(p.key);
+      });
+
+      var val = selected.join(",");
+      tursoQuery("UPDATE dashboard_users SET allowed_pages = ? WHERE id = ?;", [val, _editingPermissionsUserId], function(err, res) {
+        if (err) {
+          alert("Failed to save permissions: " + err.message);
+          return;
+        }
+
+        if (_currentUser && _currentUser.id == _editingPermissionsUserId) {
+          _currentUser.allowed_pages = val;
+          sessionStorage.setItem("meti_dash_user", JSON.stringify(_currentUser));
+          applyUserPermissions();
+        }
+
+        closePermissionsModal();
+        loadUsersList();
       });
     }
 
@@ -2944,8 +3448,10 @@
       msg.style.color = "var(--text-secondary)";
       msg.textContent = "Creating user in Turso...";
 
-      var sql = "INSERT INTO dashboard_users (username, password, full_name, role) VALUES (?, ?, ?, ?);";
-      tursoQuery(sql, [u, p, f, r], function(err, res) {
+      var defaultAllowed = getUserAllowedPages({ role: r });
+      var allowedStr = defaultAllowed.join(",");
+      var sql = "INSERT INTO dashboard_users (username, password, full_name, role, allowed_pages) VALUES (?, ?, ?, ?, ?);";
+      tursoQuery(sql, [u, p, f, r, allowedStr], function(err, res) {
         if (err) {
           msg.style.color = "var(--error)";
           msg.textContent = err.message.indexOf("UNIQUE") > -1 ? "Username already exists!" : "Error: " + err.message;
