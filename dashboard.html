@@ -2041,6 +2041,18 @@
           </div>
         </div>
 
+        <!-- Password Reset Requests Pending Admin Approval -->
+        <div id="resetRequestsBox" style="display:none; margin-bottom:20px; background:rgba(239,68,68,0.06); border:1.5px solid rgba(239,68,68,0.3); border-radius:10px; padding:16px 20px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="font-size:1.15rem;">🚨</span>
+              <h4 style="color:#ef4444; font-size:0.95rem; margin:0; font-weight:800;">Pending Password Reset Requests (<span id="resetReqCount">0</span>)</h4>
+            </div>
+            <span style="font-size:0.75rem; color:var(--text-muted); font-weight:600;">Security Protection: Users cannot reset password without your explicit approval</span>
+          </div>
+          <div id="resetReqList" style="display:flex; flex-direction:column; gap:8px;"></div>
+        </div>
+
         <h4 style="color:var(--primary-dark); font-size:0.9rem; margin-bottom:12px;">Authorized Dashboard Users</h4>
         <div class="table-wrap" style="border:1px solid var(--border); border-radius:8px; max-height:450px;">
           <table>
@@ -2239,7 +2251,7 @@
   <!-- ACCOUNT ACTIVATION & PASSWORD RESET MODAL -->
   <!-- ============================================================ -->
   <div class="modal-overlay" id="activationModal">
-    <div class="modal-box" style="max-width:440px;">
+    <div class="modal-box" style="max-width:460px;">
       <div class="modal-hd">
         <div class="modal-title" id="actModalTitle">✨ Activate Account</div>
         <button class="modal-close" onclick="closeActivationModal()">✕</button>
@@ -2248,6 +2260,17 @@
         <p id="actModalDesc" style="font-size:0.8rem; color:var(--text-secondary); margin-bottom:16px; line-height:1.4;">
           Enter your authorized Username and the Verification PIN provided by Admin to create your personal password.
         </p>
+
+        <!-- Admin Approval Request Box (For Password Reset Mode) -->
+        <div id="actResetRequestSection" style="display:none; background:rgba(239,68,68,0.06); border:1px solid rgba(239,68,68,0.25); border-radius:8px; padding:12px 14px; margin-bottom:16px;">
+          <div style="font-size:0.78rem; font-weight:700; color:#ef4444; margin-bottom:4px;">🛡️ Security Policy: Admin Approval Required</div>
+          <div style="font-size:0.74rem; color:var(--text-secondary); line-height:1.4; margin-bottom:8px;">
+            To protect your account and company data, password resets require Admin approval before you can proceed.
+          </div>
+          <button type="button" class="btn-action secondary" onclick="requestAdminResetApproval()" id="btnRequestResetApproval" style="width:100%; justify-content:center; padding:7px; font-size:0.78rem; font-weight:700; border-color:#ef4444; color:#ef4444;">
+            📩 Submit Reset Request to Admin
+          </button>
+        </div>
 
         <form onsubmit="submitActivationOrReset(event); return false;">
           <div class="form-group">
@@ -3884,7 +3907,7 @@
       var tbody = document.getElementById("usersTableBody");
       tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:14px; color:var(--text-muted);">Loading users...</td></tr>';
 
-      tursoQuery("SELECT id, username, full_name, role, allowed_pages, created_at, status, recovery_pin FROM dashboard_users ORDER BY id ASC;", [], function(err, res) {
+      tursoQuery("SELECT id, username, full_name, role, allowed_pages, created_at, status, recovery_pin, reset_status, reset_code, reset_requested_at FROM dashboard_users ORDER BY id ASC;", [], function(err, res) {
         if (err) {
           tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:14px; color:var(--error);">Failed: ' + err.message + '</td></tr>';
           return;
@@ -3905,9 +3928,43 @@
             allowed_pages: r[4] ? String(r[4].value) : "",
             created_at: r[5] ? String(r[5].value) : "",
             status: r[6] ? String(r[6].value) : "active",
-            recovery_pin: r[7] ? String(r[7].value) : ""
+            recovery_pin: r[7] ? String(r[7].value) : "",
+            reset_status: r[8] ? String(r[8].value) : "none",
+            reset_code: r[9] ? String(r[9].value) : "",
+            reset_requested_at: r[10] ? String(r[10].value) : ""
           };
         });
+
+        // Check if there are pending reset requests requiring Admin approval
+        var pendingResets = _usersCache.filter(function(u) { return (u.reset_status || "").toLowerCase() === "requested"; });
+        var reqBox = document.getElementById("resetRequestsBox");
+        var reqCount = document.getElementById("resetReqCount");
+        var reqList = document.getElementById("resetReqList");
+
+        if (reqBox && reqCount && reqList) {
+          if (pendingResets.length > 0) {
+            reqBox.style.display = "block";
+            reqCount.textContent = pendingResets.length;
+            var listHtml = "";
+            pendingResets.forEach(function(pr) {
+              listHtml += '<div style="display:flex; justify-content:space-between; align-items:center; background:var(--surface); border:1px solid rgba(239,68,68,0.4); border-radius:8px; padding:10px 14px; flex-wrap:wrap; gap:8px;">'
+                + '<div>'
+                + '<strong style="color:var(--text); font-size:0.86rem;">' + pr.full_name + '</strong> '
+                + '<code style="color:var(--primary); font-size:0.8rem; margin:0 4px;">(@' + pr.username + ')</code> '
+                + '<span class="role-badge role-badge-shiftsv" style="font-size:0.68rem; padding:2px 6px;">' + pr.role.toUpperCase() + '</span>'
+                + '<div style="font-size:0.72rem; color:var(--text-muted); margin-top:3px;">Requested reset at: ' + (pr.reset_requested_at || "Just now") + '</div>'
+                + '</div>'
+                + '<div style="display:flex; gap:6px;">'
+                + '<button type="button" class="btn-action" style="background:#059669; padding:5px 12px; font-size:0.75rem;" onclick="approveResetRequest(' + pr.id + ', \'' + pr.username + '\')">✅ Approve & Issue Code</button>'
+                + '<button type="button" class="btn-action secondary" style="color:#ef4444; border-color:#f87171; padding:5px 10px; font-size:0.75rem;" onclick="rejectResetRequest(' + pr.id + ', \'' + pr.username + '\')">❌ Reject</button>'
+                + '</div>'
+                + '</div>';
+            });
+            reqList.innerHTML = listHtml;
+          } else {
+            reqBox.style.display = "none";
+          }
+        }
 
         var html = "";
         _usersCache.forEach(function(u, idx) {
@@ -3930,9 +3987,17 @@
             ? '<span style="font-size:0.7rem; color:var(--text-muted);">(Current)</span>'
             : '<button class="del-btn" style="padding:3px 7px; font-size:0.72rem;" onclick="deleteUser(' + uId + ', \'' + uName + '\')">Delete</button>';
 
-          var statusBadge = (status === 'pending')
-            ? '<span style="color:#d97706; background:rgba(245,158,11,0.15); border:1px solid rgba(245,158,11,0.3); border-radius:6px; padding:2px 8px; font-size:0.72rem; font-weight:700;">🟡 Pending Activation</span>'
-            : '<span style="color:#059669; background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.3); border-radius:6px; padding:2px 8px; font-size:0.72rem; font-weight:700;">🟢 Active</span>';
+          var resetSt = (u.reset_status || "none").toLowerCase();
+          var statusBadge = "";
+          if (resetSt === 'requested') {
+            statusBadge = '<span style="color:#ef4444; background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.35); border-radius:6px; padding:2px 8px; font-size:0.72rem; font-weight:800; display:inline-flex; align-items:center; gap:4px;">🚨 Reset Requested</span>';
+          } else if (resetSt === 'approved') {
+            statusBadge = '<span style="color:#0284c7; background:rgba(2,132,199,0.15); border:1px solid rgba(2,132,199,0.35); border-radius:6px; padding:2px 8px; font-size:0.72rem; font-weight:700;">🔵 Approved (Code: ' + (u.reset_code || '---') + ')</span>';
+          } else if (status === 'pending') {
+            statusBadge = '<span style="color:#d97706; background:rgba(245,158,11,0.15); border:1px solid rgba(245,158,11,0.3); border-radius:6px; padding:2px 8px; font-size:0.72rem; font-weight:700;">🟡 Pending Activation</span>';
+          } else {
+            statusBadge = '<span style="color:#059669; background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.3); border-radius:6px; padding:2px 8px; font-size:0.72rem; font-weight:700;">🟢 Active</span>';
+          }
 
           var pinCell = '<div style="display:inline-flex; align-items:center; gap:4px;">'
             + '<code style="background:var(--border); padding:2px 6px; border-radius:4px; font-weight:700; font-size:0.8rem; letter-spacing:1px;">' + pin + '</code>'
@@ -4129,7 +4194,7 @@
     }
 
     // ============================================================
-    // SELF-SERVICE ACTIVATION & FORGOT PASSWORD LOGIC
+    // SELF-SERVICE ACTIVATION & ADMIN-APPROVED RESET LOGIC
     // ============================================================
     var _actMode = "activate"; // 'activate' or 'reset'
 
@@ -4145,6 +4210,7 @@
       var p1In = document.getElementById("actNewPass");
       var p2In = document.getElementById("actConfirmPass");
       var msg = document.getElementById("actMsg");
+      var reqSec = document.getElementById("actResetRequestSection");
 
       msg.textContent = "";
       p1In.value = "";
@@ -4154,15 +4220,17 @@
       if (prefillUser) uIn.value = prefillUser;
 
       if (_actMode === "activate") {
+        if (reqSec) reqSec.style.display = "none";
         title.textContent = "✨ Activate Account & Create Password";
         desc.textContent = "Enter your authorized Username and the Activation PIN provided by Admin to choose your personal secret password.";
         pinLabel.textContent = "Activation PIN (provided by Admin)";
         submitBtn.textContent = "🚀 Set Password & Sign In";
       } else {
-        title.textContent = "🔑 Reset Forgotten Password";
-        desc.textContent = "Forgot your password? Enter your Username and your Recovery PIN to choose a new password.";
-        pinLabel.textContent = "Recovery PIN (assigned by Admin)";
-        submitBtn.textContent = "🔄 Reset Password & Sign In";
+        if (reqSec) reqSec.style.display = "block";
+        title.textContent = "🔐 Reset Password (Admin Approval Required)";
+        desc.textContent = "For data security, password resets require explicit Admin approval. Submit a request first or enter your approved Reset Code:";
+        pinLabel.textContent = "Admin One-Time Approval Code (كود موافقة الإدمن)";
+        submitBtn.textContent = "🔄 Verify Code & Reset Password";
       }
 
       modal.classList.add("show");
@@ -4171,6 +4239,62 @@
 
     function closeActivationModal() {
       document.getElementById("activationModal").classList.remove("show");
+    }
+
+    function requestAdminResetApproval() {
+      var uIn = document.getElementById("actUsername");
+      var msg = document.getElementById("actMsg");
+      var btn = document.getElementById("btnRequestResetApproval");
+      var u = uIn.value.trim().toLowerCase();
+
+      if (!u) {
+        msg.style.color = "var(--error)";
+        msg.textContent = "Please enter your Username above before submitting a request.";
+        uIn.focus();
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = "Submitting request to Admin...";
+      msg.style.color = "var(--text-secondary)";
+      msg.textContent = "Sending request to database...";
+
+      // Check if user exists
+      var sql = "SELECT id, username, full_name, reset_status FROM dashboard_users WHERE LOWER(TRIM(username)) = LOWER(TRIM(?)) LIMIT 1;";
+      tursoQuery(sql, [u], function(err, res) {
+        btn.disabled = false;
+        btn.textContent = "📩 Submit Reset Request to Admin";
+
+        if (err) {
+          msg.style.color = "var(--error)";
+          msg.textContent = "Database connection error: " + err.message;
+          return;
+        }
+
+        var rows = res ? res.rows : [];
+        if (!rows.length) {
+          msg.style.color = "var(--error)";
+          msg.textContent = "❌ Username not found. Please contact your Admin.";
+          return;
+        }
+
+        var uId = rows[0][0].value;
+        var fName = rows[0][2].value;
+
+        // Flag user as reset_status = 'requested'
+        var nowStr = new Date().toISOString().replace('T', ' ').substring(0, 19);
+        tursoQuery("UPDATE dashboard_users SET reset_status = 'requested', reset_requested_at = ? WHERE id = ?;", [nowStr, uId], function(updErr) {
+          if (updErr) {
+            msg.style.color = "var(--error)";
+            msg.textContent = "Failed to submit request: " + updErr.message;
+            return;
+          }
+
+          msg.style.color = "var(--success)";
+          msg.innerHTML = "✅ <strong>Reset request submitted to Admin!</strong><br>"
+            + "تم إرسال طلب إعادة التعيين للإدمن. بمجرد أن يوافق الإدمن على طلبك في لوحة التحكم، سيعطيك كود الموافقة المكون من 4 أرقام لتكتبه أدناه وتختار كلمة المرور الجديدة.";
+        });
+      });
     }
 
     function togglePassVis(inputId, btn) {
@@ -4215,7 +4339,7 @@
       msg.style.color = "var(--text-secondary)";
       msg.textContent = "Checking authorization...";
 
-      var sql = "SELECT id, username, full_name, role, allowed_pages, status, recovery_pin FROM dashboard_users WHERE LOWER(TRIM(username)) = LOWER(TRIM(?)) LIMIT 1;";
+      var sql = "SELECT id, username, full_name, role, allowed_pages, status, recovery_pin, reset_status, reset_code FROM dashboard_users WHERE LOWER(TRIM(username)) = LOWER(TRIM(?)) LIMIT 1;";
       tursoQuery(sql, [u], function(err, res) {
         if (err) {
           btn.disabled = false;
@@ -4241,21 +4365,50 @@
         var role = row[3].value;
         var allowed = row[4] ? String(row[4].value) : "";
         var dbPin = row[6] ? String(row[6].value).trim() : "";
+        var resetStatus = row[7] ? String(row[7].value).trim().toLowerCase() : "none";
+        var resetCode = row[8] ? String(row[8].value).trim() : "";
 
-        // Verify PIN
-        if (!dbPin || dbPin !== pin) {
-          btn.disabled = false;
-          btn.textContent = "Try Again";
-          msg.style.color = "var(--error)";
-          msg.textContent = "❌ Incorrect Verification PIN! Please check with your Admin for your assigned PIN code.";
-          return;
+        // Check if mode is 'reset' (requires Admin Approval!)
+        if (_actMode === "reset") {
+          if (resetStatus === "none") {
+            btn.disabled = false;
+            btn.textContent = "Try Again";
+            msg.style.color = "var(--error)";
+            msg.innerHTML = "❌ <strong>No approved reset request found!</strong><br>لحماية الحساب، اضغط على زر 'Submit Reset Request to Admin' أعلاه أولاً ليوافق الإدمن على استعادة كلمة المرور.";
+            return;
+          }
+          if (resetStatus === "requested") {
+            btn.disabled = false;
+            btn.textContent = "Try Again";
+            msg.style.color = "var(--error)";
+            msg.innerHTML = "⏳ <strong>Pending Admin Approval!</strong><br>طلبك ما زال قيد انتظار موافقة الإدمن. يرجى من الإدمن فتح 'Manage Users' والموافقة على طلبك وتزويدك بالكود.";
+            return;
+          }
+          if (resetStatus === "approved") {
+            if (!resetCode || resetCode !== pin) {
+              btn.disabled = false;
+              btn.textContent = "Try Again";
+              msg.style.color = "var(--error)";
+              msg.textContent = "❌ Incorrect Admin Approval Code! Please check with your Admin for the approved 4-digit code.";
+              return;
+            }
+          }
+        } else {
+          // 'activate' mode: verify initial Activation PIN
+          if (!dbPin || dbPin !== pin) {
+            btn.disabled = false;
+            btn.textContent = "Try Again";
+            msg.style.color = "var(--error)";
+            msg.textContent = "❌ Incorrect Verification PIN! Please check with your Admin for your assigned PIN code.";
+            return;
+          }
         }
 
-        // PIN is correct! Update password and set status = 'active'
+        // Code is verified! Save new password and clear reset status
         msg.style.color = "var(--primary)";
         msg.textContent = "Saving your new password...";
 
-        tursoQuery("UPDATE dashboard_users SET password = ?, status = 'active' WHERE id = ?;", [p1, uId], function(updErr, updRes) {
+        tursoQuery("UPDATE dashboard_users SET password = ?, status = 'active', reset_status = 'none', reset_code = '', reset_requested_at = '' WHERE id = ?;", [p1, uId], function(updErr, updRes) {
           btn.disabled = false;
           btn.textContent = "Done!";
 
@@ -4266,7 +4419,7 @@
           }
 
           msg.style.color = "var(--success)";
-          msg.textContent = "🎉 Password successfully set! Signing in to your dashboard...";
+          msg.textContent = "🎉 Password successfully updated! Signing in to your dashboard...";
 
           setTimeout(function() {
             closeActivationModal();
@@ -4282,6 +4435,43 @@
             showDashboard("tasks");
           }, 800);
         });
+      });
+    }
+
+    // ============================================================
+    // ADMIN ACTIONS: APPROVE / REJECT RESET REQUESTS
+    // ============================================================
+    function approveResetRequest(userId, username) {
+      var code = String(Math.floor(1000 + Math.random() * 9000));
+      if (!confirm("Approve password reset request for @" + username + "?\nA one-time code will be generated for them: " + code)) return;
+
+      tursoQuery("UPDATE dashboard_users SET reset_status = 'approved', reset_code = ? WHERE id = ?;", [code, userId], function(err) {
+        if (err) {
+          alert("Failed to approve reset: " + err.message);
+          return;
+        }
+        var msgText = "✅ Password Reset Approved for @" + username + "!
+
+"
+          + "🔑 One-Time Reset Code: " + code + "
+
+"
+          + "👉 Share this code with " + username + ". They can now enter it on the Reset Password modal on the login screen to set their new password.";
+        alert(msgText);
+        loadUsersList();
+      });
+    }
+
+    function rejectResetRequest(userId, username) {
+      if (!confirm("Reject and block password reset request for @" + username + "?\nThis protects the account from unauthorized resets.")) return;
+
+      tursoQuery("UPDATE dashboard_users SET reset_status = 'none', reset_code = '', reset_requested_at = '' WHERE id = ?;", [userId], function(err) {
+        if (err) {
+          alert("Failed to reject reset: " + err.message);
+          return;
+        }
+        alert("🛡️ Reset request for @" + username + " has been rejected and cleared.");
+        loadUsersList();
       });
     }
 
