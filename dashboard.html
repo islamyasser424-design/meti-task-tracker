@@ -4226,17 +4226,11 @@
 
     function copyInviteText() {
       if (!_lastInviteData) return;
-      var textToCopy = "👋 Welcome to MEEG Dashboard!
-"
-        + "👤 Username: " + _lastInviteData.username + "
-"
-        + "🏷️ Role: " + _lastInviteData.role + "
-"
-        + "🔑 Activation PIN: " + _lastInviteData.pin + "
-"
-        + "🌐 Link: " + _lastInviteData.url + "
-
-"
+      var textToCopy = "👋 Welcome to MEEG Dashboard!\n"
+        + "👤 Username: " + _lastInviteData.username + "\n"
+        + "🏷️ Role: " + _lastInviteData.role + "\n"
+        + "🔑 Activation PIN: " + _lastInviteData.pin + "\n"
+        + "🌐 Link: " + _lastInviteData.url + "\n\n"
         + "👉 Click 'Activate Account & Set Password' on the login screen to set your personal secret password!";
       navigator.clipboard.writeText(textToCopy).then(function() {
         alert("Copied invitation details to clipboard! You can paste and send it directly.");
@@ -4514,12 +4508,8 @@
           alert("Failed to approve reset: " + err.message);
           return;
         }
-        var msgText = "✅ Password Reset Approved for @" + username + "!
-
-"
-          + "🔑 One-Time Reset Code: " + code + "
-
-"
+        var msgText = "✅ Password Reset Approved for @" + username + "!\n\n"
+          + "🔑 One-Time Reset Code: " + code + "\n\n"
           + "👉 Share this code with " + username + ". They can now enter it on the Reset Password modal on the login screen to set their new password.";
         alert(msgText);
         loadUsersList();
