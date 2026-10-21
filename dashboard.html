@@ -49,7 +49,7 @@
       background: var(--primary-dark);
       color: #fff;
       padding: 0 20px;
-      height: 52px;
+      height: 54px;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -64,8 +64,8 @@
       gap: 10px;
     }
     .nav-logo-box {
-      width: 30px;
-      height: 30px;
+      width: 32px;
+      height: 32px;
       background: rgba(255,255,255,0.15);
       border-radius: 6px;
       display: flex;
@@ -81,7 +81,8 @@
     .nav-actions {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 8px;
+      flex-wrap: wrap;
     }
     .nav-btn {
       background: rgba(255,255,255,0.12);
@@ -97,6 +98,7 @@
       align-items: center;
       gap: 6px;
       transition: all 0.2s;
+      font-family: inherit;
     }
     .nav-btn:hover {
       background: rgba(255,255,255,0.24);
@@ -104,21 +106,22 @@
     }
     .nav-user-badge {
       background: rgba(74,127,212,0.3);
-      padding: 4px 10px;
+      padding: 4px 12px;
       border-radius: 20px;
-      font-size: 0.72rem;
+      font-size: 0.75rem;
       font-weight: 600;
       display: flex;
       align-items: center;
-      gap: 5px;
+      gap: 6px;
+      border: 1px solid rgba(255,255,255,0.2);
     }
 
     /* Container */
     .container {
-      max-width: 1400px;
+      max-width: 1550px;
       width: 100%;
       margin: 0 auto;
-      padding: 20px;
+      padding: 18px 20px 40px;
       flex: 1;
       position: relative;
       z-index: 1;
@@ -218,10 +221,10 @@
       min-height: 18px;
     }
 
-    /* Dashboard Layout */
+    /* Dashboard KPIs */
     .dash-kpis {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
       gap: 16px;
       margin-bottom: 20px;
     }
@@ -264,7 +267,7 @@
       letter-spacing: 0.5px;
     }
 
-    /* Filters Bar */
+    /* Filters Card & Multi-Column System */
     .filter-card {
       background: #fff;
       border: 1px solid var(--border);
@@ -273,15 +276,27 @@
       margin-bottom: 20px;
       box-shadow: 0 2px 8px rgba(28,69,135,0.06);
       display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
-      align-items: center;
-      justify-content: space-between;
+      flex-direction: column;
+      gap: 14px;
     }
-    .filter-group {
+    .filter-primary-row {
       display: flex;
       flex-wrap: wrap;
       gap: 10px;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .filter-left-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      flex: 1;
+    }
+    .filter-right-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
       align-items: center;
     }
     .filter-select, .filter-input {
@@ -291,14 +306,17 @@
       font-size: 0.82rem;
       background: #f7f9fd;
       font-family: inherit;
+      color: var(--text);
+      transition: all 0.2s;
     }
     .filter-select:focus, .filter-input:focus {
       outline: none;
       border-color: var(--primary);
       background: #fff;
+      box-shadow: 0 0 0 2px rgba(28,69,135,0.1);
     }
     .btn-action {
-      padding: 7px 14px;
+      padding: 7px 13px;
       background: var(--primary);
       color: #fff;
       border: none;
@@ -310,12 +328,73 @@
       align-items: center;
       gap: 6px;
       transition: all 0.2s;
+      font-family: inherit;
     }
     .btn-action:hover { background: var(--primary-dark); }
     .btn-action.success { background: #27ae60; }
     .btn-action.success:hover { background: #219653; }
+    .btn-action.secondary {
+      background: #eaeffb;
+      color: var(--primary-dark);
+      border: 1px solid var(--border);
+    }
+    .btn-action.secondary:hover {
+      background: #d9e5f7;
+    }
 
-    /* Data Table */
+    /* Expandable Advanced Column Filters Panel */
+    .col-filters-panel {
+      background: #f8fafc;
+      border: 1px solid #e1e8f0;
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      margin-top: 4px;
+      display: none;
+    }
+    .col-filters-panel.open {
+      display: block;
+      animation: fadeIn 0.2s ease-in-out;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .col-filters-title {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--primary-dark);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .col-filters-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 12px;
+    }
+    .col-filter-item {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .col-filter-item label {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--text-secondary);
+    }
+    .col-filter-item input, .col-filter-item select {
+      padding: 6px 10px;
+      border: 1.2px solid var(--border);
+      border-radius: 6px;
+      font-size: 0.8rem;
+      background: #fff;
+      font-family: inherit;
+    }
+
+    /* Data Table Card */
     .table-card {
       background: #fff;
       border: 1px solid var(--border);
@@ -346,7 +425,7 @@
     }
     .table-wrap {
       overflow-x: auto;
-      max-height: 600px;
+      max-height: 650px;
     }
     table {
       width: 100%;
@@ -364,6 +443,7 @@
       top: 0;
       z-index: 10;
       border-bottom: 2px solid var(--border);
+      user-select: none;
     }
     td {
       padding: 9px 14px;
@@ -387,8 +467,16 @@
       font-weight: 700;
       font-size: 0.7rem;
     }
+    .badge-shift {
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      background: #f1f3f5;
+      color: #495057;
+    }
 
-    /* Modal */
+    /* Modals */
     .modal-overlay {
       display: none;
       position: fixed;
@@ -405,8 +493,8 @@
       background: #fff;
       border-radius: var(--radius-lg);
       width: 100%;
-      max-width: 750px;
-      max-height: 85vh;
+      max-width: 600px;
+      max-height: 90vh;
       display: flex;
       flex-direction: column;
       box-shadow: 0 16px 40px rgba(19,47,107,0.3);
@@ -439,7 +527,7 @@
     }
     .modal-close:hover { opacity: 1; }
     .modal-bd {
-      padding: 20px;
+      padding: 22px 24px;
       overflow-y: auto;
     }
     .del-btn {
@@ -452,6 +540,105 @@
       cursor: pointer;
     }
     .del-btn:hover { background: #c0392b; }
+
+    /* Advanced Date Filter Popup Box (Image 2 style) */
+    .date-popup-box {
+      background: #fff;
+      border-radius: 12px;
+      width: 100%;
+      max-width: 520px;
+      box-shadow: 0 18px 45px rgba(0,0,0,0.22);
+      border: 1px solid #d3dbe3;
+      padding: 18px 22px;
+    }
+    .date-popup-top {
+      display: flex;
+      justify-content: flex-end;
+      margin-bottom: 12px;
+    }
+    .date-mode-select {
+      padding: 5px 12px;
+      border: 1.5px solid #c5d3ec;
+      border-radius: 6px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      background: #f7f9fd;
+      color: #1a2733;
+    }
+    .date-columns-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 22px;
+    }
+    .date-col {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .date-col-header {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: #1a2733;
+      text-align: center;
+    }
+    .date-col-preview {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--primary);
+      text-align: center;
+      min-height: 20px;
+      padding-bottom: 4px;
+    }
+    .date-control-select, .date-control-input {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1.5px solid #d3dbe3;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      background: #fff;
+      font-family: inherit;
+      color: #2c3e50;
+      box-sizing: border-box;
+    }
+    .date-control-select:focus, .date-control-input:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+    .date-popup-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      align-items: center;
+      padding-top: 10px;
+      border-top: 1px solid #edf2f7;
+    }
+    .btn-popup-cancel {
+      background: transparent;
+      border: none;
+      color: #4a6375;
+      font-size: 0.88rem;
+      font-weight: 600;
+      cursor: pointer;
+      padding: 7px 14px;
+    }
+    .btn-popup-cancel:hover { color: #1a2733; }
+    .btn-popup-apply {
+      background: #eaeffb;
+      color: var(--primary-dark);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      font-size: 0.88rem;
+      font-weight: 700;
+      padding: 7px 22px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-popup-apply:hover {
+      background: var(--primary);
+      color: #fff;
+      border-color: var(--primary);
+    }
   </style>
 </head>
 <body>
@@ -460,7 +647,7 @@
   <header class="navbar">
     <div class="nav-brand">
       <div class="nav-logo-box">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#fff" stroke-width="2.5"><path d="M3 3v18h18"/><path d="M7 16l4-6 4 3 6-8"/></svg>
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#fff" stroke-width="2.5"><path d="M3 3v18h18"/><path d="M7 16l4-6 4 3 6-8"/></svg>
       </div>
       <span class="nav-title">MEEG Analytics & Operations Dashboard</span>
     </div>
@@ -469,6 +656,7 @@
         <span>👤</span>
         <span id="currentUserName">Admin</span>
       </div>
+      <button class="nav-btn" onclick="openChangePasswordModal()" title="Change your login password">🔑 Change Password</button>
       <button class="nav-btn" id="btnManageUsers" onclick="openUsersModal()" style="display:none;">👥 Manage Users</button>
       <a href="index.html" class="nav-btn">📝 Task Entry Form</a>
       <button class="nav-btn" onclick="logout()">🚪 Logout</button>
@@ -520,36 +708,137 @@
       </div>
     </section>
 
-    <!-- Filters & Actions Bar -->
+    <!-- Filters & Actions Card -->
     <section class="filter-card">
-      <div class="filter-group">
-        <select class="filter-select" id="filterDate" onchange="applyFilters()">
-          <option value="today">📅 Today</option>
-          <option value="yesterday">📅 Yesterday</option>
-          <option value="all">📅 All Dates</option>
-        </select>
-        <select class="filter-select" id="filterShift" onchange="applyFilters()">
-          <option value="all">All Shifts</option>
-          <option value="Morning">Morning</option>
-          <option value="Night">Night</option>
-          <option value="Over Night">Over Night</option>
-        </select>
-        <select class="filter-select" id="filterModality" onchange="applyFilters()">
-          <option value="all">All Modalities</option>
-          <option value="Lidar">Lidar</option>
-          <option value="Lane Line">Lane Line</option>
-          <option value="Relabeling">Relabeling</option>
-        </select>
-        <select class="filter-select" id="filterPass" onchange="applyFilters()">
-          <option value="all">All Passes</option>
-          <option value="FP">FP</option>
-          <option value="QA">QA</option>
-        </select>
-        <input type="text" class="filter-input" id="searchQuery" placeholder="🔍 Search labeler or Task ID..." oninput="applyFilters()" style="min-width: 200px;">
+      <!-- Primary Filters Row -->
+      <div class="filter-primary-row">
+        <div class="filter-left-group">
+          <!-- Date Filter Dropdown (Image 1 style) -->
+          <select class="filter-select" id="filterDate" onchange="onDateFilterChange()" style="font-weight:600;">
+            <option value="today">📅 Today</option>
+            <option value="yesterday">📅 Yesterday</option>
+            <option value="all">📅 All Dates</option>
+            <option value="custom" id="optCustomDate" style="display:none;">📅 Custom Range</option>
+            <option value="open_advanced">⚙️ Advanced Date Range...</option>
+          </select>
+
+          <!-- Shift -->
+          <select class="filter-select" id="filterShift" onchange="applyFilters()">
+            <option value="all">All Shifts</option>
+            <option value="Morning">Morning</option>
+            <option value="Night">Night</option>
+            <option value="Over Night">Over Night</option>
+          </select>
+
+          <!-- Modality -->
+          <select class="filter-select" id="filterModality" onchange="applyFilters()">
+            <option value="all">All Modalities</option>
+            <option value="Lidar">Lidar</option>
+            <option value="Lane Line">Lane Line</option>
+            <option value="Relabeling">Relabeling</option>
+          </select>
+
+          <!-- Pass -->
+          <select class="filter-select" id="filterPass" onchange="applyFilters()">
+            <option value="all">All Passes</option>
+            <option value="FP">FP</option>
+            <option value="QA">QA</option>
+          </select>
+
+          <!-- QTC Name Dropdown -->
+          <select class="filter-select" id="filterQTC" onchange="applyFilters()" style="max-width:210px;">
+            <option value="all">All QTCs</option>
+          </select>
+
+          <!-- Global Search -->
+          <input type="text" class="filter-input" id="searchQuery" placeholder="🔍 Quick search labeler, Task ID, PC..." oninput="applyFilters()" style="min-width: 220px; flex:1;">
+        </div>
+
+        <div class="filter-right-group">
+          <button class="btn-action secondary" id="btnToggleCols" onclick="toggleColFilters()">
+            <span>🎛️ Column Filters</span>
+            <span id="activeFilterBadge" style="background:var(--primary); color:#fff; border-radius:10px; padding:1px 6px; font-size:0.68rem; display:none;">0</span>
+          </button>
+          <button class="btn-action secondary" onclick="resetAllFilters()" title="Reset all filters">🧹 Clear</button>
+          <button class="btn-action" onclick="fetchLiveData()">🔄 Refresh</button>
+          <button class="btn-action success" onclick="exportFilteredData()">📥 Export Excel (CSV)</button>
+        </div>
       </div>
-      <div class="filter-group">
-        <button class="btn-action" onclick="fetchLiveData()">🔄 Refresh</button>
-        <button class="btn-action success" onclick="exportFilteredData()">📥 Export to Excel (CSV)</button>
+
+      <!-- Expandable Dedicated Column Filters Grid -->
+      <div class="col-filters-panel" id="colFiltersPanel">
+        <div class="col-filters-title">
+          <span>Detailed Column Filters (Filter by any specific field)</span>
+          <button type="button" onclick="resetAllFilters()" style="background:none; border:none; color:var(--primary); font-size:0.75rem; font-weight:700; cursor:pointer;">Reset Column Filters</button>
+        </div>
+        <div class="col-filters-grid">
+          <div class="col-filter-item">
+            <label>Shift</label>
+            <select id="colFilterShift" onchange="applyFilters()">
+              <option value="all">All</option>
+              <option value="Morning">Morning</option>
+              <option value="Night">Night</option>
+              <option value="Over Night">Over Night</option>
+            </select>
+          </div>
+          <div class="col-filter-item">
+            <label>Unit</label>
+            <input type="text" id="colFilterUnit" placeholder="e.g. Unit 1" oninput="applyFilters()">
+          </div>
+          <div class="col-filter-item">
+            <label>QTC Name</label>
+            <select id="colFilterQTC" onchange="applyFilters()">
+              <option value="all">All QTCs</option>
+            </select>
+          </div>
+          <div class="col-filter-item">
+            <label>Yubikey Email</label>
+            <input type="text" id="colFilterYubikey" placeholder="e.g. user@yubikey" oninput="applyFilters()">
+          </div>
+          <div class="col-filter-item">
+            <label>Labeler Name</label>
+            <input type="text" id="colFilterLabeler" placeholder="Labeler name..." oninput="applyFilters()">
+          </div>
+          <div class="col-filter-item">
+            <label>National ID</label>
+            <input type="text" id="colFilterNationalId" placeholder="14-digit ID..." oninput="applyFilters()">
+          </div>
+          <div class="col-filter-item">
+            <label>PC No</label>
+            <input type="text" id="colFilterPcNo" placeholder="PC number..." oninput="applyFilters()">
+          </div>
+          <div class="col-filter-item">
+            <label>Modality</label>
+            <select id="colFilterModality" onchange="applyFilters()">
+              <option value="all">All</option>
+              <option value="Lidar">Lidar</option>
+              <option value="Lane Line">Lane Line</option>
+              <option value="Relabeling">Relabeling</option>
+            </select>
+          </div>
+          <div class="col-filter-item">
+            <label>Queue Name</label>
+            <select id="colFilterQueue" onchange="applyFilters()">
+              <option value="all">All Queues</option>
+            </select>
+          </div>
+          <div class="col-filter-item">
+            <label>Pass</label>
+            <select id="colFilterPass" onchange="applyFilters()">
+              <option value="all">All</option>
+              <option value="FP">FP</option>
+              <option value="QA">QA</option>
+            </select>
+          </div>
+          <div class="col-filter-item">
+            <label>Stage</label>
+            <select id="colFilterStage" onchange="applyFilters()">
+              <option value="all">All Stages</option>
+              <option value="Stage 1">Stage 1</option>
+              <option value="Stage 2">Stage 2</option>
+            </select>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -573,25 +862,153 @@
               <th>PC No</th>
               <th>Labeler Name</th>
               <th>National ID</th>
+              <th>Yubikey Email</th>
               <th>QTC Name</th>
               <th>Task ID</th>
-              <th>Pass</th>
               <th>Modality</th>
               <th>Queue Name</th>
+              <th>Pass</th>
               <th>Objects</th>
+              <th>Stage</th>
             </tr>
           </thead>
           <tbody id="tableBody">
-            <tr><td colspan="13" style="text-align:center; padding:24px; color:var(--text-muted);">Loading live records from Turso...</td></tr>
+            <tr><td colspan="15" style="text-align:center; padding:24px; color:var(--text-muted);">Loading live records from Turso...</td></tr>
           </tbody>
         </table>
       </div>
     </section>
   </main>
 
-  <!-- User Management Modal -->
+  <!-- ============================================================ -->
+  <!-- ADVANCED DATE FILTER MODAL (Image 2 Replication) -->
+  <!-- ============================================================ -->
+  <div class="modal-overlay" id="advDateModal">
+    <div class="date-popup-box">
+      <div class="date-popup-top">
+        <select class="date-mode-select" id="advDateMode" onchange="onAdvDateModeChange()">
+          <option value="advanced">Advanced</option>
+          <option value="calendar">Specific Dates (Calendar)</option>
+        </select>
+      </div>
+
+      <!-- Relative/Advanced Form (Image 2) -->
+      <div id="advDateRelativeForm">
+        <div class="date-columns-grid">
+          <!-- Start Date Column -->
+          <div class="date-col">
+            <div class="date-col-header">Start Date</div>
+            <div class="date-col-preview" id="startPreviewText">Sat, Aug 1, 2026</div>
+
+            <select class="date-control-select" id="startBaseSelect" onchange="updateAdvDatePreviews()">
+              <option value="today">Today</option>
+            </select>
+
+            <select class="date-control-select" id="startDirSelect" onchange="updateAdvDatePreviews()">
+              <option value="minus" selected>Minus</option>
+              <option value="plus">Plus</option>
+            </select>
+
+            <input type="number" class="date-control-input" id="startNumInput" value="2" min="0" max="365" oninput="updateAdvDatePreviews()">
+
+            <select class="date-control-select" id="startUnitSelect" onchange="updateAdvDatePreviews()">
+              <option value="days">Days</option>
+              <option value="weeks">Weeks</option>
+              <option value="months" selected>Months</option>
+              <option value="years">Years</option>
+            </select>
+          </div>
+
+          <!-- End Date Column -->
+          <div class="date-col">
+            <div class="date-col-header">End Date</div>
+            <div class="date-col-preview" id="endPreviewText">Thu, Oct 22, 2026</div>
+
+            <select class="date-control-select" id="endBaseSelect" onchange="updateAdvDatePreviews()">
+              <option value="today">Today</option>
+            </select>
+
+            <select class="date-control-select" id="endDirSelect" onchange="updateAdvDatePreviews()">
+              <option value="minus" selected>Minus</option>
+              <option value="plus">Plus</option>
+            </select>
+
+            <input type="number" class="date-control-input" id="endNumInput" value="1" min="0" max="365" oninput="updateAdvDatePreviews()">
+
+            <select class="date-control-select" id="endUnitSelect" onchange="updateAdvDatePreviews()">
+              <option value="days" selected>Days</option>
+              <option value="weeks">Weeks</option>
+              <option value="months">Months</option>
+              <option value="years">Years</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Calendar / Exact Date Pickers Form -->
+      <div id="advDateCalendarForm" style="display:none; margin-bottom: 22px;">
+        <div class="date-columns-grid">
+          <div class="date-col">
+            <div class="date-col-header">From Date</div>
+            <input type="date" class="date-control-input" id="calStartDate">
+          </div>
+          <div class="date-col">
+            <div class="date-col-header">To Date</div>
+            <input type="date" class="date-control-input" id="calEndDate">
+          </div>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="date-popup-actions">
+        <button type="button" class="btn-popup-cancel" onclick="closeAdvDateModal()">Cancel</button>
+        <button type="button" class="btn-popup-apply" onclick="applyAdvDateFilter()">Apply</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- CHANGE PASSWORD MODAL (For any logged in user) -->
+  <!-- ============================================================ -->
+  <div class="modal-overlay" id="changePasswordModal">
+    <div class="modal-box" style="max-width:440px;">
+      <div class="modal-hd">
+        <div class="modal-title">🔑 Change Password</div>
+        <button class="modal-close" onclick="closeChangePasswordModal()">✕</button>
+      </div>
+      <div class="modal-bd">
+        <p style="font-size:0.8rem; color:var(--text-secondary); margin-bottom:16px;">
+          Update your login password for user: <strong id="cpUsernameLabel" style="color:var(--primary-dark);">...</strong>
+        </p>
+
+        <form onsubmit="submitChangePassword(event)">
+          <div class="form-group">
+            <label class="form-label">Current Password</label>
+            <input type="password" id="cpCurrentPass" class="form-input" placeholder="Enter current password" required autocomplete="current-password">
+          </div>
+          <div class="form-group">
+            <label class="form-label">New Password</label>
+            <input type="password" id="cpNewPass" class="form-input" placeholder="Enter new password (min. 4 chars)" required autocomplete="new-password">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Confirm New Password</label>
+            <input type="password" id="cpConfirmPass" class="form-input" placeholder="Repeat new password" required autocomplete="new-password">
+          </div>
+          <div id="cpMsg" style="font-size:0.8rem; font-weight:600; margin-bottom:12px; min-height:18px;"></div>
+          <div style="display:flex; justify-content:flex-end; gap:10px;">
+            <button type="button" class="btn-action secondary" onclick="closeChangePasswordModal()">Cancel</button>
+            <button type="submit" class="btn-action" id="cpSubmitBtn">Save New Password</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- USER MANAGEMENT MODAL (Admin Only) -->
+  <!-- ============================================================ -->
   <div class="modal-overlay" id="usersModal">
-    <div class="modal-box">
+    <div class="modal-box" style="max-width:760px;">
       <div class="modal-hd">
         <div class="modal-title">👥 Dashboard Users & Access Control</div>
         <button class="modal-close" onclick="closeUsersModal()">✕</button>
@@ -684,12 +1101,18 @@
     }
 
     // ============================================================
-    // AUTHENTICATION STATE
+    // APPLICATION STATE
     // ============================================================
     var _currentUser = null;
     var _allSubmissions = [];
     var _filteredSubmissions = [];
+    var _customDateRange = null; // { startStr: 'YYYY-MM-DD', endStr: 'YYYY-MM-DD', label: '...' }
+    var _allQueuesList = [];
+    var _allQTCList = [];
 
+    // ============================================================
+    // AUTHENTICATION
+    // ============================================================
     function initAuth() {
       try {
         var saved = sessionStorage.getItem("meti_dash_user");
@@ -720,6 +1143,7 @@
         document.getElementById("btnManageUsers").style.display = "none";
       }
 
+      loadDropdownMeta();
       fetchLiveData();
     }
 
@@ -734,8 +1158,8 @@
       btn.textContent = "Verifying...";
       errEl.textContent = "";
 
-      var sql = "SELECT id, username, full_name, role FROM dashboard_users WHERE LOWER(username) = LOWER(?) AND password = ? LIMIT 1;";
-      tursoQuery(sql, [u, p], function(err, res) {
+      var sql = "SELECT id, username, full_name, role FROM dashboard_users WHERE username = ? AND password = ? LIMIT 1;";
+      tursoQuery(sql, [u, p], function(err, result) {
         btn.disabled = false;
         btn.textContent = "Sign In to Dashboard";
 
@@ -744,8 +1168,8 @@
           return;
         }
 
-        if (res && res.rows && res.rows.length > 0) {
-          var row = res.rows[0];
+        if (result && result.rows && result.rows.length > 0) {
+          var row = result.rows[0];
           _currentUser = {
             id: row[0].value,
             username: row[1].value,
@@ -767,13 +1191,156 @@
     }
 
     // ============================================================
-    // DASHBOARD DATA FETCHING & FILTERING
+    // CHANGE PASSWORD (For current user)
+    // ============================================================
+    function openChangePasswordModal() {
+      if (!_currentUser) return;
+      document.getElementById("cpUsernameLabel").textContent = _currentUser.full_name + " (" + _currentUser.username + ")";
+      document.getElementById("cpCurrentPass").value = "";
+      document.getElementById("cpNewPass").value = "";
+      document.getElementById("cpConfirmPass").value = "";
+      document.getElementById("cpMsg").textContent = "";
+      document.getElementById("changePasswordModal").classList.add("show");
+      setTimeout(function() { document.getElementById("cpCurrentPass").focus(); }, 150);
+    }
+
+    function closeChangePasswordModal() {
+      document.getElementById("changePasswordModal").classList.remove("show");
+    }
+
+    function submitChangePassword(e) {
+      e.preventDefault();
+      var curr = document.getElementById("cpCurrentPass").value;
+      var newP = document.getElementById("cpNewPass").value;
+      var conf = document.getElementById("cpConfirmPass").value;
+      var msg = document.getElementById("cpMsg");
+      var btn = document.getElementById("cpSubmitBtn");
+
+      if (newP !== conf) {
+        msg.style.color = "var(--error)";
+        msg.textContent = "New passwords do not match!";
+        return;
+      }
+      if (newP.length < 4) {
+        msg.style.color = "var(--error)";
+        msg.textContent = "Password must be at least 4 characters.";
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = "Updating...";
+      msg.style.color = "var(--text-secondary)";
+      msg.textContent = "Verifying current password...";
+
+      // Verify current password against Turso
+      var checkSql = "SELECT id FROM dashboard_users WHERE id = ? AND password = ? LIMIT 1;";
+      tursoQuery(checkSql, [_currentUser.id, curr], function(err, res) {
+        if (err) {
+          btn.disabled = false;
+          btn.textContent = "Save New Password";
+          msg.style.color = "var(--error)";
+          msg.textContent = "Error: " + err.message;
+          return;
+        }
+
+        if (!res || !res.rows || !res.rows.length) {
+          btn.disabled = false;
+          btn.textContent = "Save New Password";
+          msg.style.color = "var(--error)";
+          msg.textContent = "Current password is incorrect!";
+          return;
+        }
+
+        // Current password verified, proceed with update
+        var updateSql = "UPDATE dashboard_users SET password = ? WHERE id = ?;";
+        tursoQuery(updateSql, [newP, _currentUser.id], function(uErr, uRes) {
+          btn.disabled = false;
+          btn.textContent = "Save New Password";
+
+          if (uErr) {
+            msg.style.color = "var(--error)";
+            msg.textContent = "Update failed: " + uErr.message;
+            return;
+          }
+
+          msg.style.color = "var(--success)";
+          msg.textContent = "✔ Password updated successfully!";
+          setTimeout(function() {
+            closeChangePasswordModal();
+          }, 1500);
+        });
+      });
+    }
+
+    // ============================================================
+    // LOAD METADATA (Queues & QTCs for dropdowns)
+    // ============================================================
+    function loadDropdownMeta() {
+      // Fetch Queues
+      tursoQuery("SELECT name FROM custom_queues ORDER BY name ASC;", [], function(err, res) {
+        if (!err && res && res.rows) {
+          _allQueuesList = res.rows.map(function(r) { return r[0].value; });
+          populateQueueDropdowns();
+        }
+      });
+
+      // Fetch QTCs
+      tursoQuery("SELECT name, shift FROM custom_qtc ORDER BY name ASC;", [], function(err, res) {
+        if (!err && res && res.rows) {
+          var seen = new Set();
+          _allQTCList = [];
+          res.rows.forEach(function(r) {
+            var n = r[0].value;
+            if (!seen.has(n)) {
+              seen.add(n);
+              _allQTCList.push(n);
+            }
+          });
+          populateQTCDropdowns();
+        }
+      });
+    }
+
+    function populateQueueDropdowns() {
+      var selCol = document.getElementById("colFilterQueue");
+      if (!selCol) return;
+      var curVal = selCol.value;
+      selCol.innerHTML = '<option value="all">All Queues</option>';
+      _allQueuesList.forEach(function(q) {
+        var opt = document.createElement("option");
+        opt.value = q;
+        opt.textContent = q;
+        selCol.appendChild(opt);
+      });
+      selCol.value = curVal;
+    }
+
+    function populateQTCDropdowns() {
+      var selPrimary = document.getElementById("filterQTC");
+      var selCol = document.getElementById("colFilterQTC");
+
+      [selPrimary, selCol].forEach(function(sel) {
+        if (!sel) return;
+        var curVal = sel.value;
+        sel.innerHTML = '<option value="all">All QTCs</option>';
+        _allQTCList.forEach(function(q) {
+          var opt = document.createElement("option");
+          opt.value = q;
+          opt.textContent = q;
+          sel.appendChild(opt);
+        });
+        sel.value = curVal;
+      });
+    }
+
+    // ============================================================
+    // DATA FETCHING & KPIs
     // ============================================================
     function fetchLiveData() {
       var sync = document.getElementById("syncStatus");
       sync.textContent = "Syncing with Turso...";
 
-      var sql = "SELECT id, timestamp, shift, unit, pc_no, labeler_name, national_id, qtc_name, task_id, pass, modality, queue_name, object_count, stage, created_at FROM task_submissions ORDER BY id DESC LIMIT 5000;";
+      var sql = "SELECT id, timestamp, shift, unit, pc_no, labeler_name, national_id, yubikey_email, qtc_name, task_id, pass, modality, queue_name, object_count, stage, created_at FROM task_submissions ORDER BY id DESC LIMIT 5000;";
       tursoQuery(sql, [], function(err, res) {
         if (err) {
           sync.textContent = "Sync error: " + err.message;
@@ -791,28 +1358,60 @@
             pc_no: r[4] ? String(r[4].value) : "",
             labeler_name: r[5] ? String(r[5].value) : "",
             national_id: r[6] ? String(r[6].value) : "",
-            qtc_name: r[7] ? String(r[7].value) : "",
-            task_id: r[8] ? String(r[8].value) : "",
-            pass: r[9] ? String(r[9].value) : "",
-            modality: r[10] ? String(r[10].value) : "",
-            queue_name: r[11] ? String(r[11].value) : "",
-            object_count: r[12] ? parseInt(r[12].value, 10) || 0 : 0,
-            stage: r[13] ? String(r[13].value) : "",
-            created_at: r[14] ? String(r[14].value) : ""
+            yubikey_email: r[7] ? String(r[7].value) : "",
+            qtc_name: r[8] ? String(r[8].value) : "",
+            task_id: r[9] ? String(r[9].value) : "",
+            pass: r[10] ? String(r[10].value) : "",
+            modality: r[11] ? String(r[11].value) : "",
+            queue_name: r[12] ? String(r[12].value) : "",
+            object_count: r[13] ? parseInt(r[13].value, 10) || 0 : 0,
+            stage: r[14] ? String(r[14].value) : "",
+            created_at: r[15] ? String(r[15].value) : ""
           };
         });
+
+        // Also add any dynamic QTCs / Queues from submissions into dropdowns if missing
+        _allSubmissions.forEach(function(s) {
+          if (s.queue_name && !_allQueuesList.includes(s.queue_name)) {
+            _allQueuesList.push(s.queue_name);
+          }
+          if (s.qtc_name && !_allQTCList.includes(s.qtc_name)) {
+            _allQTCList.push(s.qtc_name);
+          }
+        });
+        populateQueueDropdowns();
+        populateQTCDropdowns();
 
         calculateKPIs();
         applyFilters();
       });
     }
 
+    function extractISODate(r) {
+      if (r.created_at && r.created_at.length >= 10) {
+        return r.created_at.slice(0, 10);
+      }
+      if (r.timestamp) {
+        var m = r.timestamp.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+        if (m) {
+          return m[3] + '-' + m[1].padStart(2, '0') + '-' + m[2].padStart(2, '0');
+        }
+        var d = new Date(r.timestamp);
+        if (!isNaN(d.getTime())) {
+          return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+        }
+      }
+      return '';
+    }
+
     function calculateKPIs() {
       document.getElementById("kpiTotalTasks").textContent = _allSubmissions.length.toLocaleString();
 
       var todayCairo = new Date().toLocaleDateString("en-US", { timeZone: "Africa/Cairo" });
+      var todayISO = new Date().toISOString().slice(0, 10);
+
       var todayTasks = _allSubmissions.filter(function(r) {
-        return r.timestamp.indexOf(todayCairo) > -1 || (r.created_at && r.created_at.startsWith(new Date().toISOString().slice(0, 10)));
+        return r.timestamp.indexOf(todayCairo) > -1 || extractISODate(r) === todayISO;
       });
 
       document.getElementById("kpiTodayCount").textContent = todayTasks.length.toLocaleString();
@@ -824,41 +1423,173 @@
       document.getElementById("kpiActiveLabelers").textContent = labelerSet.size;
     }
 
-    function applyFilters() {
-      var dateFilter = document.getElementById("filterDate").value;
-      var shiftFilter = document.getElementById("filterShift").value;
-      var modFilter = document.getElementById("filterModality").value;
-      var passFilter = document.getElementById("filterPass").value;
-      var query = document.getElementById("searchQuery").value.toLowerCase().trim();
+    // ============================================================
+    // FILTERING LOGIC
+    // ============================================================
+    function toggleColFilters() {
+      var p = document.getElementById("colFiltersPanel");
+      p.classList.toggle("open");
+    }
 
+    function onDateFilterChange() {
+      var sel = document.getElementById("filterDate");
+      if (sel.value === "open_advanced") {
+        openAdvDateModal();
+        // Reset selection temporarily until applied
+        sel.value = _customDateRange ? "custom" : "today";
+        return;
+      }
+      _customDateRange = null;
+      document.getElementById("optCustomDate").style.display = "none";
+      applyFilters();
+    }
+
+    function resetAllFilters() {
+      document.getElementById("filterDate").value = "today";
+      document.getElementById("optCustomDate").style.display = "none";
+      _customDateRange = null;
+
+      document.getElementById("filterShift").value = "all";
+      document.getElementById("filterModality").value = "all";
+      document.getElementById("filterPass").value = "all";
+      document.getElementById("filterQTC").value = "all";
+      document.getElementById("searchQuery").value = "";
+
+      // Column filters
+      document.getElementById("colFilterShift").value = "all";
+      document.getElementById("colFilterUnit").value = "";
+      document.getElementById("colFilterQTC").value = "all";
+      document.getElementById("colFilterYubikey").value = "";
+      document.getElementById("colFilterLabeler").value = "";
+      document.getElementById("colFilterNationalId").value = "";
+      document.getElementById("colFilterPcNo").value = "";
+      document.getElementById("colFilterModality").value = "all";
+      document.getElementById("colFilterQueue").value = "all";
+      document.getElementById("colFilterPass").value = "all";
+      document.getElementById("colFilterStage").value = "all";
+
+      applyFilters();
+    }
+
+    function applyFilters() {
+      var dateVal = document.getElementById("filterDate").value;
+
+      // Primary filters
+      var pShift = document.getElementById("filterShift").value;
+      var pMod = document.getElementById("filterModality").value;
+      var pPass = document.getElementById("filterPass").value;
+      var pQTC = document.getElementById("filterQTC").value;
+      var q = document.getElementById("searchQuery").value.toLowerCase().trim();
+
+      // Column filters
+      var cShift = document.getElementById("colFilterShift").value;
+      var cUnit = document.getElementById("colFilterUnit").value.toLowerCase().trim();
+      var cQTC = document.getElementById("colFilterQTC").value;
+      var cYubikey = document.getElementById("colFilterYubikey").value.toLowerCase().trim();
+      var cLabeler = document.getElementById("colFilterLabeler").value.toLowerCase().trim();
+      var cNatId = document.getElementById("colFilterNationalId").value.trim();
+      var cPcNo = document.getElementById("colFilterPcNo").value.toLowerCase().trim();
+      var cMod = document.getElementById("colFilterModality").value;
+      var cQueue = document.getElementById("colFilterQueue").value;
+      var cPass = document.getElementById("colFilterPass").value;
+      var cStage = document.getElementById("colFilterStage").value;
+
+      // Sync primary and column dropdowns if user changes either
+      if (pShift !== "all" && cShift === "all") cShift = pShift;
+      if (cShift !== "all" && pShift === "all") document.getElementById("filterShift").value = cShift;
+
+      if (pMod !== "all" && cMod === "all") cMod = pMod;
+      if (cMod !== "all" && pMod === "all") document.getElementById("filterModality").value = cMod;
+
+      if (pPass !== "all" && cPass === "all") cPass = pPass;
+      if (cPass !== "all" && pPass === "all") document.getElementById("filterPass").value = cPass;
+
+      if (pQTC !== "all" && cQTC === "all") cQTC = pQTC;
+      if (cQTC !== "all" && pQTC === "all") document.getElementById("filterQTC").value = cQTC;
+
+      // Count active filters for badge
+      var activeCount = 0;
+      if (dateVal !== "all") activeCount++;
+      if (cShift !== "all") activeCount++;
+      if (cUnit) activeCount++;
+      if (cQTC !== "all") activeCount++;
+      if (cYubikey) activeCount++;
+      if (cLabeler) activeCount++;
+      if (cNatId) activeCount++;
+      if (cPcNo) activeCount++;
+      if (cMod !== "all") activeCount++;
+      if (cQueue !== "all") activeCount++;
+      if (cPass !== "all") activeCount++;
+      if (cStage !== "all") activeCount++;
+      if (q) activeCount++;
+
+      var badge = document.getElementById("activeFilterBadge");
+      if (activeCount > 0) {
+        badge.textContent = activeCount;
+        badge.style.display = "inline-block";
+      } else {
+        badge.style.display = "none";
+      }
+
+      // Pre-compute date bounds
       var todayCairo = new Date().toLocaleDateString("en-US", { timeZone: "Africa/Cairo" });
+      var todayISO = new Date().toISOString().slice(0, 10);
+
       var yesterday = new Date();
       yesterday.setDate(yesterday.getDate() - 1);
       var yesterdayCairo = yesterday.toLocaleDateString("en-US", { timeZone: "Africa/Cairo" });
+      var yesterdayISO = yesterday.toISOString().slice(0, 10);
 
       _filteredSubmissions = _allSubmissions.filter(function(r) {
-        // Date
-        if (dateFilter === "today") {
-          var matchToday = r.timestamp.indexOf(todayCairo) > -1 || (r.created_at && r.created_at.startsWith(new Date().toISOString().slice(0, 10)));
-          if (!matchToday) return false;
-        } else if (dateFilter === "yesterday") {
-          var matchYest = r.timestamp.indexOf(yesterdayCairo) > -1;
-          if (!matchYest) return false;
+        var recISO = extractISODate(r);
+
+        // Date Check
+        if (dateVal === "today") {
+          if (r.timestamp.indexOf(todayCairo) === -1 && recISO !== todayISO) return false;
+        } else if (dateVal === "yesterday") {
+          if (r.timestamp.indexOf(yesterdayCairo) === -1 && recISO !== yesterdayISO) return false;
+        } else if (dateVal === "custom" && _customDateRange) {
+          if (!recISO) return false;
+          if (recISO < _customDateRange.startStr || recISO > _customDateRange.endStr) return false;
         }
 
         // Shift
-        if (shiftFilter !== "all" && r.shift.toLowerCase() !== shiftFilter.toLowerCase()) return false;
+        if (cShift !== "all" && r.shift.toLowerCase() !== cShift.toLowerCase()) return false;
+
+        // Unit
+        if (cUnit && r.unit.toLowerCase().indexOf(cUnit) === -1) return false;
+
+        // QTC Name
+        if (cQTC !== "all" && r.qtc_name.toLowerCase() !== cQTC.toLowerCase()) return false;
+
+        // Yubikey Email
+        if (cYubikey && r.yubikey_email.toLowerCase().indexOf(cYubikey) === -1) return false;
+
+        // Labeler Name
+        if (cLabeler && r.labeler_name.toLowerCase().indexOf(cLabeler) === -1) return false;
+
+        // National ID
+        if (cNatId && r.national_id.indexOf(cNatId) === -1) return false;
+
+        // PC No
+        if (cPcNo && r.pc_no.toLowerCase().indexOf(cPcNo) === -1) return false;
 
         // Modality
-        if (modFilter !== "all" && r.modality.toLowerCase() !== modFilter.toLowerCase()) return false;
+        if (cMod !== "all" && r.modality.toLowerCase() !== cMod.toLowerCase()) return false;
+
+        // Queue Name
+        if (cQueue !== "all" && r.queue_name.toLowerCase() !== cQueue.toLowerCase()) return false;
 
         // Pass
-        if (passFilter !== "all" && r.pass.toUpperCase() !== passFilter.toUpperCase()) return false;
+        if (cPass !== "all" && r.pass.toUpperCase() !== cPass.toUpperCase()) return false;
 
-        // Search Query
-        if (query) {
-          var combined = (r.labeler_name + " " + r.task_id + " " + r.pc_no + " " + r.national_id + " " + r.queue_name).toLowerCase();
-          if (combined.indexOf(query) === -1) return false;
+        // Stage
+        if (cStage !== "all" && r.stage.toLowerCase() !== cStage.toLowerCase()) return false;
+
+        // Global Quick Search
+        if (q) {
+          var combined = (r.labeler_name + " " + r.task_id + " " + r.pc_no + " " + r.national_id + " " + r.queue_name + " " + r.yubikey_email + " " + r.qtc_name).toLowerCase();
+          if (combined.indexOf(q) === -1) return false;
         }
 
         return true;
@@ -869,77 +1600,240 @@
 
     function renderTable() {
       var tbody = document.getElementById("tableBody");
-      document.getElementById("tableCounterText").textContent = "(" + _filteredSubmissions.length + " matching records)";
+      var counter = document.getElementById("tableCounterText");
+      counter.textContent = "(" + _filteredSubmissions.length.toLocaleString() + " records)";
 
       if (!_filteredSubmissions.length) {
-        tbody.innerHTML = '<tr><td colspan="13" style="text-align:center; padding:24px; color:var(--text-muted);">No matching task submissions found.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="15" style="text-align:center; padding:32px; color:var(--text-muted);">No records match the selected filters.</td></tr>';
         return;
       }
 
       var html = "";
-      _filteredSubmissions.slice(0, 200).forEach(function(r) {
-        var passBadge = r.pass.toUpperCase() === "QA" ? '<span class="badge-qa">QA</span>' : '<span class="badge-fp">FP</span>';
+      _filteredSubmissions.slice(0, 1000).forEach(function(r) {
+        var passBadge = r.pass.toUpperCase() === "FP"
+          ? '<span class="badge-fp">FP</span>'
+          : '<span class="badge-qa">QA</span>';
+
+        var taskDisplay = r.task_id;
+        if (taskDisplay && taskDisplay.length > 28) {
+          taskDisplay = taskDisplay.slice(0, 26) + "...";
+        }
+
         html += '<tr>'
-          + '<td><strong>#' + r.id + '</strong></td>'
-          + '<td>' + r.timestamp + '</td>'
-          + '<td>' + r.shift + '</td>'
-          + '<td>' + r.unit + '</td>'
-          + '<td>' + r.pc_no + '</td>'
-          + '<td><strong>' + r.labeler_name + '</strong></td>'
-          + '<td>' + r.national_id + '</td>'
-          + '<td>' + r.qtc_name + '</td>'
-          + '<td><code>' + r.task_id + '</code></td>'
-          + '<td>' + passBadge + '</td>'
+          + '<td style="font-weight:700; color:var(--primary-dark);">#' + r.id + '</td>'
+          + '<td style="color:var(--text-secondary);">' + r.timestamp + '</td>'
+          + '<td><span class="badge-shift">' + r.shift + '</span></td>'
+          + '<td>' + (r.unit || "-") + '</td>'
+          + '<td><code>' + (r.pc_no || "-") + '</code></td>'
+          + '<td style="font-weight:600;">' + r.labeler_name + '</td>'
+          + '<td style="font-family:monospace; color:var(--text-secondary);">' + (r.national_id || "-") + '</td>'
+          + '<td style="color:var(--text-secondary);">' + (r.yubikey_email || "-") + '</td>'
+          + '<td style="font-weight:600; color:var(--primary);">' + (r.qtc_name || "-") + '</td>'
+          + '<td><code title="' + r.task_id + '">' + taskDisplay + '</code></td>'
           + '<td>' + r.modality + '</td>'
-          + '<td>' + r.queue_name + '</td>'
-          + '<td><strong>' + r.object_count + '</strong></td>'
+          + '<td style="max-width:200px; overflow:hidden; text-overflow:ellipsis;" title="' + r.queue_name + '">' + r.queue_name + '</td>'
+          + '<td>' + passBadge + '</td>'
+          + '<td style="font-weight:700; text-align:right;">' + r.object_count + '</td>'
+          + '<td>' + (r.stage || "-") + '</td>'
           + '</tr>';
       });
+
+      if (_filteredSubmissions.length > 1000) {
+        html += '<tr><td colspan="15" style="text-align:center; padding:12px; background:#f7f9fd; color:var(--text-secondary); font-style:italic;">Showing first 1,000 of ' + _filteredSubmissions.length.toLocaleString() + ' records. Export to Excel for the complete dataset.</td></tr>';
+      }
+
       tbody.innerHTML = html;
     }
 
+    // ============================================================
+    // ADVANCED DATE FILTER MODAL LOGIC (Replicating Image 2)
+    // ============================================================
+    function openAdvDateModal() {
+      document.getElementById("advDateModal").classList.add("show");
+      updateAdvDatePreviews();
+    }
+
+    function closeAdvDateModal() {
+      document.getElementById("advDateModal").classList.remove("show");
+    }
+
+    function onAdvDateModeChange() {
+      var mode = document.getElementById("advDateMode").value;
+      if (mode === "advanced") {
+        document.getElementById("advDateRelativeForm").style.display = "block";
+        document.getElementById("advDateCalendarForm").style.display = "none";
+        updateAdvDatePreviews();
+      } else {
+        document.getElementById("advDateRelativeForm").style.display = "none";
+        document.getElementById("advDateCalendarForm").style.display = "block";
+        // Default calendar inputs
+        var today = new Date().toISOString().slice(0, 10);
+        if (!document.getElementById("calStartDate").value) {
+          var past = new Date();
+          past.setMonth(past.getMonth() - 2);
+          document.getElementById("calStartDate").value = past.toISOString().slice(0, 10);
+        }
+        if (!document.getElementById("calEndDate").value) {
+          document.getElementById("calEndDate").value = today;
+        }
+      }
+    }
+
+    function computeRelativeDate(dir, amount, unit) {
+      var d = new Date(); // base: today
+      amount = parseInt(amount, 10) || 0;
+      var sign = (dir === "minus") ? -1 : 1;
+      var delta = sign * amount;
+
+      if (unit === "days") {
+        d.setDate(d.getDate() + delta);
+      } else if (unit === "weeks") {
+        d.setDate(d.getDate() + (delta * 7));
+      } else if (unit === "months") {
+        d.setMonth(d.getMonth() + delta);
+      } else if (unit === "years") {
+        d.setFullYear(d.getFullYear() + delta);
+      }
+      return d;
+    }
+
+    function formatDateFriendly(d) {
+      var options = { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' };
+      return d.toLocaleDateString('en-US', options);
+    }
+
+    function toISODate(d) {
+      var yr = d.getFullYear();
+      var mo = String(d.getMonth() + 1).padStart(2, '0');
+      var da = String(d.getDate()).padStart(2, '0');
+      return yr + '-' + mo + '-' + da;
+    }
+
+    function updateAdvDatePreviews() {
+      var sDir = document.getElementById("startDirSelect").value;
+      var sNum = document.getElementById("startNumInput").value;
+      var sUnit = document.getElementById("startUnitSelect").value;
+      var sDate = computeRelativeDate(sDir, sNum, sUnit);
+      document.getElementById("startPreviewText").textContent = formatDateFriendly(sDate);
+
+      var eDir = document.getElementById("endDirSelect").value;
+      var eNum = document.getElementById("endNumInput").value;
+      var eUnit = document.getElementById("endUnitSelect").value;
+      var eDate = computeRelativeDate(eDir, eNum, eUnit);
+      document.getElementById("endPreviewText").textContent = formatDateFriendly(eDate);
+    }
+
+    function applyAdvDateFilter() {
+      var mode = document.getElementById("advDateMode").value;
+      var sISO = "";
+      var eISO = "";
+      var label = "";
+
+      if (mode === "advanced") {
+        var sDir = document.getElementById("startDirSelect").value;
+        var sNum = document.getElementById("startNumInput").value;
+        var sUnit = document.getElementById("startUnitSelect").value;
+        var sDate = computeRelativeDate(sDir, sNum, sUnit);
+
+        var eDir = document.getElementById("endDirSelect").value;
+        var eNum = document.getElementById("endNumInput").value;
+        var eUnit = document.getElementById("endUnitSelect").value;
+        var eDate = computeRelativeDate(eDir, eNum, eUnit);
+
+        sISO = toISODate(sDate);
+        eISO = toISODate(eDate);
+        label = formatDateFriendly(sDate) + " - " + formatDateFriendly(eDate);
+      } else {
+        sISO = document.getElementById("calStartDate").value;
+        eISO = document.getElementById("calEndDate").value;
+        if (!sISO || !eISO) {
+          alert("Please select both start and end dates.");
+          return;
+        }
+        label = sISO + " - " + eISO;
+      }
+
+      if (sISO > eISO) {
+        var tmp = sISO; sISO = eISO; eISO = tmp;
+      }
+
+      _customDateRange = {
+        startStr: sISO,
+        endStr: eISO,
+        label: label
+      };
+
+      var optCustom = document.getElementById("optCustomDate");
+      optCustom.textContent = "📅 Custom: " + label;
+      optCustom.style.display = "block";
+      document.getElementById("filterDate").value = "custom";
+
+      closeAdvDateModal();
+      applyFilters();
+    }
+
+    // ============================================================
+    // EXPORT TO CSV (UTF-8 BOM for Arabic support)
+    // ============================================================
     function exportFilteredData() {
       if (!_filteredSubmissions.length) {
         alert("No submissions to export!");
         return;
       }
 
-      var headers = ["ID", "Timestamp", "Shift", "Unit", "PC No", "Labeler Name", "National ID", "QTC Name", "Task ID", "Pass", "Modality", "Queue Name", "Object Count", "Stage"];
+      var headers = [
+        "ID",
+        "Timestamp",
+        "Shift",
+        "Unit",
+        "PC No",
+        "Labeler Name",
+        "National ID",
+        "Yubikey Email",
+        "QTC Name",
+        "Task ID",
+        "Pass",
+        "Modality",
+        "Queue Name",
+        "Object Count",
+        "Stage"
+      ];
       var csvLines = [headers.join(",")];
 
       _filteredSubmissions.forEach(function(r) {
         var line = [
           r.id,
-          '"' + r.timestamp.replace(/"/g, '""') + '"',
-          '"' + r.shift.replace(/"/g, '""') + '"',
-          '"' + r.unit.replace(/"/g, '""') + '"',
-          '"' + r.pc_no.replace(/"/g, '""') + '"',
-          '"' + r.labeler_name.replace(/"/g, '""') + '"',
-          '"' + r.national_id.replace(/"/g, '""') + '"',
-          '"' + r.qtc_name.replace(/"/g, '""') + '"',
-          '"' + r.task_id.replace(/"/g, '""') + '"',
-          '"' + r.pass.replace(/"/g, '""') + '"',
-          '"' + r.modality.replace(/"/g, '""') + '"',
-          '"' + r.queue_name.replace(/"/g, '""') + '"',
+          '"' + (r.timestamp || "").replace(/"/g, '""') + '"',
+          '"' + (r.shift || "").replace(/"/g, '""') + '"',
+          '"' + (r.unit || "").replace(/"/g, '""') + '"',
+          '"' + (r.pc_no || "").replace(/"/g, '""') + '"',
+          '"' + (r.labeler_name || "").replace(/"/g, '""') + '"',
+          '"' + (r.national_id || "").replace(/"/g, '""') + '"',
+          '"' + (r.yubikey_email || "").replace(/"/g, '""') + '"',
+          '"' + (r.qtc_name || "").replace(/"/g, '""') + '"',
+          '"' + (r.task_id || "").replace(/"/g, '""') + '"',
+          '"' + (r.pass || "").replace(/"/g, '""') + '"',
+          '"' + (r.modality || "").replace(/"/g, '""') + '"',
+          '"' + (r.queue_name || "").replace(/"/g, '""') + '"',
           r.object_count,
-          '"' + r.stage.replace(/"/g, '""') + '"'
+          '"' + (r.stage || "").replace(/"/g, '""') + '"'
         ];
         csvLines.push(line.join(","));
       });
 
-      var csvContent = "\uFEFF" + csvLines.join("\r\n"); // UTF-8 BOM for Arabic in Excel
+      var csvContent = "\uFEFF" + csvLines.join("\r\n"); // UTF-8 BOM
       var blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
       var url = URL.createObjectURL(blob);
       var link = document.createElement("a");
       link.setAttribute("href", url);
-      link.setAttribute("download", "meti_tasks_" + new Date().toISOString().slice(0, 10) + ".csv");
+      link.setAttribute("download", "meti_telemetry_" + new Date().toISOString().slice(0, 10) + ".csv");
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
     }
 
     // ============================================================
-    // USER MANAGEMENT MODAL LOGIC
+    // USER MANAGEMENT MODAL LOGIC (Admin Only)
     // ============================================================
     function openUsersModal() {
       document.getElementById("usersModal").classList.add("show");
