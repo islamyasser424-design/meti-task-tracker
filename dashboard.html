@@ -404,6 +404,21 @@
     .btn-action.secondary:hover {
       background: #d9e5f7;
     }
+    .btn-action:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+    .table-footer-controls {
+      padding: 12px 20px;
+      background: #fff;
+      border-top: 1.5px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 14px;
+    }
 
     /* Expandable Dedicated Column Filters Grid */
     .col-filters-panel {
@@ -864,7 +879,12 @@
               <option value="all">All QTCs</option>
             </select>
 
-            <input type="text" class="filter-input" id="searchQuery" placeholder="🔍 Quick search labeler, Task ID, PC..." oninput="applyFilters()" style="min-width: 220px; flex:1;">
+            <div style="display:flex; align-items:center; gap:6px; flex:1; min-width:240px;">
+              <input type="text" class="filter-input" id="searchQuery" placeholder="🔍 Search Task ID, Labeler, National ID, PC..." oninput="applyFilters()" style="flex:1;">
+              <button type="button" class="btn-action secondary" id="btnServerSearch" onclick="searchFullDatabase()" title="Search across all 51,000+ records directly in database" style="padding:6px 11px; font-size:0.75rem; white-space:nowrap; font-weight:700;">
+                🔍 Full DB
+              </button>
+            </div>
           </div>
 
           <div class="filter-right-group">
@@ -878,7 +898,8 @@
               <span id="syncIcon">⚡</span>
               <span id="syncText">Sync Sheets</span>
             </button>
-            <button class="btn-action success" onclick="exportFilteredData()">📥 Export Excel (CSV)</button>
+            <button class="btn-action success" onclick="exportFilteredData()" title="Export currently filtered view to CSV">📥 Export View</button>
+            <button class="btn-action secondary" onclick="exportFullDatabaseCSV()" title="Stream and export entire 51,000+ database records directly to CSV" style="font-weight:700;">⚡ Export Full DB</button>
           </div>
         </div>
 
@@ -964,7 +985,7 @@
         <div class="table-header">
           <div class="table-title">
             <span>📋 Operational Task Telemetry</span>
-            <span style="font-size:0.75rem; color:var(--text-muted); font-weight:600;" id="tableCounterText">(0 records)</span>
+            <span style="font-size:0.75rem; color:var(--text-secondary); font-weight:700; background:rgba(13,148,136,0.1); border:1px solid rgba(13,148,136,0.25); padding:2px 10px; border-radius:12px;" id="tableCounterText">(Loading records...)</span>
           </div>
           <span id="syncStatus" style="font-size:0.75rem; color:var(--primary); font-weight:600;">● Live Edge Synced</span>
         </div>
@@ -992,9 +1013,65 @@
               </tr>
             </thead>
             <tbody id="tableBody">
-              <tr><td colspan="15" style="text-align:center; padding:24px; color:var(--text-muted);">Loading live records from Turso...</td></tr>
+              <tr><td colspan="17" style="text-align:center; padding:24px; color:var(--text-muted);">Loading live records from Turso...</td></tr>
             </tbody>
           </table>
+        </div>
+
+        <!-- Table Pagination & Incremental Loading Controls -->
+        <div class="table-footer-controls" id="tableFooterControls">
+          <!-- Left: Pagination Info & Nav -->
+          <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 4px;">
+              <button class="btn-action secondary" id="btnFirstPage" onclick="goToPage(1)" title="First Page" style="padding: 5px 9px; font-size: 0.75rem;">⏮</button>
+              <button class="btn-action secondary" id="btnPrevPage" onclick="goToPage(_currentPage - 1)" title="Previous Page" style="padding: 5px 9px; font-size: 0.75rem;">◀ Prev</button>
+              <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); margin: 0 4px; display:inline-flex; align-items:center; gap:4px;">
+                Page <input type="number" id="pageNumberInput" min="1" value="1" onchange="onPageInputChange(this.value)" style="width: 52px; padding: 4px 6px; text-align: center; border: 1px solid var(--border); border-radius: 4px; font-weight: 700;"> of <span id="totalPagesText">1</span>
+              </span>
+              <button class="btn-action secondary" id="btnNextPage" onclick="goToPage(_currentPage + 1)" title="Next Page" style="padding: 5px 9px; font-size: 0.75rem;">Next ▶</button>
+              <button class="btn-action secondary" id="btnLastPage" onclick="goToPage(_totalPages)" title="Last Page" style="padding: 5px 9px; font-size: 0.75rem;">⏭</button>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 6px; font-size: 0.8rem; color: var(--text-secondary);">
+              <span>Rows:</span>
+              <select id="pageSizeSelect" onchange="changePageSize(this.value)" style="padding: 4px 8px; border: 1px solid var(--border); border-radius: 4px; font-size: 0.8rem; font-weight: 600; background: #fff;">
+                <option value="50" selected>50</option>
+                <option value="100">100</option>
+                <option value="250">250</option>
+                <option value="500">500</option>
+                <option value="1000">1,000</option>
+              </select>
+            </div>
+            
+            <span id="pageRangeText" style="font-size: 0.78rem; color: var(--text-muted); font-weight: 600;">Showing 0–0</span>
+          </div>
+
+          <!-- Right: Database Volume & Chunk Loading Actions -->
+          <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+            <span id="dbStreamStatus" style="font-size: 0.78rem; font-weight: 600; color: var(--text-secondary); background: #f1f5f9; padding: 4px 10px; border-radius: 6px; border: 1px solid #e2e8f0;">
+              Loaded 5,000 of 51,845 records
+            </span>
+
+            <button class="btn-action secondary" id="btnLoadMore" onclick="loadMoreRecords()" title="Fetch next 5,000 records from database" style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; font-size: 0.78rem; font-weight: 700;">
+              <span>📥 Load Next 5,000</span>
+            </button>
+
+            <button class="btn-action" id="btnStreamAll" onclick="streamAllDatabaseRecords()" title="Stream all 51,000+ records in background batches" style="background: linear-gradient(135deg, #0d9488 0%, #0284c7 100%); color: #fff; border: none; display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; font-size: 0.78rem; font-weight: 700;">
+              <span id="streamAllIcon">⚡</span>
+              <span id="streamAllText">Load Entire History (51k+)</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Progress Bar for Streaming All Records -->
+        <div id="streamProgressContainer" style="display: none; padding: 10px 20px; background: #f0fdfa; border-top: 1px solid rgba(13, 148, 136, 0.25);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <span id="streamProgressLabel" style="font-size: 0.78rem; font-weight: 700; color: var(--primary);">Loading database records in background...</span>
+            <button onclick="stopStreamingDatabase()" style="background: none; border: none; color: var(--error); font-size: 0.75rem; font-weight: 700; cursor: pointer;">⏹ Stop</button>
+          </div>
+          <div style="width: 100%; height: 7px; background: #e2e8f0; border-radius: 4px; overflow: hidden;">
+            <div id="streamProgressBar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #0d9488, #0284c7); transition: width 0.3s ease;"></div>
+          </div>
         </div>
       </section>
     </div>
@@ -1401,6 +1478,41 @@
       });
     }
 
+    function tursoBatchQuery(queries, callback) {
+      var requests = queries.map(function(q) {
+        return {
+          type: "execute",
+          stmt: {
+            sql: q.sql,
+            args: (q.args || []).map(function(arg) {
+              if (typeof arg === "number") return { type: "integer", value: String(arg) };
+              if (arg === null || arg === undefined) return { type: "null" };
+              return { type: "text", value: String(arg) };
+            })
+          }
+        };
+      });
+
+      executePipelineBatch(requests)
+        .then(function(data) {
+          if (data && data.results) {
+            for (var i = 0; i < data.results.length; i++) {
+              if (data.results[i].type === "error") {
+                callback(new Error(data.results[i].error ? data.results[i].error.message : "Database batch error"), null);
+                return;
+              }
+            }
+            var results = data.results.map(function(r) { return r.response ? r.response.result : null; });
+            callback(null, results);
+          } else {
+            callback(new Error("Empty response from database"), null);
+          }
+        })
+        .catch(function(err) {
+          callback(err, null);
+        });
+    }
+
     // ============================================================
     // APPLICATION STATE
     // ============================================================
@@ -1413,6 +1525,36 @@
     var _allQTCList = [];
     var _adminQueuesCache = [];
     var _adminQTCCache = [];
+
+    var _totalDbCount = 0;
+    var _currentPage = 1;
+    var _pageSize = 50;
+    var _totalPages = 1;
+    var _isLoadingMore = false;
+    var _isStreamingAll = false;
+    var _stopStreamingFlag = false;
+
+    function mapSubmissionRow(r) {
+      return {
+        id: r[0] ? r[0].value : "",
+        timestamp: r[1] ? String(r[1].value) : "",
+        shift: r[2] ? String(r[2].value) : "",
+        unit: r[3] ? String(r[3].value) : "",
+        pc_no: r[4] ? String(r[4].value) : "",
+        labeler_name: r[5] ? String(r[5].value) : "",
+        national_id: r[6] ? String(r[6].value) : "",
+        yubikey_email: r[7] ? String(r[7].value) : "",
+        qtc_name: r[8] ? String(r[8].value) : "",
+        task_id: r[9] ? String(r[9].value) : "",
+        pass: r[10] ? String(r[10].value) : "",
+        modality: r[11] ? String(r[11].value) : "",
+        queue_name: r[12] ? String(r[12].value) : "",
+        object_count: r[13] ? parseInt(r[13].value, 10) || 0 : 0,
+        stage: r[14] ? String(r[14].value) : "",
+        created_at: r[15] ? String(r[15].value) : "",
+        task_link: r[16] ? String(r[16].value) : ""
+      };
+    }
 
     // ============================================================
     // TAB SWITCHER
@@ -2177,13 +2319,33 @@
         return true;
       });
 
+      _currentPage = 1;
       renderTable();
     }
 
     function renderTable() {
       var tbody = document.getElementById("tableBody");
       var counter = document.getElementById("tableCounterText");
-      counter.textContent = "(" + _filteredSubmissions.length.toLocaleString() + " records)";
+      var dbStatus = document.getElementById("dbStreamStatus");
+
+      _totalPages = Math.ceil(_filteredSubmissions.length / _pageSize) || 1;
+      if (_currentPage > _totalPages) _currentPage = _totalPages;
+      if (_currentPage < 1) _currentPage = 1;
+
+      var totalInDbStr = _totalDbCount ? _totalDbCount.toLocaleString() : "...";
+      var loadedInMemStr = _allSubmissions.length.toLocaleString();
+      var filteredStr = _filteredSubmissions.length.toLocaleString();
+
+      if (counter) {
+        if (_allSubmissions.length < _totalDbCount) {
+          counter.textContent = "(" + filteredStr + " filtered | " + loadedInMemStr + " loaded of " + totalInDbStr + " in DB)";
+        } else {
+          counter.textContent = "(" + filteredStr + " filtered of " + totalInDbStr + " total)";
+        }
+      }
+      if (dbStatus) {
+        dbStatus.textContent = "Loaded " + loadedInMemStr + " of " + totalInDbStr + " records";
+      }
 
       var isAdmin = _currentUser && (_currentUser.role === "admin");
       var thAction = document.getElementById("thTaskAction");
@@ -2194,12 +2356,20 @@
       var totalCols = isAdmin ? 17 : 16;
 
       if (!_filteredSubmissions.length) {
-        tbody.innerHTML = '<tr><td colspan="' + totalCols + '" style="text-align:center; padding:32px; color:var(--text-muted);">No records match the selected filters.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="' + totalCols + '" style="text-align:center; padding:32px; color:var(--text-muted);">'
+          + '<div style="font-size:0.95rem; margin-bottom:8px;">No records match the current filters.</div>'
+          + '<button class="btn-action secondary" onclick="searchFullDatabase()" style="font-size:0.78rem;">🔍 Search across entire 51k+ database</button>'
+          + '</td></tr>';
+        updatePaginationControls(0, 0, 0);
         return;
       }
 
+      var startIdx = (_currentPage - 1) * _pageSize;
+      var endIdx = Math.min(startIdx + _pageSize, _filteredSubmissions.length);
+      var pageItems = _filteredSubmissions.slice(startIdx, endIdx);
+
       var html = "";
-      _filteredSubmissions.slice(0, 1000).forEach(function(r) {
+      pageItems.forEach(function(r) {
         var passBadge = r.pass.toUpperCase() === "FP"
           ? '<span class="badge-fp">FP</span>'
           : '<span class="badge-qa">QA</span>';
@@ -2245,11 +2415,51 @@
           + '</tr>';
       });
 
-      if (_filteredSubmissions.length > 1000) {
-        html += '<tr><td colspan="' + totalCols + '" style="text-align:center; padding:12px; background:#f7f9fd; color:var(--text-secondary); font-style:italic;">Showing first 1,000 of ' + _filteredSubmissions.length.toLocaleString() + ' records. Export to Excel for the complete dataset.</td></tr>';
-      }
-
       tbody.innerHTML = html;
+      updatePaginationControls(startIdx + 1, endIdx, _filteredSubmissions.length);
+    }
+
+    function updatePaginationControls(start, end, total) {
+      var rangeText = document.getElementById("pageRangeText");
+      if (rangeText) {
+        rangeText.textContent = total > 0 ? "Showing " + start.toLocaleString() + "–" + end.toLocaleString() + " of " + total.toLocaleString() : "Showing 0";
+      }
+      var pageInput = document.getElementById("pageNumberInput");
+      if (pageInput) {
+        pageInput.value = _currentPage;
+        pageInput.max = _totalPages;
+      }
+      var totalPagesText = document.getElementById("totalPagesText");
+      if (totalPagesText) {
+        totalPagesText.textContent = _totalPages.toLocaleString();
+      }
+      var btnFirst = document.getElementById("btnFirstPage");
+      var btnPrev = document.getElementById("btnPrevPage");
+      var btnNext = document.getElementById("btnNextPage");
+      var btnLast = document.getElementById("btnLastPage");
+
+      if (btnFirst) btnFirst.disabled = (_currentPage <= 1);
+      if (btnPrev) btnPrev.disabled = (_currentPage <= 1);
+      if (btnNext) btnNext.disabled = (_currentPage >= _totalPages);
+      if (btnLast) btnLast.disabled = (_currentPage >= _totalPages);
+    }
+
+    function goToPage(p) {
+      p = parseInt(p, 10) || 1;
+      if (p < 1) p = 1;
+      if (p > _totalPages) p = _totalPages;
+      _currentPage = p;
+      renderTable();
+    }
+
+    function onPageInputChange(val) {
+      goToPage(val);
+    }
+
+    function changePageSize(sz) {
+      _pageSize = parseInt(sz, 10) || 50;
+      _currentPage = 1;
+      renderTable();
     }
 
     function deleteSubmission(id) {
@@ -2501,7 +2711,107 @@
       var url = URL.createObjectURL(blob);
       var link = document.createElement("a");
       link.setAttribute("href", url);
-      link.setAttribute("download", "meti_telemetry_" + new Date().toISOString().slice(0, 10) + ".csv");
+      link.setAttribute("download", "meti_filtered_telemetry_" + _filteredSubmissions.length + "_records_" + new Date().toISOString().slice(0, 10) + ".csv");
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    async function exportFullDatabaseCSV() {
+      var totalStr = _totalDbCount ? _totalDbCount.toLocaleString() : "51,800+";
+      var proceed = confirm("Exporting all " + totalStr + " records will stream the complete database directly into a CSV file. Proceed?");
+      if (!proceed) return;
+
+      var sync = document.getElementById("syncStatus");
+      if (sync) sync.textContent = "⏳ Streaming entire database for CSV export...";
+
+      var headers = [
+        "ID", "Timestamp", "Shift", "Unit", "PC No", "Labeler Name",
+        "National ID", "Yubikey Email", "QTC Name", "Task ID", "Task Link",
+        "Pass", "Modality", "Queue Name", "Object Count", "Stage"
+      ];
+      var csvLines = [headers.join(",")];
+
+      var minId = Infinity;
+      var exportedCount = 0;
+
+      while (true) {
+        var sql = (minId !== Infinity)
+          ? "SELECT id, timestamp, shift, unit, pc_no, labeler_name, national_id, yubikey_email, qtc_name, task_id, task_link, pass, modality, queue_name, object_count, stage FROM task_submissions WHERE id < ? ORDER BY id DESC LIMIT 10000;"
+          : "SELECT id, timestamp, shift, unit, pc_no, labeler_name, national_id, yubikey_email, qtc_name, task_id, task_link, pass, modality, queue_name, object_count, stage FROM task_submissions ORDER BY id DESC LIMIT 10000;";
+        var args = (minId !== Infinity) ? [minId] : [];
+
+        try {
+          var res = await new Promise(function(resolve, reject) {
+            tursoQuery(sql, args, function(err, result) {
+              if (err) reject(err);
+              else resolve(result);
+            });
+          });
+
+          var rows = (res && res.rows) ? res.rows : [];
+          if (!rows.length) break;
+
+          rows.forEach(function(r) {
+            var id = r[0] ? r[0].value : "";
+            var ts = r[1] ? String(r[1].value) : "";
+            var shift = r[2] ? String(r[2].value) : "";
+            var unit = r[3] ? String(r[3].value) : "";
+            var pc_no = r[4] ? String(r[4].value) : "";
+            var lab_name = r[5] ? String(r[5].value) : "";
+            var nat_id = r[6] ? String(r[6].value) : "";
+            var yk_email = r[7] ? String(r[7].value) : "";
+            var qtc_name = r[8] ? String(r[8].value) : "";
+            var tid = r[9] ? String(r[9].value) : "";
+            var tlink = r[10] ? String(r[10].value) : "";
+            var pas = r[11] ? String(r[11].value) : "";
+            var mod = r[12] ? String(r[12].value) : "";
+            var qname = r[13] ? String(r[13].value) : "";
+            var obj_cnt = r[14] ? (r[14].value || 0) : 0;
+            var stage = r[15] ? String(r[15].value) : "";
+
+            var numId = parseInt(id, 10);
+            if (!isNaN(numId) && numId < minId) minId = numId;
+
+            var line = [
+              id,
+              '"' + ts.replace(/"/g, '""') + '"',
+              '"' + shift.replace(/"/g, '""') + '"',
+              '"' + unit.replace(/"/g, '""') + '"',
+              '"' + pc_no.replace(/"/g, '""') + '"',
+              '"' + lab_name.replace(/"/g, '""') + '"',
+              '"' + nat_id.replace(/"/g, '""') + '"',
+              '"' + yk_email.replace(/"/g, '""') + '"',
+              '"' + qtc_name.replace(/"/g, '""') + '"',
+              '"' + tid.replace(/"/g, '""') + '"',
+              '"' + tlink.replace(/"/g, '""') + '"',
+              '"' + pas.replace(/"/g, '""') + '"',
+              '"' + mod.replace(/"/g, '""') + '"',
+              '"' + qname.replace(/"/g, '""') + '"',
+              obj_cnt,
+              '"' + stage.replace(/"/g, '""') + '"'
+            ];
+            csvLines.push(line.join(","));
+            exportedCount++;
+          });
+
+          if (sync) sync.textContent = "⏳ Streamed " + exportedCount.toLocaleString() + " records...";
+          if (rows.length < 10000) break;
+          await new Promise(function(r) { setTimeout(r, 40); });
+        } catch(err) {
+          alert("Error streaming full database export: " + err.message);
+          break;
+        }
+      }
+
+      if (sync) sync.textContent = "● Live Edge Synced (" + new Date().toLocaleTimeString("en-US", {timeZone:"Africa/Cairo"}) + ")";
+
+      var csvContent = "\uFEFF" + csvLines.join(String.fromCharCode(13, 10));
+      var blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      var url = URL.createObjectURL(blob);
+      var link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", "meti_complete_database_" + exportedCount + "_records_" + new Date().toISOString().slice(0, 10) + ".csv");
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -2772,47 +3082,36 @@ async function syncGoogleSheetsClient(isAuto) {
       if (icon) icon.innerHTML = '⚡';
       if (text) text.innerText = 'Sync Sheets';
     }
-    // Refresh table view
-    fetchLiveDataOnly();
+    // Refresh table view only if new statements were synced or manual
+    if (stmts.length > 0 || !isAuto) {
+      fetchLiveDataOnly();
+    }
   }
 }
 
-// Rename raw fetching to fetchLiveDataOnly and make fetchLiveData trigger sync
 function fetchLiveDataOnly() {
   var sync = document.getElementById("syncStatus");
-  if (!sync) return;
-  sync.textContent = "Syncing with Database...";
+  if (sync) sync.textContent = "⚡ Loading from database...";
 
-  var sql = "SELECT id, timestamp, shift, unit, pc_no, labeler_name, national_id, yubikey_email, qtc_name, task_id, pass, modality, queue_name, object_count, stage, created_at, task_link FROM task_submissions ORDER BY id DESC LIMIT 5000;";
-  tursoQuery(sql, [], function(err, res) {
+  var batch = [
+    { sql: "SELECT COUNT(*) FROM task_submissions;" },
+    { sql: "SELECT id, timestamp, shift, unit, pc_no, labeler_name, national_id, yubikey_email, qtc_name, task_id, pass, modality, queue_name, object_count, stage, created_at, task_link FROM task_submissions ORDER BY id DESC LIMIT 5000;" }
+  ];
+
+  tursoBatchQuery(batch, function(err, results) {
     if (err) {
-      sync.textContent = "Sync error: " + err.message;
+      if (sync) sync.textContent = "Database sync error: " + err.message;
       return;
     }
-    sync.textContent = "● Live Edge Synced (" + new Date().toLocaleTimeString("en-US", {timeZone:"Africa/Cairo"}) + ")";
+    if (sync) sync.textContent = "● Live Edge Synced (" + new Date().toLocaleTimeString("en-US", {timeZone:"Africa/Cairo"}) + ")";
 
-    var rows = res ? res.rows : [];
-    _allSubmissions = rows.map(function(r) {
-      return {
-        id: r[0] ? r[0].value : "",
-        timestamp: r[1] ? String(r[1].value) : "",
-        shift: r[2] ? String(r[2].value) : "",
-        unit: r[3] ? String(r[3].value) : "",
-        pc_no: r[4] ? String(r[4].value) : "",
-        labeler_name: r[5] ? String(r[5].value) : "",
-        national_id: r[6] ? String(r[6].value) : "",
-        yubikey_email: r[7] ? String(r[7].value) : "",
-        qtc_name: r[8] ? String(r[8].value) : "",
-        task_id: r[9] ? String(r[9].value) : "",
-        pass: r[10] ? String(r[10].value) : "",
-        modality: r[11] ? String(r[11].value) : "",
-        queue_name: r[12] ? String(r[12].value) : "",
-        object_count: r[13] ? parseInt(r[13].value, 10) || 0 : 0,
-        stage: r[14] ? String(r[14].value) : "",
-        created_at: r[15] ? String(r[15].value) : "",
-        task_link: r[16] ? String(r[16].value) : ""
-      };
-    });
+    if (results && results[0] && results[0].rows && results[0].rows[0]) {
+      var cntVal = results[0].rows[0][0] ? results[0].rows[0][0].value : 0;
+      _totalDbCount = parseInt(cntVal, 10) || 0;
+    }
+
+    var rows = (results && results[1] && results[1].rows) ? results[1].rows : [];
+    _allSubmissions = rows.map(mapSubmissionRow);
 
     _allSubmissions.forEach(function(s) {
       if (s.queue_name && !_allQueuesList.includes(s.queue_name)) {
@@ -2826,12 +3125,193 @@ function fetchLiveDataOnly() {
     populateQTCDropdowns();
 
     calculateKPIs();
+    _currentPage = 1;
     applyFilters();
   });
 }
 
 function fetchLiveData() {
-  syncGoogleSheetsClient(true);
+  // 1. Instantly fetch from database to render UI in ~1s
+  fetchLiveDataOnly();
+  // 2. Schedule non-blocking silent Google Sheets auto-sync in background
+  setTimeout(function() {
+    syncGoogleSheetsClient(true);
+  }, 1200);
+}
+
+function loadMoreRecords() {
+  if (_isLoadingMore || _isStreamingAll) return;
+  _isLoadingMore = true;
+
+  var btn = document.getElementById("btnLoadMore");
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span>⏳ Loading...</span>';
+  }
+
+  var minId = _allSubmissions.reduce(function(min, r) {
+    var num = parseInt(r.id, 10);
+    return (!isNaN(num) && num < min) ? num : min;
+  }, Infinity);
+
+  var sql = (minId !== Infinity)
+    ? "SELECT id, timestamp, shift, unit, pc_no, labeler_name, national_id, yubikey_email, qtc_name, task_id, pass, modality, queue_name, object_count, stage, created_at, task_link FROM task_submissions WHERE id < ? ORDER BY id DESC LIMIT 5000;"
+    : "SELECT id, timestamp, shift, unit, pc_no, labeler_name, national_id, yubikey_email, qtc_name, task_id, pass, modality, queue_name, object_count, stage, created_at, task_link FROM task_submissions ORDER BY id DESC LIMIT 5000;";
+
+  var args = (minId !== Infinity) ? [minId] : [];
+
+  tursoQuery(sql, args, function(err, res) {
+    _isLoadingMore = false;
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<span>📥 Load Next 5,000</span>';
+    }
+
+    if (err) {
+      alert("Error loading more records: " + err.message);
+      return;
+    }
+
+    var rows = (res && res.rows) ? res.rows : [];
+    if (!rows.length) {
+      alert("All records in database are already loaded!");
+      return;
+    }
+
+    var newItems = rows.map(mapSubmissionRow);
+    var existingIds = new Set(_allSubmissions.map(function(s) { return String(s.id); }));
+    newItems.forEach(function(item) {
+      if (!existingIds.has(String(item.id))) {
+        _allSubmissions.push(item);
+      }
+    });
+
+    calculateKPIs();
+    applyFilters();
+  });
+}
+
+async function streamAllDatabaseRecords() {
+  if (_isStreamingAll) return;
+  _isStreamingAll = true;
+  _stopStreamingFlag = false;
+
+  var container = document.getElementById("streamProgressContainer");
+  var bar = document.getElementById("streamProgressBar");
+  var label = document.getElementById("streamProgressLabel");
+  var btn = document.getElementById("btnStreamAll");
+  if (container) container.style.display = "block";
+  if (btn) btn.disabled = true;
+
+  while (!_stopStreamingFlag) {
+    var minId = _allSubmissions.reduce(function(min, r) {
+      var num = parseInt(r.id, 10);
+      return (!isNaN(num) && num < min) ? num : min;
+    }, Infinity);
+
+    var sql = (minId !== Infinity)
+      ? "SELECT id, timestamp, shift, unit, pc_no, labeler_name, national_id, yubikey_email, qtc_name, task_id, pass, modality, queue_name, object_count, stage, created_at, task_link FROM task_submissions WHERE id < ? ORDER BY id DESC LIMIT 10000;"
+      : "SELECT id, timestamp, shift, unit, pc_no, labeler_name, national_id, yubikey_email, qtc_name, task_id, pass, modality, queue_name, object_count, stage, created_at, task_link FROM task_submissions ORDER BY id DESC LIMIT 10000;";
+
+    var args = (minId !== Infinity) ? [minId] : [];
+
+    try {
+      var res = await new Promise(function(resolve, reject) {
+        tursoQuery(sql, args, function(err, result) {
+          if (err) reject(err);
+          else resolve(result);
+        });
+      });
+
+      var rows = (res && res.rows) ? res.rows : [];
+      if (!rows.length) {
+        break; // reached end of data
+      }
+
+      var existingIds = new Set(_allSubmissions.map(function(s) { return String(s.id); }));
+      rows.forEach(function(r) {
+        var item = mapSubmissionRow(r);
+        if (!existingIds.has(String(item.id))) {
+          _allSubmissions.push(item);
+        }
+      });
+
+      var target = _totalDbCount || 52000;
+      var pct = Math.min(100, Math.round((_allSubmissions.length / target) * 100));
+      if (bar) bar.style.width = pct + "%";
+      if (label) label.textContent = "Loading database: " + _allSubmissions.length.toLocaleString() + " / " + target.toLocaleString() + " records (" + pct + "%)...";
+
+      calculateKPIs();
+      renderTable();
+
+      if (rows.length < 10000) break;
+
+      // Yield event loop
+      await new Promise(function(r) { setTimeout(r, 60); });
+    } catch(err) {
+      console.warn("Streaming batch error:", err);
+      break;
+    }
+  }
+
+  _isStreamingAll = false;
+  if (btn) {
+    btn.disabled = false;
+    btn.innerHTML = '<span>⚡ All ' + _allSubmissions.length.toLocaleString() + ' Loaded</span>';
+  }
+  if (label) label.textContent = "✔ Completed! All " + _allSubmissions.length.toLocaleString() + " records loaded in memory.";
+  setTimeout(function() {
+    if (container) container.style.display = "none";
+  }, 3500);
+}
+
+function stopStreamingDatabase() {
+  _stopStreamingFlag = true;
+  _isStreamingAll = false;
+  var container = document.getElementById("streamProgressContainer");
+  if (container) container.style.display = "none";
+  var btn = document.getElementById("btnStreamAll");
+  if (btn) btn.disabled = false;
+}
+
+function searchFullDatabase() {
+  var q = document.getElementById("searchQuery").value.trim();
+  if (!q) {
+    alert("Please enter a search term (Task ID, Labeler Name, National ID, or PC No) to search the database.");
+    return;
+  }
+
+  var sync = document.getElementById("syncStatus");
+  if (sync) sync.textContent = "🔍 Searching full database...";
+
+  var pattern = "%" + q + "%";
+  var sql = "SELECT id, timestamp, shift, unit, pc_no, labeler_name, national_id, yubikey_email, qtc_name, task_id, pass, modality, queue_name, object_count, stage, created_at, task_link FROM task_submissions WHERE task_id LIKE ? OR labeler_name LIKE ? OR national_id LIKE ? OR pc_no LIKE ? OR yubikey_email LIKE ? ORDER BY id DESC LIMIT 1000;";
+
+  tursoQuery(sql, [pattern, pattern, pattern, pattern, pattern], function(err, res) {
+    if (sync) sync.textContent = "● Live Edge Synced (" + new Date().toLocaleTimeString("en-US", {timeZone:"Africa/Cairo"}) + ")";
+    if (err) {
+      alert("Database search error: " + err.message);
+      return;
+    }
+
+    var rows = (res && res.rows) ? res.rows : [];
+    if (!rows.length) {
+      alert("No records found in database matching: " + q);
+      return;
+    }
+
+    var newItems = rows.map(mapSubmissionRow);
+    var existingIds = new Set(_allSubmissions.map(function(s) { return String(s.id); }));
+    newItems.forEach(function(item) {
+      if (!existingIds.has(String(item.id))) {
+        _allSubmissions.unshift(item);
+      }
+    });
+
+    _currentPage = 1;
+    calculateKPIs();
+    applyFilters();
+  });
 }
 
 // 25-second continuous background polling for live submissions
@@ -2840,6 +3320,19 @@ setInterval(function() {
     syncGoogleSheetsClient(true);
   }
 }, 25000);
+
+// Attach Enter key listener to Search input
+document.addEventListener("DOMContentLoaded", function() {
+  var sq = document.getElementById("searchQuery");
+  if (sq) {
+    sq.addEventListener("keydown", function(e) {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        searchFullDatabase();
+      }
+    });
+  }
+});
 
   </script>
 </body>
