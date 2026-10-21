@@ -966,6 +966,78 @@ input[type=number] { -moz-appearance:textfield }
   background: #f8fafc;
 }
 
+
+.admin-tab-btn {
+  background: transparent;
+  border: none;
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #4a6375;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.admin-tab-btn.active {
+  background: #1c4587;
+  color: #fff;
+}
+.admin-tab-btn:hover:not(.active) {
+  background: #eaeffb;
+  color: #132f6b;
+}
+.btn-del-queue {
+  background: #e74c3c;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-del-queue:hover {
+  background: #c0392b;
+}
+
+
+.admin-tab-btn {
+  background: transparent;
+  border: none;
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #4a6375;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.admin-tab-btn.active {
+  background: #1c4587;
+  color: #fff;
+}
+.admin-tab-btn:hover:not(.active) {
+  background: #eaeffb;
+  color: #132f6b;
+}
+.btn-del-queue {
+  background: #e74c3c;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-del-queue:hover {
+  background: #c0392b;
+}
+
 </style>
 </head>
 <body>
@@ -2493,6 +2565,14 @@ if(lastYK) { document.getElementById("yk").value = lastYK; validateYK(lastYK); }
       </div>
 
       <div id="adminContentSection" style="display:none;">
+        <!-- Admin Navigation Tabs -->
+        <div class="admin-tabs" style="display:flex; gap:10px; margin-bottom:16px; border-bottom:2px solid #e1e8f0; padding-bottom:8px;">
+          <button id="tabRecordsBtn" class="admin-tab-btn active" onclick="switchAdminTab('records')">📊 Records & Export</button>
+          <button id="tabQueuesBtn" class="admin-tab-btn" onclick="switchAdminTab('queues')">📋 Manage Queues (إدارة الـ Queues)</button>
+        </div>
+
+        <!-- TAB 1: Records & Stats -->
+        <div id="adminRecordsTab">
         <div class="admin-stats-grid">
           <div class="admin-stat-card">
             <div class="val" id="statToday">0</div>
@@ -2537,6 +2617,42 @@ if(lastYK) { document.getElementById("yk").value = lastYK; validateYK(lastYK); }
             </tbody>
           </table>
         </div>
+        </div><!-- /#adminRecordsTab -->
+
+        <!-- TAB 2: Queue Manager -->
+        <div id="adminQueuesTab" style="display:none;">
+          <div style="background:#f7f9fd; border:1px solid #c5d3ec; border-radius:8px; padding:16px; margin-bottom:16px;">
+            <h4 style="color:#132f6b; margin-bottom:8px; font-size:0.9rem;">➕ Add New Queue Name</h4>
+            <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+              <input type="text" id="newQueueName" placeholder="e.g. sc3_full_scene_new_project_v5" style="flex:2; min-width:220px; padding:8px 12px; border:1.5px solid #c5d3ec; border-radius:6px; font-size:0.85rem;" onkeydown="if(event.key==='Enter')addNewQueueFromAdmin()">
+              <input type="text" id="newQueueHighlight" placeholder="Highlight word (optional, e.g. v5)" style="flex:1; min-width:140px; padding:8px 12px; border:1.5px solid #c5d3ec; border-radius:6px; font-size:0.85rem;" onkeydown="if(event.key==='Enter')addNewQueueFromAdmin()">
+              <button class="admin-btn" onclick="addNewQueueFromAdmin()">➕ Add Queue</button>
+            </div>
+            <div id="addQueueMsg" style="margin-top:6px; font-size:0.75rem; font-weight:600;"></div>
+          </div>
+
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+            <h4 style="color:#132f6b; font-size:0.85rem;">Active Queues in Database (<span id="queueCount">0</span>)</h4>
+            <button class="admin-btn" style="padding:4px 10px; font-size:0.75rem;" onclick="loadQueuesInAdmin()">🔄 Refresh List</button>
+          </div>
+
+          <div class="admin-table-wrap" style="max-height:300px; overflow-y:auto;">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th style="width:50px;">#</th>
+                  <th>Queue Name</th>
+                  <th>Highlight Word</th>
+                  <th style="width:90px; text-align:center;">Action</th>
+                </tr>
+              </thead>
+              <tbody id="adminQueueTableBody">
+                <tr><td colspan="4" style="text-align:center; padding:15px; color:#7a96a8;">Loading queues...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div><!-- /#adminQueuesTab -->
+
       </div>
     </div>
   </div>
@@ -2655,6 +2771,147 @@ function exportToCsv() {
   link.click();
   document.body.removeChild(link);
 }
+
+// ══════════════════════════════════════════════════════════════
+// QUEUE MANAGER & LIVE TURSO INTEGRATION
+// ══════════════════════════════════════════════════════════════
+var _activeAdminTab = 'records';
+var _cachedAdminQueues = [];
+
+function switchAdminTab(tab) {
+  _activeAdminTab = tab;
+  var recTab = document.getElementById("adminRecordsTab");
+  var qTab = document.getElementById("adminQueuesTab");
+  var btnRec = document.getElementById("tabRecordsBtn");
+  var btnQ = document.getElementById("tabQueuesBtn");
+
+  if (tab === 'records') {
+    recTab.style.display = "block";
+    qTab.style.display = "none";
+    btnRec.classList.add("active");
+    btnQ.classList.remove("active");
+    loadAdminData();
+  } else {
+    recTab.style.display = "none";
+    qTab.style.display = "block";
+    btnRec.classList.remove("active");
+    btnQ.classList.add("active");
+    loadQueuesInAdmin();
+  }
+}
+
+// Fetch queues from Turso and update the employee's dropdown on page load
+function loadLiveQueuesFromTurso() {
+  tursoQuery("SELECT id, name, highlight FROM custom_queues ORDER BY name ASC;", [], function(err, res) {
+    if (!err && res && res.rows && res.rows.length > 0) {
+      var queueList = res.rows.map(function(r) {
+        return {
+          id: r[0] ? r[0].value : null,
+          name: r[1] ? String(r[1].value) : "",
+          highlight: r[2] && r[2].value ? String(r[2].value) : ""
+        };
+      });
+      _cachedAdminQueues = queueList;
+      renderQueueList(queueList);
+    }
+  });
+}
+
+// Admin function: Load queues in table
+function loadQueuesInAdmin() {
+  var tbody = document.getElementById("adminQueueTableBody");
+  var countEl = document.getElementById("queueCount");
+  tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:15px; color:#7a96a8;">Loading queues from Turso...</td></tr>';
+
+  tursoQuery("SELECT id, name, highlight FROM custom_queues ORDER BY id DESC;", [], function(err, res) {
+    if (err) {
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:15px; color:#e74c3c;">Failed to load: ' + err.message + '</td></tr>';
+      return;
+    }
+    var rows = res ? res.rows : [];
+    _cachedAdminQueues = rows.map(function(r) {
+      return { id: r[0].value, name: String(r[1].value), highlight: r[2] && r[2].value ? String(r[2].value) : "" };
+    });
+    countEl.textContent = rows.length;
+
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:15px; color:#7a96a8;">No custom queues found. Add one above!</td></tr>';
+      return;
+    }
+
+    var html = "";
+    rows.forEach(function(r, idx) {
+      var qId = r[0] ? r[0].value : "";
+      var qName = r[1] ? r[1].value : "";
+      var qHl = r[2] && r[2].value ? r[2].value : "—";
+      html += '<tr>'
+        + '<td>' + (idx + 1) + '</td>'
+        + '<td><code>' + escapeHtml(qName) + '</code></td>'
+        + '<td><span style="color:#1c4587; font-weight:600;">' + escapeHtml(qHl) + '</span></td>'
+        + '<td style="text-align:center;"><button class="btn-del-queue" onclick="deleteQueueFromAdmin(' + qId + ', \'' + escapeHtml(qName).replace(/'/g, "\\'") + '\')">🗑️ Delete</button></td>'
+        + '</tr>';
+    });
+    tbody.innerHTML = html;
+  });
+}
+
+// Admin function: Add new queue
+function addNewQueueFromAdmin() {
+  var nameIn = document.getElementById("newQueueName");
+  var hlIn = document.getElementById("newQueueHighlight");
+  var msg = document.getElementById("addQueueMsg");
+  var name = nameIn.value.trim();
+  var hl = hlIn.value.trim();
+
+  if (!name) {
+    msg.style.color = "#e74c3c";
+    msg.textContent = "⚠️ Please enter a queue name.";
+    return;
+  }
+
+  msg.style.color = "#4a6375";
+  msg.textContent = "Saving to Turso...";
+
+  var sql = "INSERT INTO custom_queues (name, highlight) VALUES (?, ?);";
+  tursoQuery(sql, [name, hl], function(err, res) {
+    if (err) {
+      msg.style.color = "#e74c3c";
+      if (err.message && err.message.indexOf("UNIQUE") > -1) {
+        msg.textContent = "⚠️ This Queue name already exists!";
+      } else {
+        msg.textContent = "⚠️ Error: " + err.message;
+      }
+      return;
+    }
+
+    nameIn.value = "";
+    hlIn.value = "";
+    msg.style.color = "#27ae60";
+    msg.textContent = "✔ Queue added successfully!";
+    toast("✔ Queue added successfully!", "ok");
+    loadQueuesInAdmin();
+    loadLiveQueuesFromTurso();
+    setTimeout(function() { msg.textContent = ""; }, 4000);
+  });
+}
+
+// Admin function: Delete queue
+function deleteQueueFromAdmin(id, name) {
+  if (!confirm("Are you sure you want to delete queue: \n" + name + "?")) return;
+  tursoQuery("DELETE FROM custom_queues WHERE id = ?;", [id], function(err, res) {
+    if (err) {
+      alert("Failed to delete queue: " + err.message);
+      return;
+    }
+    toast("✔ Queue deleted!", "ok");
+    loadQueuesInAdmin();
+    loadLiveQueuesFromTurso();
+  });
+}
+
+// Auto-load live queues from Turso when page loads
+loadLiveQueuesFromTurso();
+
 </script>
 
 </body>
