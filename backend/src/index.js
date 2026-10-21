@@ -2,14 +2,14 @@
 // Deploy behind a custom same-site domain; set TURSO_URL, TURSO_TOKEN and SESSION_SECRET as Worker secrets.
 const te = new TextEncoder();
 const json = (data, status=200, headers={}) => new Response(JSON.stringify(data), {status,headers:{"content-type":"application/json; charset=utf-8","cache-control":"no-store",...headers}});
-const b64url = bytes => btoa(String.fromCharCode(...bytes)).replace(/\\+/g,"-").replace(/\\//g,"_").replace(/=+$/,"");
+const b64url = bytes => btoa(String.fromCharCode(...bytes)).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
 const decode = v => Uint8Array.from(atob(v.replace(/-/g,"+").replace(/_/g,"/")), c=>c.charCodeAt(0));
 async function mac(secret,data){const k=await crypto.subtle.importKey("raw",te.encode(secret),{name:"HMAC",hash:"SHA-256"},false,["sign"]);return b64url(new Uint8Array(await crypto.subtle.sign("HMAC",k,te.encode(data))));}
 function equals(a,b){if(a.length!==b.length)return false;let diff=0;for(let i=0;i<a.length;i++)diff|=a.charCodeAt(i)^b.charCodeAt(i);return diff===0;}
 async function sessionToken(user,env){const payload=b64url(te.encode(JSON.stringify({id:user.id,role:user.role,exp:Math.floor(Date.now()/1000)+28800})));return payload+"."+(await mac(env.SESSION_SECRET,payload));}
 async function verifySession(request,env){
   const cookie=request.headers.get("Cookie")||"";
-  const token=cookie.match(/(?:^|;\\s*)meeg_session=([^;]+)/)?.[1];
+  const token=cookie.match(/(?:^|;\s*)meeg_session=([^;]+)/)?.[1];
   if(!token)return null;
   const [body,sig,...extra]=token.split(".");
   if(!body||!sig||extra.length||!equals(await mac(env.SESSION_SECRET,body),sig))return null;
@@ -22,7 +22,7 @@ async function verifySession(request,env){
 }
 async function db(env,sql,params=[]){
   if(!env.TURSO_URL||!env.TURSO_TOKEN)throw Error("Database secrets missing");
-  const endpoint=env.TURSO_URL.replace(/\\/v2\\/pipeline\\/?$/,"").replace(/\\/$/,"")+"/v2/pipeline";
+  const endpoint=env.TURSO_URL.replace(/\/v2\/pipeline\/?$/,"").replace(/\/$/,"")+"/v2/pipeline";
   const args=params.map(v=>v===null?{type:"null"}:typeof v==="number"?{type:"integer",value:String(v)}:{type:"text",value:String(v)});
   const res=await fetch(endpoint,{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+env.TURSO_TOKEN},body:JSON.stringify({requests:[{type:"execute",stmt:{sql,args}}]})});
   if(!res.ok)throw Error("Database unavailable");
