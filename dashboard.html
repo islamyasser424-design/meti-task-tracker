@@ -1503,7 +1503,7 @@
       <form onsubmit="handleLogin(event); return false;">
         <div class="form-group">
           <label class="form-label">Username</label>
-          <input type="text" id="loginUsername" class="form-input" placeholder="e.g. admin or islam" required autocomplete="username" autofocus>
+          <input type="text" id="loginUsername" class="form-input" placeholder="Username" required autocomplete="username" autofocus>
         </div>
         <div class="form-group">
           <label class="form-label">Password</label>
@@ -1514,7 +1514,7 @@
         </div>
         <button type="button" class="btn-submit" id="loginBtn" onclick="handleLogin(event)">Sign In to Dashboard</button>
         <div class="login-err" id="loginErr"></div>
-        <div style="margin-top:10px; font-size:0.75rem; color:var(--text-muted); text-align:center;">💡 <strong>Super Admin:</strong> Username: <code style="color:var(--primary); font-weight:700;">admin</code> (or <code style="color:var(--primary); font-weight:700;">islam</code>) &nbsp;|&nbsp; Password: <code style="color:var(--primary); font-weight:700;">123456</code></div>
+        
 
         <div style="margin-top:20px; padding-top:16px; border-top:1px solid var(--border); display:flex; flex-direction:column; gap:9px; text-align:center;">
           <button type="button" onclick="openActivationModal('activate')" style="background:rgba(13,148,136,0.1); border:1px solid rgba(13,148,136,0.25); border-radius:8px; color:var(--primary); font-size:0.82rem; font-weight:700; cursor:pointer; padding:9px 12px; display:inline-flex; align-items:center; justify-content:center; gap:6px; transition:all 0.15s;">
@@ -4426,29 +4426,42 @@
         var resetStatus = row[7] ? String(row[7].value).trim().toLowerCase() : "none";
         var resetCode = row[8] ? String(row[8].value).trim() : "";
 
-        // Check if mode is 'reset' (requires Admin Approval!)
+        // Check if mode is 'reset' (Strict Admin Approval for users, Master PIN for Admin)
         if (_actMode === "reset") {
-          if (resetStatus === "none") {
-            btn.disabled = false;
-            btn.textContent = "Try Again";
-            msg.style.color = "var(--error)";
-            msg.innerHTML = "❌ <strong>No approved reset request found!</strong><br>لحماية الحساب، اضغط على زر 'Submit Reset Request to Admin' أعلاه أولاً ليوافق الإدمن على استعادة كلمة المرور.";
-            return;
-          }
-          if (resetStatus === "requested") {
-            btn.disabled = false;
-            btn.textContent = "Try Again";
-            msg.style.color = "var(--error)";
-            msg.innerHTML = "⏳ <strong>Pending Admin Approval!</strong><br>طلبك ما زال قيد انتظار موافقة الإدمن. يرجى من الإدمن فتح 'Manage Users' والموافقة على طلبك وتزويدك بالكود.";
-            return;
-          }
-          if (resetStatus === "approved") {
-            if (!resetCode || resetCode !== pin) {
+          var isSuperAdmin = (role === "admin" || u === "admin" || u === "islam" || u === "islam.yasser");
+          if (isSuperAdmin) {
+            // Super Admin Emergency Recovery via Admin PIN
+            if (pin !== dbPin && pin !== "1234") {
               btn.disabled = false;
               btn.textContent = "Try Again";
               msg.style.color = "var(--error)";
-              msg.textContent = "❌ Incorrect Admin Approval Code! Please check with your Admin for the approved 4-digit code.";
+              msg.textContent = "❌ Incorrect Admin Recovery PIN! Default PIN is 1234.";
               return;
+            }
+          } else {
+            // Regular User: Strictly Enforce Explicit Admin Approval
+            if (resetStatus === "none") {
+              btn.disabled = false;
+              btn.textContent = "Try Again";
+              msg.style.color = "var(--error)";
+              msg.innerHTML = "❌ <strong>No approved reset request found!</strong><br>لحماية بيانات الشركة وسرية الحسابات، يجب أولاً تقديم طلب لإعادة التعيين بالضغط على 'Submit Reset Request to Admin' أعلاه ليوافق عليه الإدمن.";
+              return;
+            }
+            if (resetStatus === "requested") {
+              btn.disabled = false;
+              btn.textContent = "Try Again";
+              msg.style.color = "var(--error)";
+              msg.innerHTML = "⏳ <strong>Pending Admin Approval!</strong><br>طلبك قيد انتظار موافقة الإدمن في لوحة التحكم. بمجرد موافقة الإدمن سيعطيك كود الموافقة المكون من 4 أرقام.";
+              return;
+            }
+            if (resetStatus === "approved") {
+              if (!resetCode || resetCode !== pin) {
+                btn.disabled = false;
+                btn.textContent = "Try Again";
+                msg.style.color = "var(--error)";
+                msg.textContent = "❌ Incorrect Admin Approval Code! Please check with your Admin for the approved 4-digit code.";
+                return;
+              }
             }
           }
         } else {
