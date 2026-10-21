@@ -1373,6 +1373,20 @@
       });
     }
 
+    function executePipelineBatch(statements) {
+      return fetch(TURSO_URL + "/v2/pipeline", {
+        method: "POST",
+        headers: {
+          "Authorization": "Bearer " + TURSO_TOKEN,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ requests: statements })
+      }).then(function(res) {
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        return res.json();
+      });
+    }
+
     // ============================================================
     // APPLICATION STATE
     // ============================================================
@@ -1965,56 +1979,7 @@
     // ============================================================
     // DATA FETCHING & KPIS
     // ============================================================
-    function fetchLiveData() {
-      var sync = document.getElementById("syncStatus");
-      sync.textContent = "Syncing with Turso...";
-
-      var sql = "SELECT id, timestamp, shift, unit, pc_no, labeler_name, national_id, yubikey_email, qtc_name, task_id, pass, modality, queue_name, object_count, stage, created_at, task_link FROM task_submissions ORDER BY id DESC LIMIT 5000;";
-      tursoQuery(sql, [], function(err, res) {
-        if (err) {
-          sync.textContent = "Sync error: " + err.message;
-          return;
-        }
-        sync.textContent = "● Live Edge Synced (" + new Date().toLocaleTimeString("en-US", {timeZone:"Africa/Cairo"}) + ")";
-
-        var rows = res ? res.rows : [];
-        _allSubmissions = rows.map(function(r) {
-          return {
-            id: r[0] ? r[0].value : "",
-            timestamp: r[1] ? String(r[1].value) : "",
-            shift: r[2] ? String(r[2].value) : "",
-            unit: r[3] ? String(r[3].value) : "",
-            pc_no: r[4] ? String(r[4].value) : "",
-            labeler_name: r[5] ? String(r[5].value) : "",
-            national_id: r[6] ? String(r[6].value) : "",
-            yubikey_email: r[7] ? String(r[7].value) : "",
-            qtc_name: r[8] ? String(r[8].value) : "",
-            task_id: r[9] ? String(r[9].value) : "",
-            pass: r[10] ? String(r[10].value) : "",
-            modality: r[11] ? String(r[11].value) : "",
-            queue_name: r[12] ? String(r[12].value) : "",
-            object_count: r[13] ? parseInt(r[13].value, 10) || 0 : 0,
-            stage: r[14] ? String(r[14].value) : "",
-            created_at: r[15] ? String(r[15].value) : "",
-            task_link: r[16] ? String(r[16].value) : ""
-          };
-        });
-
-        _allSubmissions.forEach(function(s) {
-          if (s.queue_name && !_allQueuesList.includes(s.queue_name)) {
-            _allQueuesList.push(s.queue_name);
-          }
-          if (s.qtc_name && !_allQTCList.includes(s.qtc_name)) {
-            _allQTCList.push(s.qtc_name);
-          }
-        });
-        populateQueueDropdowns();
-        populateQTCDropdowns();
-
-        calculateKPIs();
-        applyFilters();
-      });
-    }
+// (fetchLiveData logic is defined in real-time sync block below)
 
     function extractISODate(r) {
       if (r.created_at && r.created_at.length >= 10) {
@@ -2635,128 +2600,233 @@
     // Auto-init on page load
     initAuth();
   
+
 // ============================================================
-// CLIENT-SIDE GOOGLE SHEETS SYNC
+// AUTOMATIC REAL-TIME GOOGLE SHEETS SYNC VIA JSONP GVIZ
 // ============================================================
-async function syncGoogleSheetsClient() {
-  const btn = document.getElementById('btnSyncSheets');
-  const icon = document.getElementById('syncIcon');
-  const text = document.getElementById('syncText');
-  if (!btn) return;
-  btn.disabled = true;
-  if (icon) icon.innerHTML = '⏳';
-  if (text) text.innerText = 'Syncing...';
+function fetchSheetGViz(sheetId, query) {
+  return new Promise(function(resolve) {
+    var cbName = 'gviz_cb_' + Math.floor(Math.random() * 10000000);
+    var script = document.createElement('script');
+    var timer = setTimeout(function() {
+      cleanup();
+      resolve(null);
+    }, 12000);
+
+    function cleanup() {
+      if (timer) clearTimeout(timer);
+      delete window[cbName];
+      if (script.parentNode) script.parentNode.removeChild(script);
+    }
+
+    window[cbName] = function(data) {
+      cleanup();
+      resolve(data);
+    };
+
+    script.onerror = function() {
+      cleanup();
+      resolve(null);
+    };
+
+    var encodedQuery = encodeURIComponent(query);
+    script.src = 'https://docs.google.com/spreadsheets/d/' + sheetId + '/gviz/tq?tqx=responseHandler:' + cbName + '&tq=' + encodedQuery;
+    document.head.appendChild(script);
+  });
+}
+
+var _isSyncingSheets = false;
+async function syncGoogleSheetsClient(isAuto) {
+  if (_isSyncingSheets) return;
+  _isSyncingSheets = true;
+
+  var btn = document.getElementById('btnSyncSheets');
+  var icon = document.getElementById('syncIcon');
+  var text = document.getElementById('syncText');
+  var syncPill = document.getElementById('syncStatus');
+
+  if (!isAuto && btn) {
+    btn.disabled = true;
+    if (icon) icon.innerHTML = '⏳';
+    if (text) text.innerText = 'Syncing...';
+  }
+  if (syncPill) syncPill.textContent = '⚡ Checking Google Sheets live submissions...';
 
   try {
-    const sheetUrls = [
-      { name: 'Daily Sheet', url: 'https://docs.google.com/spreadsheets/d/1vpsYtvoZSKLsUeKj-FTXVGJmyFygSSck8DUIODJha_A/export?format=csv&gid=0', idCol: 'Task ID', qtcCol: 'QTC Name', pcCol: 'PC No', natCol: 'National ID' }
-    ];
+    // Sheet 1: Main/Active Sheet with 51k+ rows
+    var data1 = await fetchSheetGViz('1g9mPKQMactJKC-BP0Ik3Cw72PLUXCb4VTKFbHYLjc5I', 'select * order by A desc limit 150');
+    // Sheet 2: Daily Active Sheet
+    var data2 = await fetchSheetGViz('1vpsYtvoZSKLsUeKj-FTXVGJmyFygSSck8DUIODJha_A', 'select * order by A desc limit 50');
 
-    let totalProcessed = 0;
-    for (const s of sheetUrls) {
-      let csvData = '';
-      try {
-        const resp = await fetch(s.url);
-        if (resp.ok) csvData = await resp.text();
-      } catch(e) {
-        try {
-          const proxyResp = await fetch('https://api.allorigins.win/raw?url=' + encodeURIComponent(s.url));
-          if (proxyResp.ok) csvData = await proxyResp.text();
-        } catch(e2) {
-          console.warn('Proxy fetch failed', e2);
-        }
+    var stmts = [];
+
+    // Helper to format values
+    function toVal(v, typ) {
+      if (typ === 'integer') {
+        var num = parseInt(v || 0, 10);
+        return { type: 'integer', value: String(isNaN(num) ? 0 : num) };
       }
+      return { type: 'text', value: String(v === null || v === undefined ? '' : v).trim() };
+    }
 
-      if (!csvData) continue;
-      const lines = csvData.split(/\r?\n/).filter(l => l.trim().length > 0);
-      if (lines.length < 2) continue;
+    // Process Sheet 1 rows
+    if (data1 && data1.table && data1.table.rows) {
+      data1.table.rows.forEach(function(r) {
+        if (!r.c) return;
+        var vals = r.c.map(function(cell) { return cell ? (cell.f || cell.v || '') : ''; });
+        if (vals.length < 15) return;
+        var ts = vals[0] || '';
+        var shift = vals[1] || '';
+        var unit = vals[2] || '';
+        var qtc_name = vals[3] || '';
+        var yk_email = String(vals[4] || '').toLowerCase().trim();
+        var lab_name = vals[5] || '';
+        var nat_id = String(vals[6] || '').trim();
+        var pc_no = String(vals[7] || '').trim();
+        var mod = vals[8] || '';
+        var queue = vals[9] || '';
+        var link = vals[10] || '';
+        var tid = String(vals[11] || '').trim();
+        var obj_cnt = vals[12] || 0;
+        var pas = String(vals[13] || '').trim();
+        var stage = vals[14] || '';
+        var created = vals[15] || ts;
 
-      const parseLine = (line) => {
-        const res = [];
-        let cur = '', inQ = false;
-        for (let i = 0; i < line.length; i++) {
-          const c = line[i];
-          if (c === '"') {
-            if (inQ && line[i+1] === '"') { cur += '"'; i++; }
-            else { inQ = !inQ; }
-          } else if (c === ',' && !inQ) {
-            res.push(cur.trim());
-            cur = '';
-          } else {
-            cur += c;
-          }
-        }
-        res.push(cur.trim());
-        return res;
-      };
+        if (!tid) return;
 
-      const headers = parseLine(lines[0]);
-      const idIdx = headers.findIndex(h => h.toLowerCase() === s.idCol.toLowerCase() || h.toLowerCase() === 'task id' || h.toLowerCase() === 'id');
-      const qtcIdx = headers.findIndex(h => h.toLowerCase() === s.qtcCol.toLowerCase() || h.toLowerCase().includes('qtc'));
-      const shiftIdx = headers.findIndex(h => h.toLowerCase() === 'shift');
-      const unitIdx = headers.findIndex(h => h.toLowerCase() === 'unit');
-      const pcIdx = headers.findIndex(h => h.toLowerCase() === s.pcCol.toLowerCase() || h.toLowerCase() === 'pc no');
-      const nameIdx = headers.findIndex(h => h.toLowerCase() === 'labeler name');
-      const natIdx = headers.findIndex(h => h.toLowerCase() === s.natCol.toLowerCase() || h.toLowerCase().includes('national'));
-      const emailIdx = headers.findIndex(h => h.toLowerCase() === 'yubikey email');
-      const stageIdx = headers.findIndex(h => h.toLowerCase() === 'stage');
-      const linkIdx = headers.findIndex(h => h.toLowerCase() === 'task link');
-      const passIdx = headers.findIndex(h => h.toLowerCase() === 'pass');
-      const modIdx = headers.findIndex(h => h.toLowerCase() === 'modality');
-      const qIdx = headers.findIndex(h => h.toLowerCase() === 'queue name');
-      const objIdx = headers.findIndex(h => h.toLowerCase().includes('object'));
-      const tsIdx = headers.findIndex(h => h.toLowerCase() === 'timestamp');
-
-      const statements = [];
-      for (let i = 1; i < lines.length; i++) {
-        const row = parseLine(lines[i]);
-        const taskId = idIdx >= 0 ? (row[idIdx] || '') : '';
-        const pass = passIdx >= 0 ? (row[passIdx] || '') : '';
-        const email = emailIdx >= 0 ? (row[emailIdx] || '').toLowerCase() : '';
-        if (!taskId) continue;
-
-        const sql = `INSERT OR IGNORE INTO task_submissions (timestamp, shift, unit, pc_no, labeler_name, national_id, qtc_shift, yubikey_email, qtc_name, stage, task_link, task_id, pass, modality, queue_name, object_count, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-        const args = [
-          { type: 'text', value: tsIdx >= 0 ? (row[tsIdx] || '') : '' },
-          { type: 'text', value: shiftIdx >= 0 ? (row[shiftIdx] || '') : '' },
-          { type: 'text', value: unitIdx >= 0 ? (row[unitIdx] || '') : '' },
-          { type: 'text', value: pcIdx >= 0 ? (row[pcIdx] || '') : '' },
-          { type: 'text', value: nameIdx >= 0 ? (row[nameIdx] || '') : '' },
-          { type: 'text', value: natIdx >= 0 ? (row[natIdx] || '') : '' },
-          { type: 'text', value: shiftIdx >= 0 ? (row[shiftIdx] || '') : '' },
-          { type: 'text', value: email },
-          { type: 'text', value: qtcIdx >= 0 ? (row[qtcIdx] || '') : '' },
-          { type: 'text', value: stageIdx >= 0 ? (row[stageIdx] || '') : '' },
-          { type: 'text', value: linkIdx >= 0 ? (row[linkIdx] || '') : '' },
-          { type: 'text', value: taskId },
-          { type: 'text', value: pass },
-          { type: 'text', value: modIdx >= 0 ? (row[modIdx] || '') : '' },
-          { type: 'text', value: qIdx >= 0 ? (row[qIdx] || '') : '' },
-          { type: 'integer', value: String(parseInt(objIdx >= 0 ? (row[objIdx] || '0') : '0', 10) || 0) },
-          { type: 'text', value: tsIdx >= 0 ? (row[tsIdx] || '') : '' }
+        var sql = "INSERT OR IGNORE INTO task_submissions (timestamp, shift, unit, pc_no, labeler_name, national_id, qtc_shift, yubikey_email, qtc_name, stage, task_link, task_id, pass, modality, queue_name, object_count, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        var args = [
+          toVal(ts), toVal(shift), toVal(unit), toVal(pc_no), toVal(lab_name),
+          toVal(nat_id), toVal(shift), toVal(yk_email), toVal(qtc_name),
+          toVal(stage), toVal(link), toVal(tid), toVal(pas), toVal(mod),
+          toVal(queue), toVal(obj_cnt, 'integer'), toVal(created)
         ];
-        statements.push({ type: 'execute', stmt: { sql, args } });
-      }
+        stmts.push({ type: 'execute', stmt: { sql: sql, args: args } });
+      });
+    }
 
-      for (let b = 0; b < statements.length; b += 50) {
-        const chunk = statements.slice(b, b + 50);
-        await executePipeline(chunk);
-        totalProcessed += chunk.length;
+    // Process Sheet 2 rows
+    if (data2 && data2.table && data2.table.rows) {
+      data2.table.rows.forEach(function(r) {
+        if (!r.c) return;
+        var vals = r.c.map(function(cell) { return cell ? (cell.f || cell.v || '') : ''; });
+        if (vals.length < 15) return;
+        var ts = vals[0] || '';
+        var shift = vals[1] || '';
+        var unit = vals[2] || '';
+        var qtc_name = vals[3] || '';
+        var yk_email = String(vals[4] || '').toLowerCase().trim();
+        var lab_name = vals[5] || '';
+        var nat_id = String(vals[6] || '').trim();
+        var pc_no = String(vals[7] || '').trim();
+        var mod = vals[8] || '';
+        var queue = vals[9] || '';
+        var link = vals[10] || '';
+        var tid = String(vals[11] || '').trim();
+        var obj_cnt = vals[12] || 0;
+        var pas = String(vals[13] || '').trim();
+        var stage = vals[14] || '';
+
+        if (!tid) return;
+
+        var sql = "INSERT OR IGNORE INTO task_submissions (timestamp, shift, unit, pc_no, labeler_name, national_id, qtc_shift, yubikey_email, qtc_name, stage, task_link, task_id, pass, modality, queue_name, object_count, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        var args = [
+          toVal(ts), toVal(shift), toVal(unit), toVal(pc_no), toVal(lab_name),
+          toVal(nat_id), toVal(shift), toVal(yk_email), toVal(qtc_name),
+          toVal(stage), toVal(link), toVal(tid), toVal(pas), toVal(mod),
+          toVal(queue), toVal(obj_cnt, 'integer'), toVal(ts)
+        ];
+        stmts.push({ type: 'execute', stmt: { sql: sql, args: args } });
+      });
+    }
+
+    if (stmts.length > 0) {
+      for (var b = 0; b < stmts.length; b += 50) {
+        await executePipelineBatch(stmts.slice(b, b + 50));
       }
     }
 
-    alert('✅ تم مزامنة بيانات Google Sheets بنجاح مع قاعدة البيانات!');
-    await fetchLiveData();
+    if (!isAuto) {
+      alert('✅ تم مزامنة أحدث بيانات Google Sheets بنجاح!');
+    }
   } catch(err) {
-    console.error('Sync error:', err);
-    alert('⚠️ حدث خطأ أثناء المزامنة: ' + (err.message || err));
+    console.warn('Sync error:', err);
   } finally {
-    btn.disabled = false;
-    if (icon) icon.innerHTML = '⚡';
-    if (text) text.innerText = 'Sync Sheets';
+    _isSyncingSheets = false;
+    if (!isAuto && btn) {
+      btn.disabled = false;
+      if (icon) icon.innerHTML = '⚡';
+      if (text) text.innerText = 'Sync Sheets';
+    }
+    // Refresh table view
+    fetchLiveDataOnly();
   }
 }
 
-</script>
+// Rename raw fetching to fetchLiveDataOnly and make fetchLiveData trigger sync
+function fetchLiveDataOnly() {
+  var sync = document.getElementById("syncStatus");
+  if (!sync) return;
+  sync.textContent = "Syncing with Database...";
+
+  var sql = "SELECT id, timestamp, shift, unit, pc_no, labeler_name, national_id, yubikey_email, qtc_name, task_id, pass, modality, queue_name, object_count, stage, created_at, task_link FROM task_submissions ORDER BY id DESC LIMIT 5000;";
+  tursoQuery(sql, [], function(err, res) {
+    if (err) {
+      sync.textContent = "Sync error: " + err.message;
+      return;
+    }
+    sync.textContent = "● Live Edge Synced (" + new Date().toLocaleTimeString("en-US", {timeZone:"Africa/Cairo"}) + ")";
+
+    var rows = res ? res.rows : [];
+    _allSubmissions = rows.map(function(r) {
+      return {
+        id: r[0] ? r[0].value : "",
+        timestamp: r[1] ? String(r[1].value) : "",
+        shift: r[2] ? String(r[2].value) : "",
+        unit: r[3] ? String(r[3].value) : "",
+        pc_no: r[4] ? String(r[4].value) : "",
+        labeler_name: r[5] ? String(r[5].value) : "",
+        national_id: r[6] ? String(r[6].value) : "",
+        yubikey_email: r[7] ? String(r[7].value) : "",
+        qtc_name: r[8] ? String(r[8].value) : "",
+        task_id: r[9] ? String(r[9].value) : "",
+        pass: r[10] ? String(r[10].value) : "",
+        modality: r[11] ? String(r[11].value) : "",
+        queue_name: r[12] ? String(r[12].value) : "",
+        object_count: r[13] ? parseInt(r[13].value, 10) || 0 : 0,
+        stage: r[14] ? String(r[14].value) : "",
+        created_at: r[15] ? String(r[15].value) : "",
+        task_link: r[16] ? String(r[16].value) : ""
+      };
+    });
+
+    _allSubmissions.forEach(function(s) {
+      if (s.queue_name && !_allQueuesList.includes(s.queue_name)) {
+        _allQueuesList.push(s.queue_name);
+      }
+      if (s.qtc_name && !_allQTCList.includes(s.qtc_name)) {
+        _allQTCList.push(s.qtc_name);
+      }
+    });
+    populateQueueDropdowns();
+    populateQTCDropdowns();
+
+    calculateKPIs();
+    applyFilters();
+  });
+}
+
+function fetchLiveData() {
+  syncGoogleSheetsClient(true);
+}
+
+// 25-second continuous background polling for live submissions
+setInterval(function() {
+  if (document.getElementById('dashView').style.display !== 'none') {
+    syncGoogleSheetsClient(true);
+  }
+}, 25000);
+
+  </script>
 </body>
 </html>
