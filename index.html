@@ -1224,8 +1224,9 @@ input[type=number] { -moz-appearance:textfield }
           <span class="sd-arrow"></span>
         </div>
         <ul class="sdl" id="modalityList">
-          <li data-v="Lane Line"><span class="hl">Lane Line</span></li>
           <li data-v="Lidar"><span class="hl">Lidar</span></li>
+          <li data-v="Lane Line"><span class="hl">Lane Line</span></li>
+          <li data-v="Relabeling"><span class="hl">Relabeling</span></li>
         </ul>
         <input type="hidden" id="modality">
       </div>
@@ -1592,6 +1593,38 @@ function checkPassWarn() {
   var cur=document.getElementById("pass").value, warn=document.getElementById("passWarn"), pi=document.getElementById("passIcon");
   if (linkPassVal&&cur&&cur!==linkPassVal){warn.style.display="flex";pi.textContent="\u2014";pi.style.color="";pi.style.opacity=".4";}
   else{warn.style.display="none";if(linkPassVal&&cur&&cur===linkPassVal){pi.textContent="\u2713";pi.style.color="var(--success)";pi.style.opacity="1";}}
+}
+
+
+// ══════════════════════════════════════════════════════════════
+// AUTO-FILL RULES: Modality & Pass from Link Stage Segment
+// ══════════════════════════════════════════════════════════════
+// SellIvandar2D   → Modality: Lidar     | Pass: FP
+// SellIvandarQA   → Modality: Lidar     | Pass: QA
+// SellMapping     → Modality: Lane Line | Pass: FP
+// SellMappingQA   → Modality: Lane Line | Pass: QA
+// SellRelabeling  → Modality: Relabeling| Pass: FP
+// SellRelabelingQA→ Modality: Relabeling| Pass: QA
+// ══════════════════════════════════════════════════════════════
+function detectModalityAndPass(url) {
+  var dM = (url || "").match(/\/do\/([^\/]+)/i);
+  if (!dM) return { modality: "", pass: "", seg: "" };
+  var seg = dM[1].trim();
+  var segUpper = seg.toUpperCase();
+
+  // Pass rule: if ends with QA -> QA, else FP
+  var pass = segUpper.endsWith("QA") ? "QA" : "FP";
+  var modality = "";
+
+  if (segUpper.indexOf("SELLIVANDAR") > -1) {
+    modality = "Lidar";
+  } else if (segUpper.indexOf("SELLMAPPING") > -1) {
+    modality = "Lane Line";
+  } else if (segUpper.indexOf("SELLRELABELING") > -1) {
+    modality = "Relabeling";
+  }
+
+  return { modality: modality, pass: pass, seg: seg };
 }
 
 function detectStage(url) {
@@ -2077,43 +2110,53 @@ if(idMatch && url.length > idMatch[1].length){ this.value=idMatch[1]; url=idMatc
   if(idM){linkTaskId=idM[1];idEl.value=idM[1];idEl.style.borderColor="#1a8a5a";icon.textContent="\u2713";icon.style.color="var(--success)";icon.style.opacity="1";document.getElementById("taskIdWarn").style.display="none";}
   else{linkTaskId="";idEl.value="";idEl.style.borderColor="";icon.textContent="\u2014";icon.style.color="";icon.style.opacity=".4";document.getElementById("taskIdWarn").style.display="none";}
 
-  // Extract Pass (FP / QA)
-  var dM=url.match(/\/do\/([^\/]+)\//);
-  if(dM){var dp=dM[1].toUpperCase().endsWith("QA")?"QA":"FP";linkPassVal=dp;passDD.setValue(dp);var pi=document.getElementById("passIcon");pi.textContent="\u2713";pi.style.color="var(--success)";pi.style.opacity="1";document.getElementById("passWarn").style.display="none";}
-  else{linkPassVal="";passDD.reset();document.getElementById("passWarn").style.display="none";var pi2=document.getElementById("passIcon");pi2.textContent="\u2014";pi2.style.color="";pi2.style.opacity=".4";}
+    // ── AUTO-DETECT: Pass & Modality from Link ───────────
+  var autoResult = detectModalityAndPass(url);
 
-  // ── NEW: Auto-fill Queue Name + Modality from URL ──────────
-  var queueSegM = url.match(/\/queue\/([^\/\?#&]+)/i);
- if (queueSegM) {
-    var extractedQ = queueSegM[1].toLowerCase().trim();
+  // Set Pass (FP / QA)
+  if (autoResult.pass) {
+    linkPassVal = autoResult.pass;
+    passDD.setValue(autoResult.pass);
+    var pi = document.getElementById("passIcon");
+    if (pi) { pi.textContent = "\u2713"; pi.style.color = "var(--success)"; pi.style.opacity = "1"; }
+    document.getElementById("passWarn").style.display = "none";
+  } else {
+    linkPassVal = "";
+    passDD.reset();
+    document.getElementById("passWarn").style.display = "none";
+    var pi2 = document.getElementById("passIcon");
+    if (pi2) { pi2.textContent = "\u2014"; pi2.style.color = ""; pi2.style.opacity = ".4"; }
+  }
 
-    // 1) Set Queue Name dropdown
-    queueDD.setValue(extractedQ);
-    showAutofillBadge("queueBadge", true);
-    autoFilledQueue = true;
-
-    // 2) Get raw stage segment from URL (e.g. "SellMSL", "SellIvandar")
-    var doSegArr = url.match(/\/do\/([^\/]+)\//i);
-    var stageSegRaw = doSegArr ? doSegArr[1] : "";
-    stageSegRaw = stageSegRaw.replace(/(?:QA|FP)$/i, "");
-    // 3) Detect + set Modality
-    var autoMod = detectModalityFromStageQueue(stageSegRaw, extractedQ);
-    if (autoMod) {
-      modalityDD.setValue(autoMod);
+  // Set Modality (Lidar, Lane Line, Relabeling)
+  if (autoResult.modality) {
+    modalityDD.setValue(autoResult.modality);
+    showAutofillBadge("modalityBadge", true);
+    autoFilledModality = true;
+  } else {
+    // Fallback: check queue-based modality if stage segment was ambiguous
+    var queueSegM_tmp = url.match(/\/queue\/([^\/\?#&]+)/i);
+    var fbMod = queueSegM_tmp ? detectModalityFromStageQueue(autoResult.seg || "", queueSegM_tmp[1].toLowerCase().trim()) : "";
+    if (fbMod) {
+      modalityDD.setValue(fbMod);
       showAutofillBadge("modalityBadge", true);
       autoFilledModality = true;
     } else {
-      // Queue found but no modality rule → reset modality so user picks manually
-      modalityDD.reset();
+      if (autoFilledModality) { modalityDD.reset(); autoFilledModality = false; }
       showAutofillBadge("modalityBadge", false);
-      autoFilledModality = false;
     }
+  }
+
+  // Set Queue Name (if present in URL)
+  var queueSegM = url.match(/\/queue\/([^\/\?#&]+)/i);
+  if (queueSegM) {
+    var extractedQ = queueSegM[1].toLowerCase().trim();
+    queueDD.setValue(extractedQ);
+    showAutofillBadge("queueBadge", true);
+    autoFilledQueue = true;
   } else {
-    // No /queue/ in URL → clear if they were auto-filled
     if (autoFilledQueue) { queueDD.reset(); autoFilledQueue = false; }
     showAutofillBadge("queueBadge", false);
-    if (autoFilledModality) { modalityDD.reset(); autoFilledModality = false; }
-    showAutofillBadge("modalityBadge", false);
   }
   // ── END auto-fill ───────────────────────────────────────────
 
