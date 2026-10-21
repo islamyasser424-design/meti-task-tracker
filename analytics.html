@@ -879,7 +879,7 @@ function loadUsers(force){
     const raw = sessionStorage.getItem("meti_dash_user");
     if (raw) {
       const u = JSON.parse(raw);
-      if (u && (u.role || '').toLowerCase() === 'admin') {
+      if (u && u.id && u.username && ['admin','sv','wla','shift sv','floor sv','training sv','traning sv','qtc'].includes(String(u.role||'').toLowerCase())) {
         const em = (u.username || 'admin').toLowerCase() + '@meti.internal';
         usersMap[em] = { name: u.full_name || 'Admin', role: 'Executive Admin' };
         usersLoaded = true;
@@ -904,8 +904,8 @@ function getLoggedInEmail(){
     const raw = sessionStorage.getItem("meti_dash_user");
     if(raw){
       const u = JSON.parse(raw);
-      if(u && (u.role || '').toLowerCase() === 'admin'){
-        return (u.username || 'admin').toLowerCase() + '@meti.internal';
+      if(u && u.id && u.username && ['admin','sv','wla','shift sv','floor sv','training sv','traning sv','qtc'].includes(String(u.role||'').toLowerCase())){
+        return String(u.username).toLowerCase() + '@meti.internal';
       }
     }
   }catch(e){}
