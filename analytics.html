@@ -758,29 +758,6 @@ html[data-theme="dark"] #fg___date .calendar-panel{background:#fff;color:#202124
 <div class="arcs-prog" id="arcsProg" style="display:none"><div class="arcs-track"><span class="arcs-pfill" id="arcsFill"></span></div><span class="arcs-ppct" id="arcsPct">0%</span></div>
 <div class="arcs-res" id="arcsRes"></div>
 </div></div>
-<div id="loginScreen">
-  <div class="login-card" id="loginCard">
-    <div class="login-logo">
-      <svg width="30" height="26" viewBox="0 0 54 46">
-        <polygon points="0,4 30,4 21,16 0,16" fill="#5cf3e2"/>
-        <polygon points="5,19 35,19 26,31 5,31" fill="#5cf3e2" opacity=".7"/>
-        <polygon points="10,34 40,34 31,46 10,46" fill="#5cf3e2" opacity=".45"/>
-      </svg>
-    </div>
-    <div class="login-title">MEEG</div>
-    <div class="login-sub">Productivity · Sign In</div>
-    <input type="email" id="loginEmailInput" class="login-input" placeholder="you@example.com" autocomplete="email" onkeydown="if(event.key==='Enter')attemptLogin()"/>
-    <div class="login-hint" id="loginHint" style="display:none"></div>
-    <input type="password" id="loginPassInput" class="login-input stack" placeholder="Password" autocomplete="current-password" style="display:none" onkeydown="if(event.key==='Enter')attemptLogin()"/>
-    <input type="password" id="loginPass2Input" class="login-input stack" placeholder="Confirm password" autocomplete="new-password" style="display:none" onkeydown="if(event.key==='Enter')attemptLogin()"/>
-    <div class="login-link" id="loginShowPass" style="display:none" onclick="toggleLoginPass()">👁 Show password</div>
-    <div class="login-btn-zone" id="loginBtnZone">
-      <button class="login-btn" id="loginSubmitBtn" onclick="attemptLogin()">Continue →</button>
-    </div>
-    <div class="login-err-msg" id="loginErrMsg"></div>
-    <div class="login-link" id="loginBackLink" style="display:none" onclick="goLoginStep('email')">← Use a different email</div>
-  </div>
-</div>
 <div class="orb orb-1"></div><div class="orb orb-2"></div>
 <div id="splash">
   <div style="display:flex;flex-direction:column;align-items:center;gap:18px;">
@@ -904,7 +881,7 @@ function getLoggedInEmail(){
     const raw = sessionStorage.getItem("meti_dash_user");
     if(raw){
       const u = JSON.parse(raw);
-      if(u && (u.role || '').toLowerCase() === 'admin'){
+      if(u && u.id && u.username && ['admin','sv','wla','shift sv','floor sv','training sv','traning sv','qtc'].includes(String(u.role||'').toLowerCase())){
         return (u.username || 'admin').toLowerCase() + '@meti.internal';
       }
     }
@@ -3002,7 +2979,7 @@ function startApp(){renderUserChip(false);
   document.documentElement.setAttribute('data-theme', savedTheme);const btn=document.getElementById('darkBtn');if(btn){btn.classList.toggle('active',savedTheme==='dark');btn.innerHTML=savedTheme==='dark'?'🌙 Dark':'☀️ Light';}applyAutoRefreshUI();hideSplash();loadData();startVersionPolling();fetchQualityData(true);startUsersWatch();
 }
 window.addEventListener('load',()=>{
-  initLoginDodge();
+  // Analytics inherits the dashboard session; no second login form.
   const splash=document.getElementById('splash');
   
   let user = null;
@@ -3013,10 +2990,10 @@ window.addEventListener('load',()=>{
 
   const isEmbedded = (window !== window.top || location.search.includes('embedded=1'));
   const userRole = (user && user.role ? user.role : '').toLowerCase();
-  const isAllowedRole = isEmbedded || ['admin', 'sv', 'wla', 'shift sv', 'floor sv', 'training sv', 'traning sv', 'qtc'].includes(userRole);
+  const isAllowedRole = ['admin', 'sv', 'wla', 'shift sv', 'floor sv', 'training sv', 'traning sv', 'qtc'].includes(userRole);
 
   // Strictly enforce RBAC (allow when embedded inside dashboard or for authorized roles)
-  if (!isEmbedded && (!user || !isAllowedRole)) {
+  if (!user || !user.id || !user.username || !isAllowedRole) {
     if (splash && splash.parentNode) splash.remove();
     const ls = document.getElementById('loginScreen');
     if (ls) ls.remove();
