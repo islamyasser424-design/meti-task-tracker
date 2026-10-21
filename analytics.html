@@ -3011,8 +3011,12 @@ window.addEventListener('load',()=>{
     user = raw ? JSON.parse(raw) : null;
   } catch(e){}
 
-  // Strictly enforce Admin RBAC
-  if (!user || (user.role || '').toLowerCase() !== 'admin') {
+  const isEmbedded = (window !== window.top || location.search.includes('embedded=1'));
+  const userRole = (user && user.role ? user.role : '').toLowerCase();
+  const isAllowedRole = isEmbedded || ['admin', 'sv', 'wla', 'shift sv', 'floor sv', 'training sv', 'traning sv', 'qtc'].includes(userRole);
+
+  // Strictly enforce RBAC (allow when embedded inside dashboard or for authorized roles)
+  if (!isEmbedded && (!user || !isAllowedRole)) {
     if (splash && splash.parentNode) splash.remove();
     const ls = document.getElementById('loginScreen');
     if (ls) ls.remove();
@@ -3031,11 +3035,11 @@ window.addEventListener('load',()=>{
     return;
   }
 
-  // Pre-seed admin user in usersMap
-  const adminEmail = (user.username || 'admin').toLowerCase() + '@meti.internal';
+  // Pre-seed admin/user in usersMap
+  const adminEmail = ((user && user.username) ? user.username : 'admin').toLowerCase() + '@meti.internal';
   usersMap[adminEmail] = {
-    name: user.full_name || 'Admin',
-    role: 'Executive Admin'
+    name: (user && user.full_name) ? user.full_name : 'Admin',
+    role: (user && user.role) ? user.role.toUpperCase() : 'Executive Admin'
   };
   usersLoaded = true;
 

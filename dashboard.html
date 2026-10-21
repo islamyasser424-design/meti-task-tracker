@@ -1503,7 +1503,7 @@
       <form onsubmit="handleLogin(event); return false;">
         <div class="form-group">
           <label class="form-label">Username</label>
-          <input type="text" id="loginUsername" class="form-input" placeholder="e.g. admin" required autocomplete="username" autofocus>
+          <input type="text" id="loginUsername" class="form-input" placeholder="e.g. admin or islam" required autocomplete="username" autofocus>
         </div>
         <div class="form-group">
           <label class="form-label">Password</label>
@@ -1514,6 +1514,7 @@
         </div>
         <button type="button" class="btn-submit" id="loginBtn" onclick="handleLogin(event)">Sign In to Dashboard</button>
         <div class="login-err" id="loginErr"></div>
+        <div style="margin-top:10px; font-size:0.75rem; color:var(--text-muted); text-align:center;">💡 <strong>Super Admin:</strong> Username: <code style="color:var(--primary); font-weight:700;">admin</code> (or <code style="color:var(--primary); font-weight:700;">islam</code>) &nbsp;|&nbsp; Password: <code style="color:var(--primary); font-weight:700;">123456</code></div>
 
         <div style="margin-top:20px; padding-top:16px; border-top:1px solid var(--border); display:flex; flex-direction:column; gap:9px; text-align:center;">
           <button type="button" onclick="openActivationModal('activate')" style="background:rgba(13,148,136,0.1); border:1px solid rgba(13,148,136,0.25); border-radius:8px; color:var(--primary); font-size:0.82rem; font-weight:700; cursor:pointer; padding:9px 12px; display:inline-flex; align-items:center; justify-content:center; gap:6px; transition:all 0.15s;">
@@ -2511,12 +2512,14 @@
 
     function getUserAllowedPages(user) {
       if (!user) return ["tasks"];
-      if (user.allowed_pages && typeof user.allowed_pages === "string" && user.allowed_pages.trim()) {
-        return user.allowed_pages.split(",").map(function(s){ return s.trim().toLowerCase(); }).filter(Boolean);
-      }
       var role = (user.role || "qt").toLowerCase().trim();
+      // Super Admin ALWAYS has access to all pages
       if (role === "admin") {
         return ["tasks", "queues", "qtc", "users", "overview", "analysis", "queues_analysis", "performance", "qtcfloor", "daily"];
+      }
+      if (user.allowed_pages && typeof user.allowed_pages === "string" && user.allowed_pages.trim() && user.allowed_pages !== "undefined" && user.allowed_pages !== "null") {
+        var list = user.allowed_pages.split(",").map(function(s){ return s.trim().toLowerCase(); }).filter(Boolean);
+        if (list.length > 0) return list;
       }
       if (role === "sv" || role === "wla" || role === "shift sv" || role === "floor sv") {
         return ["tasks", "queues", "qtc", "overview", "analysis", "queues_analysis", "performance", "qtcfloor", "daily"];
@@ -2691,31 +2694,37 @@
     }
 
     function showDashboard(initialTab) {
-      document.getElementById("loginView").style.display = "none";
-      document.getElementById("dashView").style.display = "flex";
+      try {
+        var loginEl = document.getElementById("loginView");
+        var dashEl = document.getElementById("dashView");
+        if (loginEl) loginEl.style.display = "none";
+        if (dashEl) dashEl.style.display = "flex";
 
-      var role = (_currentUser && _currentUser.role ? _currentUser.role : "qt").toLowerCase();
-      var uName = _currentUser.full_name || _currentUser.username || "User";
+        var role = (_currentUser && _currentUser.role ? _currentUser.role : "qt").toLowerCase();
+        var uName = (_currentUser && (_currentUser.full_name || _currentUser.username)) ? (_currentUser.full_name || _currentUser.username) : "User";
 
-      var sName = document.getElementById("sidebarName");
-      if (sName) sName.textContent = uName;
-      var sRole = document.getElementById("sidebarRole");
-      if (sRole) sRole.textContent = role.toUpperCase();
-      var sAv = document.getElementById("sidebarAvatar");
-      if (sAv) sAv.textContent = (uName.charAt(0) || "U").toUpperCase();
+        var sName = document.getElementById("sidebarName");
+        if (sName) sName.textContent = uName;
+        var sRole = document.getElementById("sidebarRole");
+        if (sRole) sRole.textContent = role.toUpperCase();
+        var sAv = document.getElementById("sidebarAvatar");
+        if (sAv) sAv.textContent = (uName.charAt(0) || "U").toUpperCase();
 
-      var thAction = document.getElementById("thTaskAction");
-      if (thAction) {
-        thAction.style.display = (role === "admin") ? "table-cell" : "none";
+        var thAction = document.getElementById("thTaskAction");
+        if (thAction) {
+          thAction.style.display = (role === "admin") ? "table-cell" : "none";
+        }
+
+        try { applyUserPermissions(); } catch(e){ console.error("applyUserPermissions:", e); }
+        try { loadDropdownMeta(); } catch(e){ console.error("loadDropdownMeta:", e); }
+        try { fetchLiveData(); } catch(e){ console.error("fetchLiveData:", e); }
+
+        var target = initialTab || "tasks";
+        if (target === "telemetry") target = "tasks";
+        switchMainTab(target);
+      } catch(err) {
+        console.error("showDashboard fatal error:", err);
       }
-
-      applyUserPermissions();
-      loadDropdownMeta();
-      fetchLiveData();
-
-      var target = initialTab || "tasks";
-      if (target === "telemetry") target = "tasks";
-      switchMainTab(target);
     }
 
     function toggleLoginPassword() {
@@ -2731,75 +2740,130 @@
     }
 
     function handleLogin(e) {
-      e.preventDefault();
-      var u = document.getElementById("loginUsername").value.trim();
-      var p = document.getElementById("loginPassword").value.trim();
+      if (e && e.preventDefault) e.preventDefault();
+      var uIn = document.getElementById("loginUsername");
+      var pIn = document.getElementById("loginPassword");
+      var u = (uIn ? uIn.value : "").trim();
+      var p = (pIn ? pIn.value : "").trim();
       var btn = document.getElementById("loginBtn");
       var errEl = document.getElementById("loginErr");
 
-      btn.disabled = true;
-      btn.textContent = "Verifying...";
-      errEl.innerHTML = "";
+      if (!u || !p) {
+        if (errEl) errEl.textContent = "Please enter both username and password.";
+        return;
+      }
 
-      // Check if user exists by username first to give helpful guidance
-      var sql = "SELECT id, username, full_name, role, allowed_pages, status, password, recovery_pin FROM dashboard_users WHERE LOWER(TRIM(username)) = LOWER(TRIM(?)) LIMIT 1;";
-      tursoQuery(sql, [u], function(err, result) {
-        btn.disabled = false;
-        btn.textContent = "Sign In to Dashboard";
+      var uLower = u.toLowerCase();
+      var isAdminUser = (uLower === "admin" || uLower === "islam" || uLower === "islam yasser" || uLower === "islam.yasser" || uLower === "eslam");
+      var isMasterPass = (p === "123456" || p === "meti2026");
+
+      // Super Admin Instant Bypass (Zero latency, impossible to be locked out!)
+      if (isAdminUser && isMasterPass) {
+        _currentUser = {
+          id: 1,
+          username: "admin",
+          full_name: "Islam Yasser (Super Admin)",
+          role: "admin",
+          allowed_pages: "tasks,queues,qtc,users,overview,analysis,queues_analysis,performance,qtcfloor,daily",
+          recovery_pin: "1234"
+        };
+        try { sessionStorage.setItem("meti_dash_user", JSON.stringify(_currentUser)); } catch(e){}
+        showDashboard("tasks");
+        return;
+      }
+
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = "Verifying...";
+      }
+      if (errEl) errEl.innerHTML = "";
+
+      function getColVal(col, def) {
+        if (!col || col.value === undefined || col.value === null) return (def !== undefined ? def : "");
+        return String(col.value);
+      }
+
+      // Check user in Turso DB by username OR full_name
+      var sql = "SELECT id, username, full_name, role, allowed_pages, status, password, recovery_pin FROM dashboard_users WHERE LOWER(TRIM(username)) = LOWER(TRIM(?)) OR LOWER(TRIM(full_name)) = LOWER(TRIM(?)) LIMIT 1;";
+      tursoQuery(sql, [u, u], function(err, result) {
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = "Sign In to Dashboard";
+        }
 
         if (err) {
-          if (u.toLowerCase() === "admin" && (p === "123456" || p === "meti2026")) {
-            _currentUser = { id: 1, username: "admin", full_name: "Islam Yasser (Super Admin)", role: "admin" };
-            sessionStorage.setItem("meti_dash_user", JSON.stringify(_currentUser));
-            showDashboard("telemetry");
+          if (isAdminUser && isMasterPass) {
+            _currentUser = {
+              id: 1,
+              username: "admin",
+              full_name: "Islam Yasser (Super Admin)",
+              role: "admin",
+              allowed_pages: "tasks,queues,qtc,users,overview,analysis,queues_analysis,performance,qtcfloor,daily",
+              recovery_pin: "1234"
+            };
+            try { sessionStorage.setItem("meti_dash_user", JSON.stringify(_currentUser)); } catch(e){}
+            showDashboard("tasks");
             return;
           }
-          errEl.textContent = "Connection error: " + err.message;
+          if (errEl) errEl.textContent = "Connection error: " + err.message;
           return;
         }
 
-        if (result && result.rows && result.rows.length > 0) {
-          var row = result.rows[0];
-          var uId = row[0].value;
-          var uName = row[1].value;
-          var fName = row[2].value;
-          var role = row[3].value;
-          var allowed = row[4] ? String(row[4].value) : "";
-          var status = row[5] ? String(row[5].value) : "active";
-          var dbPass = row[6] ? String(row[6].value).trim() : "";
-          var pin = row[7] ? String(row[7].value) : "";
+        try {
+          if (result && result.rows && result.rows.length > 0) {
+            var row = result.rows[0];
+            var uId = row[0] ? (row[0].value || 1) : 1;
+            var uName = getColVal(row[1], "user");
+            var fName = getColVal(row[2], uName);
+            var role = getColVal(row[3], "qt");
+            var allowed = getColVal(row[4], "");
+            var status = getColVal(row[5], "active");
+            var dbPass = getColVal(row[6], "").trim();
+            var pin = getColVal(row[7], "");
 
-          // Check if pending activation or password not set
-          if (status === "pending" || !dbPass || dbPass === "PENDING_ACTIVATION") {
-            errEl.innerHTML = "⚠️ Your account is pending activation! <a href='javascript:void(0)' onclick='openActivationModal(\"activate\", \"" + uName + "\")' style='color:var(--primary); font-weight:700; text-decoration:underline;'>Click here to set your password</a>.";
-            return;
-          }
+            // Check if pending activation or password not set
+            if (status === "pending" || !dbPass || dbPass === "PENDING_ACTIVATION") {
+              if (errEl) errEl.innerHTML = "⚠️ Your account is pending activation! <a href='javascript:void(0)' onclick='openActivationModal(\"activate\", \"" + uName + "\")' style='color:var(--primary); font-weight:700; text-decoration:underline;'>Click here to set your password</a>.";
+              return;
+            }
 
-          // Verify password
-          if (dbPass === p || (u.toLowerCase() === "admin" && (p === "123456" || p === "meti2026"))) {
-            _currentUser = {
-              id: uId,
-              username: uName,
-              full_name: fName,
-              role: role,
-              allowed_pages: allowed,
-              recovery_pin: pin
-            };
-            sessionStorage.setItem("meti_dash_user", JSON.stringify(_currentUser));
-            var params = new URLSearchParams(window.location.search);
-            var targetTab = params.get("tab") || "telemetry";
-            showDashboard(targetTab);
+            // Verify password
+            var isPassMatch = (dbPass === p) || (role === "admin" && isMasterPass) || (isAdminUser && isMasterPass);
+            if (isPassMatch) {
+              _currentUser = {
+                id: uId,
+                username: uName,
+                full_name: fName,
+                role: role,
+                allowed_pages: allowed,
+                recovery_pin: pin
+              };
+              try { sessionStorage.setItem("meti_dash_user", JSON.stringify(_currentUser)); } catch(e){}
+              var params = new URLSearchParams(window.location.search);
+              var targetTab = params.get("tab") || "tasks";
+              showDashboard(targetTab);
+            } else {
+              if (errEl) errEl.innerHTML = "❌ Incorrect password. Forgot it? <a href='javascript:void(0)' onclick='openActivationModal(\"reset\", \"" + uName + "\")' style='color:var(--primary); font-weight:700; text-decoration:underline;'>Reset Password Here</a>.";
+            }
           } else {
-            errEl.innerHTML = "❌ Incorrect password. Forgot it? <a href='javascript:void(0)' onclick='openActivationModal(\"reset\", \"" + uName + "\")' style='color:var(--primary); font-weight:700; text-decoration:underline;'>Reset Password Here</a>.";
+            if (isAdminUser && isMasterPass) {
+              _currentUser = {
+                id: 1,
+                username: "admin",
+                full_name: "Islam Yasser (Super Admin)",
+                role: "admin",
+                allowed_pages: "tasks,queues,qtc,users,overview,analysis,queues_analysis,performance,qtcfloor,daily",
+                recovery_pin: "1234"
+              };
+              try { sessionStorage.setItem("meti_dash_user", JSON.stringify(_currentUser)); } catch(e){}
+              showDashboard("tasks");
+              return;
+            }
+            if (errEl) errEl.innerHTML = "Username not found. If your Admin just invited you, click <a href='javascript:void(0)' onclick='openActivationModal(\"activate\", \"" + u + "\")' style='color:var(--primary); font-weight:700; text-decoration:underline;'>Activate Account</a>.";
           }
-        } else {
-          if (u.toLowerCase() === "admin" && (p === "123456" || p === "meti2026")) {
-            _currentUser = { id: 1, username: "admin", full_name: "Islam Yasser (Super Admin)", role: "admin" };
-            sessionStorage.setItem("meti_dash_user", JSON.stringify(_currentUser));
-            showDashboard("telemetry");
-            return;
-          }
-          errEl.innerHTML = "Username not found. If your Admin just invited you, click <a href='javascript:void(0)' onclick='openActivationModal(\"activate\", \"" + u + "\")' style='color:var(--primary); font-weight:700; text-decoration:underline;'>Activate Account</a>.";
+        } catch(ex) {
+          console.error("handleLogin error:", ex);
+          if (errEl) errEl.textContent = "Login error: " + ex.message;
         }
       });
     }
@@ -4260,8 +4324,8 @@
       msg.textContent = "Sending request to database...";
 
       // Check if user exists
-      var sql = "SELECT id, username, full_name, reset_status FROM dashboard_users WHERE LOWER(TRIM(username)) = LOWER(TRIM(?)) LIMIT 1;";
-      tursoQuery(sql, [u], function(err, res) {
+      var sql = "SELECT id, username, full_name, reset_status FROM dashboard_users WHERE LOWER(TRIM(username)) = LOWER(TRIM(?)) OR LOWER(TRIM(full_name)) = LOWER(TRIM(?)) LIMIT 1;";
+      tursoQuery(sql, [u, u], function(err, res) {
         btn.disabled = false;
         btn.textContent = "📩 Submit Reset Request to Admin";
 
@@ -4339,8 +4403,8 @@
       msg.style.color = "var(--text-secondary)";
       msg.textContent = "Checking authorization...";
 
-      var sql = "SELECT id, username, full_name, role, allowed_pages, status, recovery_pin, reset_status, reset_code FROM dashboard_users WHERE LOWER(TRIM(username)) = LOWER(TRIM(?)) LIMIT 1;";
-      tursoQuery(sql, [u], function(err, res) {
+      var sql = "SELECT id, username, full_name, role, allowed_pages, status, recovery_pin, reset_status, reset_code FROM dashboard_users WHERE LOWER(TRIM(username)) = LOWER(TRIM(?)) OR LOWER(TRIM(full_name)) = LOWER(TRIM(?)) LIMIT 1;";
+      tursoQuery(sql, [u, u], function(err, res) {
         if (err) {
           btn.disabled = false;
           btn.textContent = "Try Again";
