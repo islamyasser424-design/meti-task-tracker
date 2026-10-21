@@ -1,0 +1,2618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>METI Tasks Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --primary: #1c4587;
+  --primary-dark: #132f6b;
+  --primary-light: #2557a7;
+  --primary-xlight: #eaeffb;
+  --accent: #4a7fd4;
+  --surface: #fff;
+  --bg: #f0f4f7;
+  --border: #c5d3ec;
+  --border-focus: #1c4587;
+  --text: #1a2733;
+  --text-secondary: #4a6375;
+  --text-muted: #7a96a8;
+  --error: #c0392b;
+  --error-bg: #fdf0ee;
+  --success: #1a8a5a;
+  --success-bg: #edf7f3;
+  --input-bg: #f7f9fd;
+  --shadow-sm: 0 1px 3px rgba(28,69,135,.08);
+  --shadow-md: 0 4px 16px rgba(28,69,135,.12);
+  --shadow-lg: 0 8px 32px rgba(28,69,135,.16);
+  --radius: 8px;
+  --radius-lg: 12px;
+}
+*,*::before,*::after { box-sizing:border-box; margin:0; padding:0 }
+body {
+  font-family: 'Inter', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
+}
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    radial-gradient(circle at 20% 20%, rgba(28,69,135,.04) 0%, transparent 50%),
+    radial-gradient(circle at 80% 80%, rgba(74,127,212,.04) 0%, transparent 50%);
+  pointer-events: none;
+  z-index: 0;
+}
+.page {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+.sticky-wrap {
+  position: sticky;
+  top: 0;
+  z-index: 1001;
+  width: 100%;
+}
+.topbar {
+  width: 100%;
+  background: var(--primary-dark);
+  padding: 0 16px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.topbar-brand { display:flex; align-items:center; gap:8px; min-width:0; }
+.topbar-logo-box {
+  width:28px; height:28px; flex-shrink:0;
+  background: rgba(255,255,255,.15);
+  border-radius: 6px;
+  display: flex; align-items:center; justify-content:center;
+}
+.topbar-logo-box svg { width:15px; height:15px }
+.topbar-company {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: .62rem; font-weight: 600;
+  color: rgba(255,255,255,.7);
+  letter-spacing: 1.2px; text-transform: uppercase;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.topbar-time {
+  font-size: .68rem;
+  color: rgba(255,255,255,.55);
+  font-weight: 500; letter-spacing: .3px;
+  white-space: nowrap; flex-shrink: 0;
+}
+header.main-header {
+  width: 100%;
+  background: var(--primary);
+  padding: 12px 16px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  box-shadow: 0 2px 12px rgba(28,69,135,.25);
+  flex-wrap: wrap;
+}
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+.header-meti {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 2rem; font-weight: 800;
+  color: #fff; letter-spacing: -1px; line-height: 1;
+  flex-shrink: 0;
+}
+.header-divider {
+  width:1px; height:36px;
+  background: rgba(255,255,255,.25);
+  flex-shrink: 0;
+}
+.header-info { display:flex; flex-direction:column; gap:3px; min-width:0; }
+.header-full-name {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size:.72rem; font-weight:600;
+  color:rgba(255,255,255,.75);
+  letter-spacing:1.2px; text-transform:uppercase;
+}
+.header-dept { font-size:.65rem; color:rgba(255,255,255,.5); font-weight:400; letter-spacing:.3px }
+
+.instructions-btn-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.instructions-arabic-label {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #fde68a;
+  letter-spacing: .2px;
+  white-space: nowrap;
+  text-shadow: 0 1px 8px rgba(0,0,0,.5);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  animation: labelPop .6s cubic-bezier(.34,1.56,.64,1) both;
+}
+.instructions-arabic-label .arrow-down-anim {
+  display: inline-block;
+  animation: bounceDown 1s ease-in-out infinite;
+  font-size: 1.2rem;
+}
+@keyframes labelPop {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes bounceDown {
+  0%,100% { transform: translateY(0); }
+  50%      { transform: translateY(4px); }
+}
+.instructions-btn-new {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  border: 2px solid rgba(255,255,255,.45);
+  border-radius: 10px;
+  padding: 10px 16px;
+  color: #fff;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: .82rem;
+  font-weight: 800;
+  letter-spacing: .3px;
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 6px 24px rgba(217,119,6,.55), inset 0 1px 0 rgba(255,255,255,.3);
+  animation: pulseGlow 2s ease-in-out infinite;
+  transition: transform .2s cubic-bezier(.34,1.4,.64,1), box-shadow .2s;
+  -webkit-tap-highlight-color: transparent;
+}
+.instructions-btn-new::after {
+  content: '';
+  position: absolute;
+  top: -50%; left: -70%;
+  width: 45%; height: 200%;
+  background: rgba(255,255,255,.28);
+  transform: skewX(-18deg);
+  animation: btnShimmer 2.8s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes btnShimmer {
+  0%   { left: -70%; opacity: 0; }
+  15%  { opacity: 1; }
+  45%  { left: 130%; opacity: 0; }
+  100% { left: 130%; opacity: 0; }
+}
+@keyframes pulseGlow {
+  0%,100% {
+    box-shadow: 0 0 0 0 rgba(251,191,36,.55), 0 6px 24px rgba(217,119,6,.55), inset 0 1px 0 rgba(255,255,255,.3);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(251,191,36,.0), 0 8px 36px rgba(217,119,6,.8), inset 0 1px 0 rgba(255,255,255,.3);
+  }
+}
+.instructions-btn-new:active { transform: scale(.97); }
+.btn-icon { font-size: 1rem; flex-shrink: 0; filter: drop-shadow(0 1px 3px rgba(0,0,0,.25)); }
+.btn-text-wrap { display: flex; flex-direction: column; gap: 1px; }
+.btn-main-text { font-size: .82rem; font-weight: 800; line-height: 1.1; letter-spacing: .2px; }
+.btn-sub-text { font-size: .58rem; font-weight: 600; color: rgba(255,255,255,.8); letter-spacing: 1px; text-transform: uppercase; }
+.btn-arrow-big {
+  font-size: 1.2rem; flex-shrink: 0;
+  animation: arrowPulse 1s ease-in-out infinite;
+  filter: drop-shadow(0 1px 3px rgba(0,0,0,.2));
+}
+@keyframes arrowPulse {
+  0%,100% { transform: translateX(0) scale(1); }
+  50%      { transform: translateX(4px) scale(1.15); }
+}
+.progress-bar-track {
+  width: 100%; height: 4px;
+  background: rgba(28,69,135,.12);
+  position: relative; overflow: visible;
+}
+.progress-bar-fill { height:100%; width:0%; background:var(--accent); transition:width .4s ease }
+.content {
+  width: 100%; max-width: 1480px;
+  padding: 16px 12px 16px;
+  align-self: center;
+}
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  overflow: visible;
+  animation: slideUp .4s ease both;
+}
+@keyframes slideUp {
+  from { opacity:0; transform:translateY(20px) }
+  to { opacity:1; transform:translateY(0) }
+}
+.card-section {
+  border-bottom: 1px solid #edf2f6;
+  padding: 20px 16px;
+}
+.card-section:first-child { border-radius: var(--radius-lg) var(--radius-lg) 0 0 }
+.card-section:last-child { border-bottom:none }
+.section-header { display:flex; align-items:center; gap:8px; margin-bottom:18px; flex-wrap:wrap; }
+.section-icon {
+  width:28px; height:28px;
+  background: var(--primary-xlight);
+  border-radius: 7px;
+  display:flex; align-items:center; justify-content:center; flex-shrink:0;
+}
+.section-icon svg { width:14px; height:14px; color:var(--primary) }
+.section-title {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size:.78rem; font-weight:700;
+  letter-spacing:1.8px; text-transform:uppercase; color:var(--primary);
+}
+.stage-wrap {
+  width: 100%;
+  display:flex; align-items:center; gap:8px;
+  margin-top: 4px;
+}
+.stage-label { font-size:.72rem; font-weight:700; color:var(--text-secondary); letter-spacing:1.2px; text-transform:uppercase; white-space:nowrap; flex-shrink:0; }
+.stage-box { position:relative; flex:1; }
+#stageField {
+  width:100%; background:#f2f6f9 !important; cursor:default !important;
+  font-size:.88rem; font-weight:500; padding:9px 34px 9px 14px;
+  border-radius:var(--radius); transition:border-color .2s,color .2s;
+}
+#stageField.filled { font-weight:600 }
+#stageIcon {
+  position:absolute; right:11px; top:50%; transform:translateY(-50%);
+  font-size:.8rem; opacity:.4; pointer-events:none; transition:opacity .2s,color .2s;
+}
+.g2 { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:16px }
+.g3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px; margin-bottom:16px }
+.full { margin-bottom:16px }
+.field label {
+  display:block;
+  font-size:1rem; font-weight:600;
+  color:var(--text-secondary);
+  margin-bottom:7px; letter-spacing:.2px;
+}
+.field label .req { color:var(--error); margin-left:2px }
+.field label .sub {
+  display:block;
+  font-size:.68rem; font-weight:400;
+  color:var(--text-muted); margin-top:2px;
+}
+input, select, textarea {
+  width:100%;
+  background: var(--input-bg);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  padding: 11px 14px;
+  color: var(--text);
+  font-family: 'Inter', sans-serif;
+  font-size: 1rem;
+  outline: none;
+  transition: border-color .18s, box-shadow .18s, background .18s;
+  appearance: none; -webkit-appearance: none;
+  -webkit-tap-highlight-color: transparent;
+}
+input::placeholder, textarea::placeholder { color:var(--text-muted) }
+input:focus, select:focus, textarea:focus {
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px rgba(28,69,135,.1);
+  background: #fff;
+}
+input[readonly] { background:#f2f6f9; color:var(--text-muted); cursor:default }
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button { -webkit-appearance:none }
+input[type=number] { -moz-appearance:textfield }
+.sdw { position:relative }
+.sdb {
+  width:100%;
+  background: var(--input-bg);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0;
+  color: var(--text);
+  font-family: 'Inter', sans-serif;
+  font-size: 1rem;
+  text-align: left;
+  cursor: pointer;
+  outline: none;
+  transition: border-color .18s, box-shadow .18s, background .18s;
+  display: flex;
+  align-items: stretch;
+  position: relative;
+  min-height: 46px;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+}
+.sdb input.sd-input {
+  flex:1; border:none; background:transparent;
+  padding: 11px 12px; font-size:1rem; color:var(--text);
+  outline:none; cursor:text;
+  font-family:'Inter',sans-serif; min-width:0;
+}
+.sdb input.sd-input::placeholder { color:var(--text-muted) }
+.sdb .sd-arrow {
+  display: flex; align-items: center; justify-content: center;
+  width: 44px; min-width: 44px; flex-shrink: 0;
+  background: var(--primary-xlight);
+  border-left: 1.5px solid var(--border);
+  color: var(--primary);
+  transition: background .18s, color .18s, border-color .18s;
+  pointer-events: none;
+  border-radius: 0 calc(var(--radius) - 1.5px) calc(var(--radius) - 1.5px) 0;
+  font-size: 0;
+}
+.sdb .sd-arrow::after {
+  content: '';
+  display: block;
+  width: 8px; height: 8px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg) translateY(-30%);
+  transition: transform .2s;
+}
+.sdb.open .sd-arrow::after { transform: rotate(-135deg) translateY(30%); }
+.sdb:hover { border-color: var(--primary); }
+.sdb:hover .sd-arrow { background: #d0dcf5; border-left-color: var(--primary); }
+.sdb.open { border-color: var(--border-focus); box-shadow: 0 0 0 3px rgba(28,69,135,.1); background: #fff; }
+.sdb.open .sd-arrow { background: var(--primary); color: #fff; border-left-color: var(--primary); }
+.sd-display {
+  flex:1; min-width:0; font-size:1rem;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  display:none; cursor:pointer;
+  padding: 11px 12px; align-items: center;
+}
+.sdl {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0; right: 0;
+  background: #fff;
+  border: 1.5px solid var(--border-focus);
+  border-radius: var(--radius);
+  z-index: 9999;
+  list-style: none;
+  box-shadow: var(--shadow-lg);
+  display: none;
+  overflow: hidden;
+  max-height: 240px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.sdl.open { display:block }
+.sdl li {
+  padding:12px 14px; cursor:pointer;
+  font-size:.9rem; color:var(--text);
+  border-bottom:1px solid #f0f4f7;
+  transition:background .15s; line-height:1.5;
+  -webkit-tap-highlight-color: transparent;
+}
+.sdl li:last-child { border-bottom:none }
+.sdl li:hover, .sdl li.sd-hover { background:var(--primary-xlight); color:var(--primary-dark) }
+.sdl li.sel { background:var(--primary-xlight); color:var(--primary); font-weight:600 }
+.sdl li.sd-empty { color:var(--text-muted); font-style:italic; cursor:default; font-size:.85rem }
+.sdl li.sd-empty:hover { background:transparent; color:var(--text-muted) }
+.hl {
+  color:#e07b00; font-weight:700;
+  background:rgba(224,123,0,.1); border:1px solid rgba(224,123,0,.3);
+  border-radius:5px; padding:1px 5px; margin:0 1px;
+  display:inline-block; letter-spacing:.2px;
+}
+.acw { position:relative }
+.acl {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0; right: 0;
+  background: #fff;
+  border: 1.5px solid var(--border-focus);
+  border-radius: var(--radius);
+  max-height: 200px; overflow-y:auto;
+  z-index: 9999;
+  box-shadow: var(--shadow-lg);
+  display: none;
+  -webkit-overflow-scrolling: touch;
+}
+.acl.open { display:block }
+.acl li {
+  padding:12px 14px; cursor:pointer;
+  font-size:1rem; color:var(--text);
+  list-style:none;
+  display:flex; align-items:center; justify-content:space-between;
+  border-bottom:1px solid #f0f4f7;
+  transition:background .15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.acl li:last-child { border-bottom:none }
+.acl li:hover, .acl li.ac-hover { background:var(--primary-xlight) }
+.delbtn {
+  font-size:.75rem; color:var(--text-muted);
+  padding:4px 8px; border-radius:4px;
+  border:none; background:none; cursor:pointer; transition:color .15s;
+  min-width:32px; text-align:center;
+}
+.delbtn:hover { color:var(--error) !important }
+.qtc-hint { font-size:.7rem; color:var(--text-muted); margin-bottom:8px; font-style:italic }
+.qtc-shift-msg {
+  font-size:.82rem; color:var(--primary);
+  padding:12px 14px;
+  background:var(--primary-xlight);
+  border-radius:var(--radius); border:1px solid var(--border);
+  display:none;
+}
+.qtc-grid {
+  display:grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap:7px; max-height:260px; overflow-y:auto; padding:2px;
+  -webkit-overflow-scrolling: touch;
+}
+.qtc-grid::-webkit-scrollbar { width:4px }
+.qtc-grid::-webkit-scrollbar-track { background:#f0f4f7; border-radius:4px }
+.qtc-grid::-webkit-scrollbar-thumb { background:var(--border); border-radius:4px }
+.qtc-card {
+  background:var(--input-bg);
+  border:1.5px solid var(--border);
+  border-radius:var(--radius);
+  padding:9px 10px; cursor:pointer;
+  transition:all .15s;
+  display:flex; align-items:center; gap:8px;
+  user-select:none;
+  -webkit-tap-highlight-color: transparent;
+}
+.qtc-card:hover { border-color:var(--primary-light); background:var(--primary-xlight) }
+.qtc-card.selected { border-color:var(--success); background:var(--success-bg); box-shadow:0 0 0 2px rgba(26,138,90,.1) }
+.qtc-card .qtc-check {
+  width:17px; height:17px;
+  border-radius:50%; border:2px solid var(--border);
+  flex-shrink:0;
+  display:flex; align-items:center; justify-content:center;
+  transition:all .15s; font-size:.68rem;
+}
+.qtc-card.selected .qtc-check { border-color:var(--success); background:var(--success); color:#fff }
+.qtc-card .qtc-name { font-size:.8rem; font-weight:600; color:var(--text); line-height:1.3 }
+.qtc-card .qtc-role { font-size:.68rem; color:var(--primary); margin-top:1px; font-weight:500 }
+.qtc-card.selected .qtc-name { color:var(--success) }
+.qtc-selected-display { margin-top:8px; min-height:28px; display:flex; flex-wrap:wrap; gap:5px }
+.qtc-tag {
+  background:var(--success-bg);
+  border:1px solid rgba(26,138,90,.35);
+  color:var(--success); border-radius:20px;
+  padding:4px 10px; font-size:.72rem; font-weight:600;
+  display:flex; align-items:center; gap:5px;
+}
+.qtc-tag button { background:none; border:none; color:var(--success); cursor:pointer; font-size:.8rem; padding:0; line-height:1; opacity:.7; min-width:20px; min-height:20px; }
+.qtc-tag button:hover { opacity:1 }
+.warn-box {
+  display:none; margin-top:6px; align-items:center; gap:6px;
+  font-size:.72rem; color:#b45309;
+  background:#fffbeb; border:1px solid #fcd34d;
+  border-radius:6px; padding:6px 10px;
+}
+.warn-box .warn-icon { font-size:.85rem; font-weight:700; flex-shrink:0 }
+.form-footer {
+  background:#f7f9fd;
+  border-top:1px solid var(--border);
+  padding:16px;
+  border-radius:0 0 var(--radius-lg) var(--radius-lg);
+  position: sticky;
+  bottom: 0;
+  z-index: 1000;
+  box-shadow: 0 -4px 16px rgba(28,69,135,.10);
+}
+.subbtn {
+  width:100%; padding:15px;
+  background:var(--success);
+  border:none; border-radius:var(--radius);
+  color:#fff;
+  font-family:'Plus Jakarta Sans',sans-serif;
+  font-size:.95rem; font-weight:700;
+  letter-spacing:1px; text-transform:uppercase;
+  cursor:pointer;
+  transition:background .2s, transform .1s, box-shadow .2s;
+  box-shadow:0 3px 12px rgba(26,138,90,.3);
+  -webkit-tap-highlight-color: transparent;
+}
+.subbtn:hover { background:#157a4e; box-shadow:0 4px 20px rgba(26,138,90,.4) }
+.subbtn:active { transform:scale(.99) }
+.subbtn:disabled { opacity:.6; cursor:not-allowed }
+.subbtn.error-state {
+  background: var(--error) !important;
+  box-shadow: 0 3px 12px rgba(192,57,43,.3) !important;
+  animation: errShake .35s ease;
+}
+@keyframes errShake {
+  0%,100% { transform:translateX(0) }
+  20%,60%  { transform:translateX(-4px) }
+  40%,80%  { transform:translateX(4px) }
+}
+.toast {
+  position:fixed; bottom:24px; left:50%;
+  transform:translateX(-50%) translateY(16px);
+  padding:11px 20px; border-radius:var(--radius);
+  font-size:.9rem; font-weight:600;
+  opacity:0; pointer-events:none;
+  transition:all .3s; z-index:99999;
+  box-shadow:var(--shadow-lg);
+  max-width:90vw; text-align:center;
+  white-space:nowrap;
+}
+.toast.show { opacity:1; transform:translateX(-50%) translateY(0) }
+.toast.ok { background:var(--success-bg); border:1px solid rgba(26,138,90,.4); color:var(--success) }
+.toast.err { background:var(--error-bg); border:1px solid rgba(192,57,43,.3); color:var(--error) }
+.err-field {
+  border-color: var(--error) !important;
+  box-shadow: 0 0 0 3px rgba(192,57,43,.1) !important;
+  animation: shake .3s ease;
+}
+@keyframes shake {
+  0%,100% { transform:translateX(0) }
+  20%,60% { transform:translateX(-3px) }
+  40%,80% { transform:translateX(3px) }
+}
+.task-id-wrap { position:relative }
+.task-id-wrap input { padding-right:36px }
+#idIcon { position:absolute; right:11px; top:50%; transform:translateY(-50%); font-size:.8rem; opacity:.4 }
+#linkHint { color:var(--text-muted) }
+.storage-panel {
+  width:100%;
+  margin:12px auto 32px;
+  border:1px solid var(--border);
+  border-radius:var(--radius-lg);
+  background:var(--surface);
+  box-shadow:var(--shadow-sm);
+  overflow:hidden;
+}
+.storage-toggle {
+  width:100%; padding:13px 16px;
+  background:#f7f9fd; border:none; cursor:pointer;
+  display:flex; align-items:center; gap:8px;
+  font-family:'Plus Jakarta Sans',sans-serif;
+  font-size:.82rem; font-weight:700; color:var(--primary); letter-spacing:.4px;
+  transition:background .15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.storage-toggle:hover { background:var(--primary-xlight) }
+.storage-arrow { margin-left:auto; font-size:.7rem; transition:transform .2s; display:inline-block }
+.storage-arrow.open { transform:rotate(180deg) }
+.storage-body { padding:16px; display:flex; flex-direction:column; gap:16px; border-top:1px solid var(--border) }
+.storage-group { display:flex; flex-direction:column; gap:8px }
+.storage-group-header {
+  display:flex; align-items:center; justify-content:space-between;
+  padding-bottom:6px; border-bottom:1px solid #edf2f6;
+}
+.storage-group-title { font-size:.75rem; font-weight:700; color:var(--text-secondary); letter-spacing:.4px }
+.storage-clear-all {
+  font-size:.7rem; font-weight:600; color:var(--error);
+  background:var(--error-bg); border:1px solid rgba(192,57,43,.2);
+  border-radius:5px; padding:4px 10px; cursor:pointer; transition:all .15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.storage-clear-all:hover { background:rgba(192,57,43,.15) }
+.storage-list { display:flex; flex-wrap:wrap; gap:6px; min-height:28px }
+.storage-item {
+  display:flex; align-items:center; gap:5px;
+  background:var(--input-bg);
+  border:1.5px solid var(--border); border-radius:20px;
+  padding:5px 10px; font-size:.78rem; font-weight:500; color:var(--text);
+  transition:border-color .15s;
+}
+.storage-item:hover { border-color:var(--error) }
+.storage-item-del {
+  background:none; border:none; color:var(--text-muted);
+  cursor:pointer; font-size:.8rem; padding:0; line-height:1; transition:color .15s;
+  min-width:18px; min-height:18px; text-align:center;
+}
+.storage-item-del:hover { color:var(--error) }
+#dbDupOverlay {
+  display: none; position: fixed; inset: 0; z-index: 999999;
+  align-items: center; justify-content: center;
+  background: rgba(15,30,60,.18); backdrop-filter: blur(1px);
+  padding: 16px;
+}
+#dbDupOverlay.show { display: flex; }
+@keyframes popIn {
+  from { opacity:0; transform:scale(.88) translateY(16px) }
+  to { opacity:1; transform:scale(1) translateY(0) }
+}
+.db-dup-dialog {
+  background: #fff;
+  border-radius: 18px;
+  padding: 28px 20px 24px;
+  width: 100%; max-width: 480px;
+  box-shadow: 0 2px 8px rgba(192,57,43,.08), 0 20px 60px rgba(192,57,43,.18);
+  text-align: center;
+  animation: popIn .38s cubic-bezier(.34,1.56,.64,1) both;
+  border-top: 5px solid var(--error);
+  max-height: 90vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.db-dup-icon { width:50px; height:50px; background:var(--error-bg); border:2.5px solid rgba(192,57,43,.35); border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto 12px; font-size:1.4rem; }
+.db-dup-title { font-family:'Plus Jakarta Sans',sans-serif; font-size:1rem; font-weight:800; color:var(--error); margin-bottom:6px; letter-spacing:-.2px; }
+.db-dup-subtitle { font-size:.78rem; color:var(--text-muted); margin-bottom:16px; line-height:1.5; }
+.db-dup-info-box { background:#fdf5f5; border:1.5px solid rgba(192,57,43,.2); border-radius:10px; padding:14px 16px; margin-bottom:14px; text-align:left; direction:ltr; }
+.db-dup-info-row { display:flex; align-items:center; justify-content:space-between; gap:12px; font-size:.85rem; color:var(--text); padding:6px 0; border-bottom:1px solid rgba(192,57,43,.1); line-height:1.5; }
+.db-dup-info-row:last-child { border-bottom:none; }
+.db-dup-info-label { font-weight:700; color:var(--error); min-width:60px; flex-shrink:0; font-size:.75rem; letter-spacing:.2px; }
+.db-dup-info-val { font-weight:500; color:var(--text); direction:ltr; text-align:left; word-break:break-all; }
+.db-dup-warn-text { font-size:.82rem; font-weight:600; color:#1a2733; direction:rtl; margin-bottom:16px; line-height:1.7; background:#fffbeb; border:1px solid #fcd34d; border-radius:8px; padding:10px 12px; text-align:right; }
+.db-dup-warn-text span.highlight { color:var(--error); font-weight:800; }
+.db-dup-btn-ok { width:100%; padding:14px; border-radius:10px; border:none; background:var(--error); color:#fff; font-weight:800; font-size:.9rem; cursor:pointer; font-family:'Plus Jakarta Sans',sans-serif; transition:background .15s,transform .1s; box-shadow:0 3px 12px rgba(192,57,43,.3); letter-spacing:.3px; -webkit-tap-highlight-color: transparent; }
+.db-dup-btn-ok:hover { background:#a93226; }
+.db-dup-btn-ok:active { transform:scale(.98); }
+
+.sec-counter {
+  display:flex; align-items:center; gap:8px;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+  border: 1.5px solid rgba(255,255,255,.15); border-radius:10px;
+  padding: 6px 12px 6px 14px;
+  box-shadow: 0 2px 12px rgba(28,69,135,.25), inset 0 1px 0 rgba(255,255,255,.12);
+  margin-left: auto; flex-shrink: 0;
+}
+.sec-counter-label { font-size:.55rem; font-weight:700; color:rgba(255,255,255,.5); letter-spacing:1.5px; text-transform:uppercase; white-space:nowrap }
+.sec-counter-num {
+  font-family:'Plus Jakarta Sans',sans-serif; font-size:1.4rem; font-weight:800;
+  color:#fff; line-height:1; letter-spacing:-1px; min-width:24px; text-align:center;
+  transition:transform .18s cubic-bezier(.34,1.56,.64,1), color .18s;
+  text-shadow:0 2px 8px rgba(0,0,0,.2);
+}
+.sec-counter-num.bump { transform:scale(1.3); color:#6ee7b7 }
+.sec-counter-sep { width:1px; height:18px; background:rgba(255,255,255,.2) }
+.sec-counter-btn {
+  background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); border-radius:20px;
+  color:rgba(255,255,255,.7); font-size:.55rem; font-weight:700; padding:3px 9px;
+  cursor:pointer; letter-spacing:.6px; text-transform:uppercase; transition:all .15s; font-family:'Inter',sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+.sec-counter-btn:hover { background:rgba(255,255,255,.22); border-color:rgba(255,255,255,.4); color:#fff }
+.sec-counter-btn.undo { color:#fcd34d; border-color:rgba(252,211,77,.5); background:rgba(252,211,77,.15); animation:undoPulse 1s ease infinite alternate }
+.sec-counter-btn.undo:hover { background:rgba(252,211,77,.28); color:#fde68a }
+@keyframes undoPulse {
+  from { box-shadow: 0 0 0 0 rgba(252,211,77,.3); }
+  to   { box-shadow: 0 0 0 4px rgba(252,211,77,.0); }
+}
+#floatingCounter {
+  display: flex;
+  position: absolute;
+  right: 12px; top: 6px;
+  align-items: center; gap: 6px;
+  padding: 4px 12px;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+  border: 1.5px solid rgba(255,255,255,.15);
+  border-radius: 50px;
+  box-shadow: 0 2px 10px rgba(28,69,135,.12);
+  cursor: default; z-index: 100;
+  opacity: 0; pointer-events: none;
+  transition: opacity .2s ease;
+}
+#floatingCounter.visible { opacity: 1; pointer-events: auto; }
+#floatingCounter .fc-label { font-size: .55rem; font-weight: 700; color: rgba(255,255,255,.6); letter-spacing: 1.2px; text-transform: uppercase; white-space: nowrap; }
+#floatingCounter .fc-count { font-family: 'Plus Jakarta Sans', sans-serif; font-size: 1.1rem; font-weight: 800; color: #fff; line-height: 1; letter-spacing: -.5px; transition: transform .18s cubic-bezier(.34,1.56,.64,1), color .18s; }
+#floatingCounter .fc-count.bump { transform: scale(1.25); color: #6ee7b7; }
+
+/* ── Auto-fill badge on Modality & Queue labels ── */
+.autofill-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: .58rem;
+  font-weight: 700;
+  letter-spacing: .8px;
+  text-transform: uppercase;
+  color: var(--success);
+  background: var(--success-bg);
+  border: 1px solid rgba(26,138,90,.3);
+  border-radius: 20px;
+  padding: 2px 7px;
+  margin-left: 6px;
+  vertical-align: middle;
+  opacity: 0;
+  transform: scale(.85);
+  transition: opacity .25s, transform .25s cubic-bezier(.34,1.56,.64,1);
+  pointer-events: none;
+}
+.autofill-badge.show { opacity: 1; transform: scale(1); }
+.autofill-badge::before { content: '⚡'; font-size: .65rem; }
+
+/* ===== RESPONSIVE BREAKPOINTS ===== */
+
+/* Tablet: 641px - 900px */
+@media (min-width:641px) and (max-width:900px) {
+  .content { padding: 24px 20px; }
+  .card-section { padding: 24px 24px; }
+  .topbar { padding: 0 24px; }
+  header.main-header { padding: 14px 24px; }
+  .header-meti { font-size: 2.4rem; }
+  .instructions-arabic-label { font-size: 1.2rem; }
+  .instructions-btn-new { padding: 11px 18px; }
+  .g3 { grid-template-columns: 1fr 1fr; }
+}
+
+/* Desktop: > 900px */
+@media (min-width:901px) {
+  .topbar { padding: 0 40px; height: 52px; }
+  .topbar-company { font-size: .75rem; letter-spacing: 2px; }
+  .topbar-time { font-size: .78rem; }
+  header.main-header { padding: 20px 48px; flex-wrap: nowrap; align-items: center; }
+  .header-left { flex: none; }
+  .header-meti { font-size: 3rem; }
+  .instructions-btn-wrap { margin-left: auto; align-items: center; }
+  .instructions-arabic-label { font-size: 1.45rem; }
+  .instructions-btn-new { padding: 14px 26px; border-radius: 14px; font-size: .95rem; }
+  .btn-icon { font-size: 1.2rem; }
+  .btn-main-text { font-size: .9rem; }
+  .btn-sub-text { font-size: .62rem; }
+  .btn-arrow-big { font-size: 1.5rem; }
+  .sdb .sd-arrow { width: 80px; min-width: 80px; }
+  .content { padding: 36px 32px 24px; }
+  .card-section { padding: 36px 48px; }
+  .g2 { gap: 22px; margin-bottom: 22px; }
+  .g3 { grid-template-columns: 1fr 1fr 1fr; gap: 22px; margin-bottom: 22px; }
+  .full { margin-bottom: 22px; }
+  .field label { font-size: 1.15rem; margin-bottom: 8px; }
+  input, select, textarea { padding: 12px 16px; font-size: 1.05rem; }
+  .sdb input.sd-input { padding: 12px 14px; font-size: 1.05rem; }
+  .sdb { min-height: 48px; }
+  .qtc-grid { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
+  .form-footer { padding: 20px 32px; }
+  .storage-body { padding: 20px 24px; }
+  .storage-toggle { padding: 14px 20px; font-size: .85rem; }
+  .sec-counter { gap: 10px; padding: 7px 16px 7px 18px; }
+  .sec-counter-label { font-size: .6rem; }
+  .sec-counter-num { font-size: 1.6rem; min-width: 28px; }
+  .sec-counter-btn { font-size: .6rem; padding: 3px 11px; }
+  .db-dup-dialog { padding: 40px 44px 32px; }
+  .stage-wrap { width: auto; margin-top: 0; }
+  #stageField { width: 215px; }
+  .section-header { flex-wrap: nowrap; }
+  #floatingCounter { right: 20px; top: 8px; padding: 5px 16px; }
+  #floatingCounter .fc-label { font-size: .6rem; }
+  #floatingCounter .fc-count { font-size: 1.2rem; }
+}
+
+/* Small mobile: < 400px */
+@media (max-width:400px) {
+  .g2 { grid-template-columns: 1fr; }
+  .g3 { grid-template-columns: 1fr; }
+  .topbar-company { font-size: .55rem; letter-spacing: .8px; }
+  .topbar-time { font-size: .6rem; }
+  .header-meti { font-size: 1.7rem; }
+  .header-full-name { font-size: .65rem; }
+  .instructions-arabic-label { font-size: .95rem; }
+  .instructions-btn-new { padding: 9px 12px; }
+  .btn-main-text { display: none; }
+  .btn-sub-text { font-size: .6rem; }
+  .sec-counter-label { display: none; }
+  .sec-counter { padding: 5px 8px; gap: 6px; }
+}
+
+/* Medium mobile: 400px - 640px - 2-column grids stay */
+@media (min-width:400px) and (max-width:640px) {
+  .g3 { grid-template-columns: 1fr 1fr; }
+}
+
+.topbar-admin-btn {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: inherit;
+  margin-right: 8px;
+}
+.topbar-admin-btn:hover {
+  background: rgba(255, 255, 255, 0.28);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+.admin-modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(19, 47, 107, 0.6);
+  backdrop-filter: blur(4px);
+  z-index: 9999;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.admin-modal-overlay.show { display: flex; }
+.admin-modal {
+  background: #fff;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 900px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 16px 40px rgba(19,47,107,0.3);
+  overflow: hidden;
+  border: 1px solid #c5d3ec;
+}
+.admin-modal-hd {
+  background: #132f6b;
+  color: #fff;
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.admin-modal-title {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 1rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.admin-modal-close {
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 1.2rem;
+  cursor: pointer;
+  opacity: 0.8;
+}
+.admin-modal-close:hover { opacity: 1; }
+.admin-modal-body {
+  padding: 20px;
+  overflow-y: auto;
+  flex: 1;
+}
+.admin-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+  margin-bottom: 20px;
+}
+.admin-stat-card {
+  background: #f7f9fd;
+  border: 1px solid #c5d3ec;
+  border-radius: 8px;
+  padding: 14px;
+  text-align: center;
+}
+.admin-stat-card .val {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: #1c4587;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+}
+.admin-stat-card .lbl {
+  font-size: 0.75rem;
+  color: #4a6375;
+  font-weight: 600;
+  margin-top: 4px;
+  text-transform: uppercase;
+}
+.admin-actions-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.admin-btn {
+  background: #1c4587;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 14px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.admin-btn:hover { background: #132f6b; }
+.admin-btn-sec {
+  background: #27ae60;
+}
+.admin-btn-sec:hover { background: #219653; }
+.admin-table-wrap {
+  overflow-x: auto;
+  border: 1px solid #e1e8f0;
+  border-radius: 8px;
+}
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.75rem;
+  text-align: left;
+}
+.admin-table th {
+  background: #eaeffb;
+  color: #132f6b;
+  padding: 10px 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  border-bottom: 2px solid #c5d3ec;
+}
+.admin-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid #eef2f6;
+  white-space: nowrap;
+}
+.admin-table tr:hover {
+  background: #f8fafc;
+}
+
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="sticky-wrap">
+  <div class="topbar">
+    <div class="topbar-brand">
+      <div class="topbar-logo-box">
+        <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="3" width="20" height="14" rx="2"/>
+          <line x1="8" y1="21" x2="16" y2="21"/>
+          <line x1="12" y1="17" x2="12" y2="21"/>
+        </svg>
+      </div>
+      <span class="topbar-company">Micro Engineering Tech Inc.</span>
+    </div>
+    <span class="topbar-time" id="topTime">Loading...</span>
+  </div>
+
+  <header class="main-header">
+    <div class="header-left">
+      <div class="header-meti">METI</div>
+      <div class="header-divider"></div>
+      <div class="header-info">
+        <div class="header-full-name">Micro Engineering</div>
+        <div class="header-dept">Labeling Operations · Internal System</div>
+      </div>
+    </div>
+    <div class="instructions-btn-wrap">
+      <span class="instructions-arabic-label">
+        لو متلغبط اقرا
+        <span class="arrow-down-anim">👇</span>
+      </span>
+      <a href="#"
+         class="instructions-btn-new"
+         id="instructionsBtn"
+         onclick="(function(){
+           var base = 'https://sites.google.com/meti.ai/training-material/home/welcome-to-meti/work-fundamentals-and-problems';
+           var anchor = '#h.l1sb0t4yvymp';
+           var w = window.open(base, '_blank');
+           setTimeout(function(){
+             try { w.location.href = base + anchor; } catch(e) {}
+           }, 1500);
+           return false;
+         })(); return false;">
+        <span class="btn-icon">📋</span>
+        <span class="btn-text-wrap">
+          <span class="btn-main-text">Form Filling Instructions</span>
+          <span class="btn-sub-text">Read Me First 🦉</span>
+        </span>
+        <span class="btn-arrow-big">➜</span>
+      </a>
+    </div>
+  </header>
+
+  <div class="progress-bar-track">
+    <div class="progress-bar-fill" id="progressBar"></div>
+    <div id="floatingCounter">
+      <span class="fc-label">Tasks Done</span>
+      <span class="fc-count" id="floatingCount">0</span>
+    </div>
+  </div>
+  </div>
+
+  <div class="content">
+    <div class="card">
+      <form id="F" autocomplete="off">
+
+        <div class="card-section">
+          <div class="section-header" style="justify-content:space-between;">
+            <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+              <div class="section-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                </svg>
+              </div>
+              <span class="section-title">Session</span>
+            </div>
+            <div class="sec-counter">
+              <span class="sec-counter-label">Tasks Done</span>
+              <span class="sec-counter-num" id="taskCounter">0</span>
+              <div class="sec-counter-sep"></div>
+              <button type="button" class="sec-counter-btn" id="counterResetBtn">Reset</button>
+              <button type="button" class="sec-counter-btn undo" id="counterUndoBtn" style="display:none">&#8629; Undo</button>
+            </div>
+          </div>
+
+          <div class="full field">
+            <label>Timestamp</label>
+            <input type="text" id="ts" readonly>
+          </div>
+          <div class="g3">
+            <div class="field">
+              <label>Shift <span class="req">*</span></label>
+              <div class="sdw">
+                <div class="sdb" id="shiftBtn" tabindex="0">
+                  <input class="sd-input" id="shiftInput" placeholder="Select Shift..." autocomplete="off" data-lpignore="true">
+                  <span class="sd-arrow"></span>
+                </div>
+                <ul class="sdl" id="shiftList">
+                  <li data-v="Morning">Morning</li>
+                  <li data-v="Night">Night</li>
+                  <li data-v="Over Night">Over Night</li>
+                  <li data-v="Morning 12 H">Morning 12 H</li>
+                  <li data-v="Over Night 12 H">Over Night 12 H</li>
+                  <li data-v="Over Shift (M)">Over Shift (M)</li>
+                  <li data-v="Over Shift (N)">Over Shift (N)</li>
+                  <li data-v="Over Shift (ON)">Over Shift (ON)</li>
+                </ul>
+                <input type="hidden" id="shift">
+              </div>
+            </div>
+            <div class="field">
+              <label>Unit <span class="req">*</span></label>
+              <div class="sdw">
+                <div class="sdb" id="unitBtn" tabindex="0">
+                  <input class="sd-input" id="unitInput" placeholder="Select Unit..." autocomplete="off" data-lpignore="true">
+                  <span class="sd-arrow"></span>
+                </div>
+                <ul class="sdl" id="unitList">
+                  <li data-v="NC Room 102">NC Room 102</li>
+                  <li data-v="NC Room 104">NC Room 104</li>
+                  <li data-v="NC Room 105">NC Room 105</li>
+                  <li data-v="NC Room 106">NC Room 106</li>
+                  <li data-v="NC Room 108">NC Room 108</li>
+                  <li data-v="2nd Floor">2nd Floor</li>
+                  <li data-v="4th Floor">4th Floor</li>
+                </ul>
+                <input type="hidden" id="unit">
+              </div>
+            </div>
+            <div class="field">
+              <label>PC No. <span class="req">*</span></label>
+              <div class="acw">
+                <input type="text" id="pcNo" placeholder="e.g. 7, 30, QTC, SL, SV or Buffer"equired autocomplete="off" data-lpignore="true" inputmode="text">
+                <ul class="acl" id="pcAcList"></ul>
+              </div>
+            </div>
+          </div>
+          <div class="g2">
+            <div class="field">
+              <label>Labeler Name <span class="req">*</span></label>
+              <div class="acw">
+                <input type="text" id="labName" placeholder="Start typing a name..." required autocomplete="off" data-lpignore="true" inputmode="text">
+                <ul class="acl" id="acList"></ul>
+              </div>
+              <div id="labNameWarn" class="warn-box">
+                <span class="warn-icon">&#9888;</span>
+                <span>اسمك باللغه الانجلزيه</span>
+              </div>
+            </div>
+            <div class="field">
+              <label>National ID <span class="req">*</span></label>
+              <input type="text" id="natId" placeholder="e.g. 30001011234567" required autocomplete="off" data-lpignore="true" inputmode="numeric" maxlength="14">
+              <div id="natIdWarn" class="warn-box">
+                <span class="warn-icon">&#9888;</span>
+                <span>الرقم القومي لازم يكون 14 رقم بالظبط</span>
+              </div>
+            </div>
+          </div>
+          <div class="g2">
+            <div class="field">
+              <label>QTC Shift <span class="req">*</span></label>
+              <div class="sdw">
+                <div class="sdb" id="qtcShiftBtn" tabindex="0">
+                  <input class="sd-input" id="qtcShiftInput" placeholder="Select QTC Shift..." autocomplete="off" data-lpignore="true">
+                  <span class="sd-arrow"></span>
+                </div>
+                <ul class="sdl" id="qtcShiftList">
+                  <li data-v="Morning">Morning</li>
+                  <li data-v="Night">Night</li>
+                  <li data-v="Over Night">Over Night</li>
+                </ul>
+                <input type="hidden" id="qtcShiftSel">
+              </div>
+            </div>
+            <div class="field">
+              <label>Yubikey <span class="req">*</span></label>
+              <div class="acw">
+                <input type="text" id="yk" placeholder="e.g. 123456 or me123456@meti.ai" required autocomplete="off" data-lpignore="true" inputmode="text">
+                <ul class="acl" id="ykAcList"></ul>
+              </div>
+              <div id="ykHint" style="font-size:.7rem;color:var(--text-muted);margin-top:5px;">
+                6-digit code <span style="color:var(--border)">|</span> or email format: me123456&#64;meti&#46;ai
+              </div>
+            </div>
+          </div>
+          <div class="full field">
+            <label>QTC Name <span class="req">*</span></label>
+            <div id="qtcShiftMsg" class="qtc-shift-msg">&#9432; Please select a QTC Shift first to view available names.</div>
+            <div id="qtcPickerWrap" style="display:none">
+              <input type="text" id="qtcSearch" placeholder="&#128269; Search by name..." autocomplete="off" style="margin-bottom:8px;background:#f7f9fd;">
+              <div class="qtc-hint">Click on a name to select — scroll to see all</div>
+              <div class="qtc-grid" id="qtcGrid"></div>
+              <div class="qtc-selected-display" id="qtcSelectedDisplay"></div>
+            </div>
+            <input type="hidden" id="qtcName">
+          </div>
+        </div>
+
+        <div class="card-section">
+  <div class="section-header" style="justify-content:space-between;">
+    <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+      <div class="section-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <line x1="16" y1="13" x2="8" y2="13"/>
+          <line x1="16" y1="17" x2="8" y2="17"/>
+        </svg>
+      </div>
+      <span class="section-title">Task Details</span>
+    </div>
+    <div class="stage-wrap">
+      <span class="stage-label">Stage <span style="color:var(--error);font-size:.75rem;">*</span></span>
+      <div class="stage-box">
+        <input type="text" id="stageField" readonly placeholder="Auto-filled...">
+        <span id="stageIcon">&#8212;</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="full field">
+    <label>Task Link <span class="req">*</span>
+      <span class="sub" id="linkHint">Must start with: https://labeling.robot.car/#</span>
+    </label>
+    <input type="text" id="taskLink" placeholder="https://labeling.robot.car/#..." required autocomplete="off" inputmode="url">
+    <div id="linkNoStageWarn" class="warn-box" dir="rtl" style="display:none">
+      <span class="warn-icon">&#9888;</span>
+      <span>فين الـ <span dir="ltr">Stage</span> اللي في الـ <span dir="ltr">Link</span></span>
+    </div>
+    <div id="linkNoIdWarn" class="warn-box" dir="rtl" style="display:none">
+      <span class="warn-icon">&#9888;</span>
+      <span>فين الـ <span dir="ltr">Task ID</span> اللي في الـ <span dir="ltr">Link</span></span>
+    </div>
+    <div id="linkShortIdWarn" class="warn-box" dir="rtl" style="display:none">
+      <span class="warn-icon">&#9888;</span>
+      <span>الـ <span dir="ltr">Task ID</span> لازم يكون <span dir="ltr">10</span> أرقام على الأقل</span>
+    </div>
+    <div id="linkArabicWarn" class="warn-box" dir="rtl" style="display:none">
+      <span class="warn-icon">&#9888;</span>
+      <span>الـ <span dir="ltr">Link</span> مش بيقبل حروف عربية</span>
+    </div>
+  </div>
+
+  <div class="g2">
+    <div class="field">
+      <label>
+        Modality <span class="req">*</span>
+        <span class="autofill-badge" id="modalityBadge">Auto</span>
+      </label>
+      <div class="sdw">
+        <div class="sdb" id="modalityBtn" tabindex="0">
+          <input class="sd-input" id="modalityInput" placeholder="Select Modality..." autocomplete="off" data-lpignore="true">
+          <span class="sd-arrow"></span>
+        </div>
+        <ul class="sdl" id="modalityList">
+          <li data-v="Lane Line"><span class="hl">Lane Line</span></li>
+          <li data-v="Lidar"><span class="hl">Lidar</span></li>
+        </ul>
+        <input type="hidden" id="modality">
+      </div>
+    </div>
+    <div class="field">
+      <label>
+        Queue Name <span class="req">*</span>
+        <span class="autofill-badge" id="queueBadge">Auto</span>
+      </label>
+      <div class="sdw" id="queueFieldWrap">
+        <div class="sdb" id="queueBtn" tabindex="0">
+          <span class="sd-display" id="queueDisplay"></span>
+          <input class="sd-input" id="queueInput" placeholder="Select Queue..." autocomplete="off" data-lpignore="true">
+          <span class="sd-arrow"></span>
+        </div>
+        <ul class="sdl" id="queueList">
+          <li data-v="sc3_full_scene_lane_lidar_parallel_labeling">sc3_full_scene_lane_lidar_<span class="hl">parallel</span>_labeling</li>
+          <li data-v="r2s_sc3_3d_labeling"><span class="hl">r2s</span>_sc3_3d_labeling</li>
+          <li data-v="v4_sc3_full_scene_3d_lanes_parallel_labeling"><span class="hl">v4</span>_sc3_full_scene_3d_lanes_parallel_labeling</li>
+          <li data-v="mpg_sc3_full_scene_mapless_3d_lane"><span class="hl">mpg</span>_sc3_full_scene_mapless_3d_lane</li>
+          <li data-v="alpine_sc3_full_scene_3d_lanes_parallel_labeling"><span class="hl">alpine</span>_sc3_full_scene_3d_lanes_parallel_labeling</li>
+        </ul>
+        <input type="hidden" id="qName">
+      </div>
+    </div>
+  </div>
+
+  <div class="g2">
+    <div class="field">
+      <label>Task ID <span class="req">*</span></label>
+      <div class="task-id-wrap">
+        <input type="text" id="taskId" placeholder="Auto-filled" required inputmode="numeric">
+        <span id="idIcon">&#8212;</span>
+      </div>
+      <div id="taskIdNumWarn" class="warn-box" dir="rtl">
+        <span class="warn-icon">&#9888;</span>
+        <span>ارقام بس</span>
+      </div>
+      <div id="taskIdWarn" class="warn-box" dir="rtl">
+        <span class="warn-icon">&#9888;</span>
+        <span>خلي بالك الـ <span dir="ltr">Task ID</span> مختلف عن اللي في الـ <span dir="ltr">Link</span></span>
+      </div>
+      <div id="taskIdShortWarn" class="warn-box" dir="rtl" style="display:none">
+        <span class="warn-icon">&#9888;</span>
+        <span>الـ <span dir="ltr">Task ID</span> لازم يكون <span dir="ltr">10</span> أرقام على الأقل</span>
+      </div>
+    </div>
+    <div class="field">
+      <label>Pass <span class="req">*</span></label>
+      <div class="sdw" style="position:relative">
+        <div class="sdb" id="passBtn" tabindex="0">
+          <input class="sd-input" id="passInput" placeholder="Auto-filled from link..." autocomplete="off" data-lpignore="true">
+          <span class="sd-arrow"></span>
+        </div>
+        <ul class="sdl" id="passList">
+          <li data-v="FP">FP</li>
+          <li data-v="QA">QA</li>
+        </ul>
+        <input type="hidden" id="pass">
+        <span id="passIcon" style="position:absolute;right:50px;top:50%;transform:translateY(-50%);font-size:.8rem;opacity:.4;pointer-events:none;z-index:10;">&#8212;</span>
+      </div>
+      <div id="passWarn" class="warn-box" dir="rtl">
+        <span class="warn-icon">&#9888;</span>
+        <span id="passWarnText">خلي بالك الـ <span dir="ltr">Pass</span> مختلف عن اللي في الـ <span dir="ltr">Link</span></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+        <div class="card-section">
+          <div class="section-header">
+            <div class="section-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="9 11 12 14 22 4"/>
+                <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+              </svg>
+            </div>
+            <span class="section-title">Task Action</span>
+          </div>
+          <div class="full field">
+            <label>How Many Objects? <span class="req">*</span></label>
+            <input type="text" id="objCount" placeholder="Enter number of objects" required inputmode="numeric" oninput="this.value=this.value.replace(/\D/g,'').slice(0,4)">
+          </div>
+        </div>
+
+        <div class="form-footer">
+          <button type="submit" class="subbtn" id="subBtn">&#10004;&nbsp; Submit Task</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="storage-panel">
+      <button type="button" class="storage-toggle" id="storageToggle">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;flex-shrink:0">
+          <ellipse cx="12" cy="5" rx="9" ry="3"/>
+          <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
+          <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+        </svg>
+        <span>Saved Data</span>
+        <span class="storage-arrow" id="storageArrow">&#9660;</span>
+      </button>
+      <div class="storage-body" id="storageBody" style="display:none">
+        <div class="storage-group">
+          <div class="storage-group-header">
+            <span class="storage-group-title">&#128100; Labeler Names</span>
+            <button type="button" class="storage-clear-all" id="clearNamesBtn">Clear All</button>
+          </div>
+          <div id="storageNames" class="storage-list"></div>
+        </div>
+        <div class="storage-group">
+          <div class="storage-group-header">
+            <span class="storage-group-title">&#128273; Yubikeys</span>
+            <button type="button" class="storage-clear-all" id="clearYKBtn">Clear All</button>
+          </div>
+          <div id="storageYK" class="storage-list"></div>
+        </div>
+        <div class="storage-group">
+          <div class="storage-group-header">
+            <span class="storage-group-title">&#128187; PC No.</span>
+            <button type="button" class="storage-clear-all" id="clearPCBtn">Clear All</button>
+          </div>
+          <div id="storagePC" class="storage-list"></div>
+        </div>
+        <div class="storage-group">
+          <div class="storage-group-header">
+            <span class="storage-group-title">&#9728; Shift</span>
+            <button type="button" class="storage-clear-all" id="clearShiftBtn">Clear All</button>
+          </div>
+          <div id="storageShift" class="storage-list"></div>
+        </div>
+        <div class="storage-group">
+          <div class="storage-group-header">
+            <span class="storage-group-title">&#127970; Unit</span>
+            <button type="button" class="storage-clear-all" id="clearUnitBtn">Clear All</button>
+          </div>
+          <div id="storageUnit" class="storage-list"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- DB Duplicate Dialog -->
+<div id="dbDupOverlay">
+  <div class="db-dup-dialog">
+    <div class="db-dup-icon">🚫</div>
+    <div class="db-dup-title" style="direction:rtl;">الـ Task ده اتبعت مره بالفعل موجود في الـ Data Base</div>
+    <div class="db-dup-subtitle" style="direction:rtl;">الـ System لقى نفس الـ Task موجود في الـ Data Base</div>
+    <div class="db-dup-info-box">
+      <div class="db-dup-info-row">
+        <span class="db-dup-info-label">Task ID</span>
+        <span class="db-dup-info-val" id="dbDupTaskId">—</span>
+      </div>
+      <div class="db-dup-info-row">
+        <span class="db-dup-info-label">Date</span>
+        <span class="db-dup-info-val" id="dbDupDate">—</span>
+      </div>
+      <div class="db-dup-info-row">
+        <span class="db-dup-info-label">Time</span>
+        <span class="db-dup-info-val" id="dbDupTime">—</span>
+      </div>
+    </div>
+    <div class="db-dup-warn-text">
+      ⚠️ لو ده <span class="highlight">غلط</span> وإنت متأكد إن ده Task جديد — <span class="highlight">بلّغ الـ QC</span> ومتبعتوش تاني
+    </div>
+    <button class="db-dup-btn-ok" id="dbDupOkBtn" type="button">
+      حسناً — هرجع أتأكد من الـ Link
+    </button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  if ('scrollRestoration' in history) {
+  history.scrollRestoration = 'manual';
+}
+window.scrollTo(0, 0);
+
+// ============================================================
+// TURSO DATABASE CONFIGURATION (Edge SQLite)
+// High-Throughput & Free Tier (25,000,000 writes/month)
+// ============================================================
+var TURSO_URL = "https://meti-tasks-islamyasser424-design.aws-eu-west-1.turso.io";
+var TURSO_TOKEN = "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3OTI1NjMzNDUsImlkIjoiMDFhMTVkMTctNWIwMS03ZGIyLWE5NDItN2Q1NDA1NWZhNjE1Iiwia2lkIjoid3ZJZENGejZKbkhZV3k4cGJWUkQ4bFVSZjNsOURtdjczY0ZiTGVKYmVXdyIsInJpZCI6IjE4NTk2YzM5LTFjZDgtNDk3Ny1hMmEwLTE4ODVlOWU3Yjg4MSJ9.6DYE3efGgX6Hiw_GptXugwhY3DGBlnsIVDWO9vCLgouLJ6ck7hwDaIyzkuv6CpZcIvLNlTNVK54bruXDYJ0UBA";
+
+function tursoQuery(sql, args, callback) {
+  var reqBody = {
+    requests: [
+      {
+        type: "execute",
+        stmt: {
+          sql: sql,
+          args: (args || []).map(function(arg) {
+            if (typeof arg === "number") return { type: "integer", value: String(arg) };
+            if (arg === null || arg === undefined) return { type: "null" };
+            return { type: "text", value: String(arg) };
+          })
+        }
+      }
+    ]
+  };
+
+  fetch(TURSO_URL + "/v2/pipeline", {
+    method: "POST",
+    headers: {
+      "Authorization": "Bearer " + TURSO_TOKEN,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(reqBody)
+  })
+  .then(function(res) {
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    return res.json();
+  })
+  .then(function(data) {
+    if (data.results && data.results[0]) {
+      var r = data.results[0];
+      if (r.type === "error") {
+        callback(new Error(r.error.message), null);
+      } else {
+        callback(null, r.response ? r.response.result : null);
+      }
+    } else {
+      callback(new Error("Empty response from database"), null);
+    }
+  })
+  .catch(function(err) {
+    callback(err, null);
+  });
+}
+
+// ============================================================
+// GAS_WEBAPP_URL — رابط الـ Web App بتاع Apps Script (اللي فيه doGet)
+// ده بيقرا أسماء الـ QTC وقائمة الـ Queue Name لايف من شيتات:
+// "Morning QTC" / "Night QTC" / "Over Night QTC" / "Queue List"
+// ⚠️ لازم تستبدل الرابط ده برابط الـ Deployment بتاعك
+// (من الشيت: Extensions → Apps Script → Deploy → New deployment → Web app → Execute as: Me → Who has access: Anyone)
+// لازم ينتهي بـ /exec
+// ============================================================
+var GAS_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbxa-Id35-ob1ZCgajX-NLKtz6xPLJVqBd20v7rXdlsoTmeP6nhfvl0of2U2j1RKo3A/exec";
+
+var NK          = "meti_labeler_names";
+var NK_YK       = "meti_yk_history";
+var NK_PC_H     = "meti_pc_history";
+var NK_SHIFT    = "meti_shift_history";
+var NK_UNIT     = "meti_unit_history";
+var NK_LAST_LAB = "meti_last_labeler";
+var NK_LAST_PC  = "meti_last_pc";
+var NK_LAST_YK  = "meti_last_yk";
+var NK_LAST_NATID = "meti_last_natid";
+var NK_QTC_SHIFT = "meti_qtc_shift_last";
+
+function buildRow(b) {
+  return {
+    timestamp:     b.timestamp    || "",
+    shift:         b.shift        || "",
+    unit:          b.unit         || "",
+    qtc_name:      b.qtcName      || "",
+    yubikey_email: b.yubikeyEmail || "",
+    labeler_name:  b.labelerName  || "",
+    national_id:   b.nationalId   || "",
+    pc_no:         b.pcNo         || "",
+    modality:      b.modality     || "",
+    queue_name:    b.queueName    || "",
+    task_link:     b.taskLink     || "",
+    task_id:       b.taskId       || "",
+    object_count:  b.objectCount  || "",
+    pass:          b.pass         || "",
+    stage:         b.stage        || ""
+  };
+}
+
+var NK_COUNTER     = "meti_task_counter";
+var COUNTER_WINDOW = 16 * 60 * 60 * 1000;
+var counterUndoVal = null;
+var undoHideTimer  = null;
+
+function getCounter() {
+  try {
+    var d = JSON.parse(localStorage.getItem(NK_COUNTER));
+    if (!d) return { count: 0, startTs: Date.now() };
+    if (Date.now() - d.startTs >= COUNTER_WINDOW) {
+      var fresh = { count: 0, startTs: Date.now() };
+      localStorage.setItem(NK_COUNTER, JSON.stringify(fresh));
+      return fresh;
+    }
+    return d;
+  } catch(e) { return { count: 0, startTs: Date.now() }; }
+}
+function saveCounter(d) { localStorage.setItem(NK_COUNTER, JSON.stringify(d)); }
+function incrementCounter() {
+  var d = getCounter(); d.count++; saveCounter(d);
+  renderCounter();
+  bumpEl("taskCounter"); bumpEl("floatingCount");
+}
+function bumpEl(id) {
+  var el = document.getElementById(id); if (!el) return;
+  el.classList.remove("bump"); void el.offsetWidth; el.classList.add("bump");
+  setTimeout(function() { el.classList.remove("bump"); }, 300);
+}
+function resetCounter() {
+  var d = getCounter();
+  counterUndoVal = { count: d.count, startTs: d.startTs };
+  saveCounter({ count: 0, startTs: Date.now() });
+  renderCounter();
+  document.getElementById("counterUndoBtn").style.display = "";
+  clearTimeout(undoHideTimer);
+  undoHideTimer = setTimeout(function() {
+    document.getElementById("counterUndoBtn").style.display = "none";
+    counterUndoVal = null;
+  }, 10000);
+}
+function undoCounter() {
+  if (counterUndoVal !== null) {
+    saveCounter(counterUndoVal); counterUndoVal = null;
+    clearTimeout(undoHideTimer);
+    renderCounter();
+    document.getElementById("counterUndoBtn").style.display = "none";
+  }
+}
+function renderCounter() {
+  var d = getCounter();
+  document.getElementById("taskCounter").textContent   = d.count;
+  document.getElementById("floatingCount").textContent = d.count;
+}
+setInterval(function() { getCounter(); renderCounter(); }, 60000);
+
+// ============================================================
+// QTC_DATA — دلوقتي بتتقرا لايف من شيتات "Morning QTC" / "Night QTC" /
+// "Over Night QTC" عن طريق GAS_WEBAPP_URL (شوف loadQTCData تحت).
+// الأوبجكت هنا بيفضل فاضي لحد ما البيانات توصل من الشيت؛ لو الفورم
+// فتح والنت بطيء أو الرابط لسه متظبطش، هيفضل فاضي وهيبان تحذير بسيط.
+// ============================================================
+var QTC_DATA = {};
+
+var selectedQTC = null, linkTaskId = "", linkPassVal = "";
+var autoFilledQueue = false, autoFilledModality = false;
+
+function toast(msg, type) {
+  var t = document.getElementById("toast");
+  t.textContent = msg; t.className = "toast " + (type||"ok") + " show";
+  clearTimeout(t._timer); t._timer = setTimeout(function(){t.className="toast";}, 4200);
+}
+function me(id){var el=document.getElementById(id);if(el)el.classList.add("err-field");}
+function ce(id){var el=document.getElementById(id);if(el)el.classList.remove("err-field");}
+function getN()      {try{return JSON.parse(localStorage.getItem(NK))||[];}catch(e){return[];}}
+function getYK()     {try{return JSON.parse(localStorage.getItem(NK_YK))||[];}catch(e){return[];}}
+function getPCH()    {try{return JSON.parse(localStorage.getItem(NK_PC_H))||[];}catch(e){return[];}}
+function getShiftH() {try{return JSON.parse(localStorage.getItem(NK_SHIFT))||[];}catch(e){return[];}}
+function getUnitH()  {try{return JSON.parse(localStorage.getItem(NK_UNIT))||[];}catch(e){return[];}}
+function saveN(n)      {if(!n.trim())return;var a=getN();     if(a.indexOf(n)===-1){a.unshift(n);localStorage.setItem(NK,      JSON.stringify(a.slice(0,60)));}}
+function saveYK(v)     {if(!v.trim())return;var a=getYK();    if(a.indexOf(v)===-1){a.unshift(v);localStorage.setItem(NK_YK,   JSON.stringify(a.slice(0,20)));}}
+function savePCH(v)    {if(!v.trim())return;var a=getPCH();   if(a.indexOf(v)===-1){a.unshift(v);localStorage.setItem(NK_PC_H, JSON.stringify(a.slice(0,20)));}}
+function saveShiftH(v) {if(!v.trim())return;var a=getShiftH();if(a.indexOf(v)===-1){a.unshift(v);localStorage.setItem(NK_SHIFT,JSON.stringify(a.slice(0,10)));}}
+function saveUnitH(v)  {if(!v.trim())return;var a=getUnitH(); if(a.indexOf(v)===-1){a.unshift(v);localStorage.setItem(NK_UNIT, JSON.stringify(a.slice(0,10)));}}
+function delN(n)      {localStorage.setItem(NK,      JSON.stringify(getN().filter(function(x){return x!==n;})));}
+function delYK(v)     {localStorage.setItem(NK_YK,   JSON.stringify(getYK().filter(function(x){return x!==v;})));}
+function delPCH(v)    {localStorage.setItem(NK_PC_H, JSON.stringify(getPCH().filter(function(x){return x!==v;})));}
+function delShiftH(v) {localStorage.setItem(NK_SHIFT,JSON.stringify(getShiftH().filter(function(x){return x!==v;})));}
+function delUnitH(v)  {localStorage.setItem(NK_UNIT, JSON.stringify(getUnitH().filter(function(x){return x!==v;})));}
+
+function checkPassWarn() {
+  var cur=document.getElementById("pass").value, warn=document.getElementById("passWarn"), pi=document.getElementById("passIcon");
+  if (linkPassVal&&cur&&cur!==linkPassVal){warn.style.display="flex";pi.textContent="\u2014";pi.style.color="";pi.style.opacity=".4";}
+  else{warn.style.display="none";if(linkPassVal&&cur&&cur===linkPassVal){pi.textContent="\u2713";pi.style.color="var(--success)";pi.style.opacity="1";}}
+}
+
+function detectStage(url) {
+  var u=(url||"").toUpperCase();
+  if(u.indexOf("SELLIVANDAR")>-1)    return "Lidar Stage";
+  if(u.indexOf("SELLMSL")>-1)        return "Image Stage";
+  if(u.indexOf("SELLRELABELING")>-1) return "Relabeling Stage";
+  if(u.indexOf("SELLMAPPING")>-1)    return "Sellmapping Stage";
+  return "";
+}
+function updateStageField(url) {
+  var el=document.getElementById("stageField"), icon=document.getElementById("stageIcon"), stage=detectStage(url);
+  el.classList.remove("filled");
+  if(stage){
+    el.value=stage;el.classList.add("filled");
+    el.style.borderColor="#6dbf9a";el.style.color="var(--text)";
+    el.style.boxShadow="";
+    icon.textContent="\u2713";icon.style.color="#6dbf9a";icon.style.opacity="1";
+  } else {
+    el.value="";el.style.borderColor="";el.style.color="var(--text-muted)";
+    el.style.boxShadow="";
+    icon.textContent="\u2014";icon.style.color="";icon.style.opacity=".4";
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// AUTO-FILL: Modality detection based on Stage segment + Queue
+// ══════════════════════════════════════════════════════════════
+// Stage segment = the raw word in the URL like "SellMSL", "SellIvandar", etc.
+// Queue        = the queue name from /queue/... in the URL
+//
+// Lane Line rules:
+//   SellMSL      + sc3_full_scene_highway_mapless_filtered_3d_lanes  → Lane Line
+//   SellIvandar  + sc3_full_scene_highway_lanes_first_lidar_labeling  → Lane Line
+//   SellIvandar  + sc3_full_scene_highway_lidar_only_labeling          → Lane Line
+//   SellRelabeling + sc3_full_scene_highway_lidar_only_labeling        → Lane Line
+//   SellMapping  + (any queue)                                         → Lane Line
+//
+// Lidar rules:
+//   SellIvandar  + sc3_full_scene_highway_mapless_filtered_3d_lanes   → Lidar
+//   SellIvandar  + sc3_full_scene_lane_lidar_parallel_labeling         → Lidar
+//   SellRelabeling + sc3_full_scene_highway_lanes_first_lidar_labeling → Lidar
+//
+// Everything else → no auto-fill (manual)
+// ══════════════════════════════════════════════════════════════
+function detectModalityFromStageQueue(stageSegment, queueName) {
+  var s = (stageSegment || "").replace(/(?:QA|FP)$/i, "").toUpperCase();
+  var q = (queueName || "").toLowerCase();
+
+ // ── Lane Line ──
+if (s === "SELLMSL" && q === "sc3_full_scene_highway_mapless_filtered_3d_lanes") return "Lane Line";
+if (s.startsWith("SELLIVANDAR") && q === "sc3_full_scene_highway_lanes_first_lidar_labeling") return "Lane Line";
+if (s.startsWith("SELLRELABELING") && q === "sc3_full_scene_highway_lidar_only_labeling") return "Lane Line";
+if (s.startsWith("SELLMAPPING")) return "Lane Line";
+
+// ── Lidar ──
+if (s.startsWith("SELLIVANDAR") && q === "sc3_full_scene_highway_mapless_filtered_3d_lanes") return "Lidar";
+if (s.startsWith("SELLIVANDAR") && q === "sc3_full_scene_highway_lidar_only_labeling") return "Lidar";
+if (s.startsWith("SELLIVANDAR") && q === "sc3_full_scene_lane_lidar_parallel_labeling") return "Lidar";
+if (s.startsWith("SELLRELABELING") && q === "sc3_full_scene_highway_lanes_first_lidar_labeling") return "Lidar";
+  return ""; // manual — no auto-fill
+}
+
+// Show/hide the ⚡ Auto badge next to label
+function showAutofillBadge(id, show) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  if (show) { el.classList.add("show"); }
+  else      { el.classList.remove("show"); }
+}
+
+function tick() {
+  var d=new Date();
+  var el=document.getElementById("ts"), top=document.getElementById("topTime");
+  if(el)  el.value       =d.toLocaleString("en-US",{timeZone:"Africa/Cairo",month:"2-digit",day:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:true});
+  if(top) top.textContent=d.toLocaleString("en-US",{timeZone:"Africa/Cairo",weekday:"short",month:"short",day:"numeric",year:"numeric",hour:"2-digit",minute:"2-digit",hour12:true});
+}
+tick(); setInterval(tick,1000);
+
+function updateProgress() {
+  var fields=["shift","unit","pcNo","labName","natId","yk","modality","taskLink","taskId","pass","qtcName","objCount","stageField"];
+  var filled=fields.filter(function(id){var el=document.getElementById(id);return el&&el.value&&el.value.trim();}).length;
+  document.getElementById("progressBar").style.width=Math.round(filled/fields.length*100)+"%";
+}
+document.querySelectorAll("input,select,textarea").forEach(function(el){
+  el.addEventListener("input",updateProgress); el.addEventListener("change",updateProgress);
+});
+
+document.getElementById("labName").addEventListener("input",function(){
+  var pos=this.selectionStart;
+  this.value=this.value.split(' ').map(function(w){return w.charAt(0).toUpperCase()+w.slice(1).toLowerCase();}).join(' ');
+  this.setSelectionRange(pos,pos);
+  var v=this.value, hasNonEng=v.length>0&&/[^a-zA-Z\s]/.test(v);
+  this.style.borderColor=hasNonEng?"var(--error)":(v.trim()?"#1a8a5a":"");
+  this.style.boxShadow=hasNonEng?"0 0 0 3px rgba(192,57,43,.1)":"";
+  document.getElementById("labNameWarn").style.display=hasNonEng?"flex":"none";
+});
+
+document.getElementById("natId").addEventListener("input",function(){
+  this.value=this.value.replace(/\D/g,"").slice(0,14);
+  var v=this.value, bad=v.length>0&&v.length!==14;
+  this.style.borderColor=bad?"var(--error)":(v.length===14?"#1a8a5a":"");
+  this.style.boxShadow=bad?"0 0 0 3px rgba(192,57,43,.1)":"";
+  document.getElementById("natIdWarn").style.display=bad?"flex":"none";
+});
+
+document.getElementById("taskId").addEventListener("input",function(){
+  var v=this.value, hasNonNum=v.length>0&&/\D/.test(v);
+  this.style.borderColor=hasNonNum?"var(--error)":"";
+  this.style.boxShadow=hasNonNum?"0 0 0 3px rgba(192,57,43,.1)":"";
+  document.getElementById("taskIdNumWarn").style.display=hasNonNum?"flex":"none";
+  var icon=document.getElementById("idIcon");
+  if(!hasNonNum){
+    var differs=linkTaskId&&v.trim()&&v.trim()!==linkTaskId;
+    document.getElementById("taskIdWarn").style.display=differs?"flex":"none";
+    document.getElementById("taskIdShortWarn").style.display=(!differs&&v.trim().length>0&&v.trim().length<10)?"flex":"none";
+    if(differs){icon.textContent="\u2014";icon.style.color="";icon.style.opacity=".4";}
+    else if(linkTaskId&&v.trim()&&v.trim()===linkTaskId){icon.textContent="\u2713";icon.style.color="var(--success)";icon.style.opacity="1";}
+  } else {document.getElementById("taskIdWarn").style.display="none";document.getElementById("taskIdShortWarn").style.display="none";}
+});
+
+var pcIn=document.getElementById("pcNo"), pcAcL=document.getElementById("pcAcList"), pcActive=-1;
+function renderPCAC(q){
+  var hits=q?getPCH().filter(function(n){return n.toLowerCase().indexOf(q.toLowerCase())>-1;}):getPCH();
+  pcActive=-1; if(!hits.length){pcAcL.innerHTML="";pcAcL.classList.remove("open");return;}
+  pcAcL.innerHTML="";
+  hits.forEach(function(val){
+    var li=document.createElement("li"),sp=document.createElement("span"),dl=document.createElement("button");
+    sp.textContent=val; dl.className="delbtn";dl.type="button";dl.textContent="\u2715";
+    li.appendChild(sp);li.appendChild(dl);
+    li.addEventListener("mousedown",function(e){
+      if(e.target===dl){e.preventDefault();delPCH(val);renderPCAC(pcIn.value);if(document.getElementById("storageBody").style.display!=="none")renderStorageManager();return;}
+      e.preventDefault();pcIn.value=val;pcAcL.classList.remove("open");pcActive=-1;validatePC(val);
+    });
+    pcAcL.appendChild(li);
+  });
+  pcAcL.classList.add("open");
+}
+function validatePC(v){
+  if(!v){pcIn.style.borderColor="";return;}
+  if(/^qtc$/i.test(v)){pcIn.value="QTC";pcIn.style.borderColor="#1a8a5a";return;}
+  if(/^sv$/i.test(v)){pcIn.value="SV";pcIn.style.borderColor="#1a8a5a";return;}
+  if(/^sl$/i.test(v)){pcIn.value="SL";pcIn.style.borderColor="#1a8a5a";return;}
+  if(/^buffer$/i.test(v)){pcIn.value="Buffer";pcIn.style.borderColor="#1a8a5a";return;}
+  if(/^\d+$/.test(v)){var num=parseInt(v,10);pcIn.style.borderColor=(num>=1&&num<=100)?"#1a8a5a":"var(--error)";}
+  else{pcIn.style.borderColor="var(--error)";}
+}
+pcIn.addEventListener("input",function(){validatePC(this.value.trim());renderPCAC(this.value);});
+pcIn.addEventListener("focus",function(){renderPCAC(this.value);});
+pcIn.addEventListener("blur",function(){setTimeout(function(){pcAcL.classList.remove("open");pcActive=-1;},180);});
+pcIn.addEventListener("keydown",function(e){
+  var items=pcAcL.querySelectorAll("li"); if(!items.length)return;
+  if(e.key==="ArrowDown"){e.preventDefault();pcActive=Math.min(pcActive+1,items.length-1);items.forEach(function(x,i){x.classList.toggle("ac-hover",i===pcActive);});}
+  else if(e.key==="ArrowUp"){e.preventDefault();pcActive=Math.max(pcActive-1,0);items.forEach(function(x,i){x.classList.toggle("ac-hover",i===pcActive);});}
+  else if(e.key==="Enter"&&pcActive>=0){e.preventDefault();var v=items[pcActive].querySelector("span").textContent;pcIn.value=v;pcAcL.classList.remove("open");pcActive=-1;validatePC(v);}
+  else if(e.key==="Escape"){pcAcL.classList.remove("open");pcActive=-1;}
+});
+
+function makeSearchableDropdown(opts){
+  var btn=document.getElementById(opts.btnId),inp=document.getElementById(opts.inputId),
+      list=document.getElementById(opts.listId),hidden=document.getElementById(opts.hiddenId),
+      dispEl=opts.displayId?document.getElementById(opts.displayId):null,
+      allItems=Array.from(list.querySelectorAll("li[data-v]")),activeIdx=-1,selectedVal="";
+  function open(){btn.classList.add("open");list.classList.add("open");if(dispEl)dispEl.style.display="none";inp.style.display="";inp.value="";filterItems("");activeIdx=-1;setTimeout(function(){inp.focus();},0);}
+  function close(){btn.classList.remove("open");list.classList.remove("open");if(!hidden.value){inp.value="";inp.style.display="";if(dispEl){dispEl.innerHTML="";dispEl.style.display="none";}}else{if(dispEl){var found=allItems.find(function(li){return li.dataset.v===hidden.value;});if(found){dispEl.innerHTML=found.innerHTML;dispEl.style.display="flex";}inp.style.display="none";}else{inp.value=hidden.value;}}activeIdx=-1;}
+  function filterItems(q){var count=0;allItems.forEach(function(li){var text=(li.dataset.v+" "+li.textContent).toLowerCase(),match=!q||text.indexOf(q.toLowerCase())>-1;li.style.display=match?"":"none";if(match)count++;});var empty=list.querySelector(".sd-empty");if(empty)empty.remove();if(count===0){var em=document.createElement("li");em.className="sd-empty";em.textContent="No results found";list.appendChild(em);}activeIdx=-1;updateHover();}
+  function updateHover(){var visible=allItems.filter(function(li){return li.style.display!=="none";});visible.forEach(function(li,i){li.classList.toggle("sd-hover",i===activeIdx);});}
+  function selectItem(li){selectedVal=li.dataset.v;hidden.value=selectedVal;allItems.forEach(function(x){x.classList.remove("sel");});li.classList.add("sel");btn.style.borderColor="#1a8a5a";if(dispEl){dispEl.innerHTML=li.innerHTML;dispEl.style.display="flex";inp.style.display="none";inp.value=selectedVal;}else{inp.value=selectedVal;}btn.classList.remove("open");list.classList.remove("open");activeIdx=-1;updateProgress();if(opts.onSelect)opts.onSelect(selectedVal);}
+  btn.addEventListener("mousedown",function(e){if(e.target===inp)return;e.preventDefault();list.classList.contains("open")?close():open();});
+  if(dispEl){dispEl.addEventListener("mousedown",function(e){e.preventDefault();open();});dispEl.style.cursor="pointer";}
+  inp.addEventListener("focus",function(){if(!list.classList.contains("open"))open();});
+  inp.addEventListener("input",function(){filterItems(this.value);hidden.value="";btn.style.borderColor="";selectedVal="";if(dispEl){dispEl.innerHTML="";dispEl.style.display="none";}});
+  inp.addEventListener("blur",function(){setTimeout(close,160);});
+  inp.addEventListener("keydown",function(e){var visible=allItems.filter(function(li){return li.style.display!=="none";});if(e.key==="ArrowDown"){e.preventDefault();activeIdx=Math.min(activeIdx+1,visible.length-1);updateHover();if(visible[activeIdx])visible[activeIdx].scrollIntoView({block:"nearest"});}else if(e.key==="ArrowUp"){e.preventDefault();activeIdx=Math.max(activeIdx-1,0);updateHover();if(visible[activeIdx])visible[activeIdx].scrollIntoView({block:"nearest"});}else if(e.key==="Enter"){e.preventDefault();if(activeIdx>=0&&visible[activeIdx])selectItem(visible[activeIdx]);}else if(e.key==="Escape"){close();}});
+  allItems.forEach(function(li){li.addEventListener("mousedown",function(e){e.preventDefault();selectItem(li);});});
+  return {
+    reset:function(){hidden.value="";inp.value="";inp.style.display="";selectedVal="";btn.style.borderColor="";allItems.forEach(function(x){x.classList.remove("sel");});if(dispEl){dispEl.innerHTML="";dispEl.style.display="none";}filterItems("");},
+    setValue:function(val){var li=allItems.find(function(x){return x.dataset.v===val;});if(li)selectItem(li);},
+    getValue:function(){return hidden.value;}
+  };
+}
+
+var shiftDD    = makeSearchableDropdown({btnId:"shiftBtn",    inputId:"shiftInput",    listId:"shiftList",    hiddenId:"shift",       onSelect:function(v){saveShiftH(v);}});
+var unitDD     = makeSearchableDropdown({btnId:"unitBtn",     inputId:"unitInput",     listId:"unitList",     hiddenId:"unit",        onSelect:function(v){saveUnitH(v);}});
+var modalityDD = makeSearchableDropdown({btnId:"modalityBtn", inputId:"modalityInput", listId:"modalityList", hiddenId:"modality"});
+var queueDD    = makeSearchableDropdown({btnId:"queueBtn",    inputId:"queueInput",    listId:"queueList",    hiddenId:"qName",       displayId:"queueDisplay"});
+var passDD     = makeSearchableDropdown({btnId:"passBtn",     inputId:"passInput",     listId:"passList",     hiddenId:"pass",        onSelect:function(){checkPassWarn();}});
+var qtcShiftDD = makeSearchableDropdown({btnId:"qtcShiftBtn", inputId:"qtcShiftInput", listId:"qtcShiftList", hiddenId:"qtcShiftSel", onSelect:function(val){
+  buildQTCGrid(val);
+  var s=document.getElementById("qtcSearch");if(s)s.value="";
+  localStorage.setItem(NK_QTC_SHIFT, val);
+}});
+
+document.addEventListener("click",function(e){
+  ["shiftBtn","unitBtn","qtcShiftBtn","modalityBtn","queueBtn","passBtn"].forEach(function(id){
+    var b=document.getElementById(id),l=document.getElementById(id.replace("Btn","List"));
+    if(b&&!b.contains(e.target)){b.classList.remove("open");if(l)l.classList.remove("open");}
+  });
+});
+
+var labIn=document.getElementById("labName"),acL=document.getElementById("acList"),acActive=-1;
+function renderAC(q){
+  var hits=q?getN().filter(function(n){return n.toLowerCase().indexOf(q.toLowerCase())>-1;}):getN();
+  acActive=-1; if(!hits.length){acL.innerHTML="";acL.classList.remove("open");return;}
+  acL.innerHTML="";
+  hits.forEach(function(name){
+    var li=document.createElement("li"),sp=document.createElement("span"),dl=document.createElement("button");
+    sp.textContent=name;dl.className="delbtn";dl.type="button";dl.textContent="\u2715";
+    li.appendChild(sp);li.appendChild(dl);
+    li.addEventListener("mousedown",function(e){
+      if(e.target===dl){e.preventDefault();delN(name);renderAC(labIn.value);if(document.getElementById("storageBody").style.display!=="none")renderStorageManager();return;}
+      e.preventDefault();labIn.value=name;acL.classList.remove("open");acActive=-1;
+    });
+    acL.appendChild(li);
+  });
+  acL.classList.add("open");
+}
+labIn.addEventListener("input",function(){renderAC(this.value);});
+labIn.addEventListener("focus",function(){renderAC(this.value);});
+labIn.addEventListener("blur",function(){setTimeout(function(){acL.classList.remove("open");acActive=-1;},180);});
+labIn.addEventListener("keydown",function(e){
+  var items=acL.querySelectorAll("li"); if(!items.length)return;
+  if(e.key==="ArrowDown"){e.preventDefault();acActive=Math.min(acActive+1,items.length-1);items.forEach(function(x,i){x.classList.toggle("ac-hover",i===acActive);});}
+  else if(e.key==="ArrowUp"){e.preventDefault();acActive=Math.max(acActive-1,0);items.forEach(function(x,i){x.classList.toggle("ac-hover",i===acActive);});}
+  else if(e.key==="Enter"&&acActive>=0){e.preventDefault();labIn.value=items[acActive].querySelector("span").textContent;acL.classList.remove("open");acActive=-1;}
+  else if(e.key==="Escape"){acL.classList.remove("open");acActive=-1;}
+});
+
+var ykIn=document.getElementById("yk"),ykAcL=document.getElementById("ykAcList"),ykActive=-1;
+function validateYK(v){
+  var hint=document.getElementById("ykHint");
+  if(!v){ykIn.style.borderColor="";hint.style.color="var(--text-muted)";hint.removeAttribute("dir");hint.textContent="6-digit code | or email format: me123456@meti.ai";return;}
+  var is6=/^\d{6}$/.test(v),isE=/^[a-zA-Z]{2}\d+@meti\.ai$/i.test(v);
+  if(is6||isE){ykIn.style.borderColor="#1a8a5a";hint.style.color="var(--success)";hint.removeAttribute("dir");hint.textContent=is6?"\u2713 Valid 6-digit code":"\u2713 Valid email";ce("yk");}
+  else{ykIn.style.borderColor="var(--error)";hint.style.color="var(--error)";hint.setAttribute("dir","rtl");hint.textContent="\u0644\u0627\u0632\u0645 \u064a\u0643\u0648\u0646 6 \u0627\u0631\u0642\u0627\u0645 \u0627\u0648 \u0627\u0644\u0634\u0643\u0644 \u062f\u0647 me123456@meti.ai";}
+}
+function renderYKAC(q){
+  var hits=q?getYK().filter(function(n){return n.toLowerCase().indexOf(q.toLowerCase())>-1;}):getYK();
+  ykActive=-1; if(!hits.length){ykAcL.innerHTML="";ykAcL.classList.remove("open");return;}
+  ykAcL.innerHTML="";
+  hits.forEach(function(val){
+    var li=document.createElement("li"),sp=document.createElement("span"),dl=document.createElement("button");
+    sp.textContent=val;dl.className="delbtn";dl.type="button";dl.textContent="\u2715";
+    li.appendChild(sp);li.appendChild(dl);
+    li.addEventListener("mousedown",function(e){
+      if(e.target===dl){e.preventDefault();delYK(val);renderYKAC(ykIn.value);if(document.getElementById("storageBody").style.display!=="none")renderStorageManager();return;}
+      e.preventDefault();ykIn.value=val;ykAcL.classList.remove("open");ykActive=-1;validateYK(val);
+    });
+    ykAcL.appendChild(li);
+  });
+  ykAcL.classList.add("open");
+}
+ykIn.addEventListener("input",function(){
+  var v = this.value;
+  if(/^\d+$/.test(v) && v.length > 6){ v = v.slice(0, 6); }
+  if(/^\d{6}$/.test(v)){ v = "me" + v + "@meti.ai"; }
+  if(/@meti\.ai$/i.test(v)){ v = v.toLowerCase().trim(); }
+  this.value = v;
+  validateYK(this.value.trim());
+  renderYKAC(this.value);
+});
+ykIn.addEventListener("focus",function(){renderYKAC(this.value);});
+ykIn.addEventListener("blur",function(){setTimeout(function(){ykAcL.classList.remove("open");ykActive=-1;},180);});
+ykIn.addEventListener("keydown",function(e){
+  var items=ykAcL.querySelectorAll("li"); if(!items.length)return;
+  if(e.key==="ArrowDown"){e.preventDefault();ykActive=Math.min(ykActive+1,items.length-1);items.forEach(function(x,i){x.classList.toggle("ac-hover",i===ykActive);});}
+  else if(e.key==="ArrowUp"){e.preventDefault();ykActive=Math.max(ykActive-1,0);items.forEach(function(x,i){x.classList.toggle("ac-hover",i===ykActive);});}
+  else if(e.key==="Enter"&&ykActive>=0){e.preventDefault();var v=items[ykActive].querySelector("span").textContent;ykIn.value=v;ykAcL.classList.remove("open");ykActive=-1;validateYK(v);}
+  else if(e.key==="Escape"){ykAcL.classList.remove("open");ykActive=-1;}
+});
+
+var qtcDataLoaded = false;
+function buildQTCGrid(shift, preserveName){
+  var grid=document.getElementById("qtcGrid"),disp=document.getElementById("qtcSelectedDisplay"),
+      wrap=document.getElementById("qtcPickerWrap"),msg=document.getElementById("qtcShiftMsg"),
+      hid=document.getElementById("qtcName");
+  // لو مبعتش اسم نحافظ عليه، حافظ على اللي متختار حاليًا (لو أي) بدل ما يتمسح
+  var keepName = (preserveName !== undefined) ? preserveName : selectedQTC;
+  selectedQTC=null;hid.value="";disp.innerHTML="";grid.innerHTML="";
+  var list=QTC_DATA[shift];
+  if(!list){
+    wrap.style.display="none";msg.style.display="block";
+    msg.innerHTML = qtcDataLoaded
+      ? "&#9432; Please select a QTC Shift first to view available names."
+      : "&#9432; بيتم تحميل الأسماء... Loading names...";
+    return;
+  }
+  msg.style.display="none";wrap.style.display="block";
+
+  function selectCard(card,p){
+    grid.querySelectorAll(".qtc-card.selected").forEach(function(c){c.classList.remove("selected");c.querySelector(".qtc-check").textContent="";});
+    card.classList.add("selected");card.querySelector(".qtc-check").textContent="\u2713";
+    selectedQTC=p.name;hid.value=selectedQTC;disp.innerHTML="";
+    var tag=document.createElement("div");tag.className="qtc-tag";
+    tag.innerHTML=selectedQTC+'<button type="button" title="Clear">\u2715</button>';
+    tag.querySelector("button").addEventListener("click",function(){selectedQTC=null;hid.value="";disp.innerHTML="";card.classList.remove("selected");card.querySelector(".qtc-check").textContent="";});
+    disp.appendChild(tag);
+  }
+
+  list.forEach(function(p){
+    var card=document.createElement("div");card.className="qtc-card";
+    card.innerHTML='<div class="qtc-check"></div><div><div class="qtc-name">'+p.name+'</div>'+(p.role?'<div class="qtc-role">'+p.role+'</div>':'')+'</div>';
+    card.addEventListener("click",function(){ selectCard(card,p); });
+    grid.appendChild(card);
+    // رجّع نفس الاختيار القديم لو الاسم لسه موجود في القايمة الجديدة
+    if(keepName && p.name === keepName){ selectCard(card,p); }
+  });
+}
+document.getElementById("qtcShiftMsg").style.display="block";
+document.getElementById("qtcSearch").addEventListener("input",function(){
+  var q=this.value.toLowerCase().trim();
+  document.querySelectorAll("#qtcGrid .qtc-card").forEach(function(card){
+    var name=card.querySelector(".qtc-name").textContent.toLowerCase();
+    card.style.display=(q===""||name.indexOf(q)>-1)?"":"none";
+  });
+});
+
+// ══════════════════════════════════════════════════════════════
+// LIVE DATA — القراءة من شيتات Morning/Night/Over Night QTC + Queue List
+// عن طريق الـ Apps Script Web App (GAS_WEBAPP_URL)
+// أي تعديل (إضافة/حذف اسم أو Queue) في الشيتات هيبان في الفورم من
+// غير ما حد يلمس الكود خالص.
+// ══════════════════════════════════════════════════════════════
+function escapeHtml(str){
+  return String(str).replace(/[&<>"']/g, function(c){
+    return ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c];
+  });
+}
+
+// بيلف الجزء اللي محتاج يتلون (highlight) جوه اسم الـ Queue بـ <span class="hl">
+function buildQueueLiHTML(name, highlight){
+  var safeName = escapeHtml(name);
+  if(!highlight) return safeName;
+  var idx = name.toLowerCase().indexOf(highlight.toLowerCase());
+  if(idx < 0) return safeName;
+  var before = escapeHtml(name.slice(0, idx));
+  var mid    = escapeHtml(name.slice(idx, idx + highlight.length));
+  var after  = escapeHtml(name.slice(idx + highlight.length));
+  return before + '<span class="hl">' + mid + '</span>' + after;
+}
+
+// بيعيد بناء حقل Queue Name بالكامل ببيانات جديدة، وبيعمل reset لكل
+// الـ event listeners بتاعته عشان ميحصلش تكرار (duplicate binding)
+function renderQueueList(items){
+  var wrap = document.getElementById("queueFieldWrap");
+  if(!wrap || !items) return;
+
+  var prevValue = document.getElementById("qName") ? document.getElementById("qName").value : "";
+
+  var liHtml = items.length
+    ? items.map(function(it){
+        return '<li data-v="' + escapeHtml(it.name) + '">' + buildQueueLiHTML(it.name, it.highlight) + '</li>';
+      }).join("")
+    : '<li class="sdl-empty" style="opacity:.6;pointer-events:none;">No queues available</li>';
+
+  wrap.innerHTML =
+    '<div class="sdb" id="queueBtn" tabindex="0">' +
+      '<span class="sd-display" id="queueDisplay"></span>' +
+      '<input class="sd-input" id="queueInput" placeholder="Select Queue..." autocomplete="off" data-lpignore="true">' +
+      '<span class="sd-arrow"></span>' +
+    '</div>' +
+    '<ul class="sdl" id="queueList">' + liHtml + '</ul>' +
+    '<input type="hidden" id="qName">';
+
+  queueDD = makeSearchableDropdown({btnId:"queueBtn", inputId:"queueInput", listId:"queueList", hiddenId:"qName", displayId:"queueDisplay"});
+  if(prevValue) queueDD.setValue(prevValue);
+}
+
+// ══════════════════════════════════════════════════════════════
+// FAST LOAD — بدل نداءين منفصلين لـ Apps Script (queue + qtc)، بقى
+// نداء واحد بس (action=all) وده بيقلل زمن الانتظار تقريبًا للنص.
+// كمان بنحفظ آخر بيانات نزلت في localStorage، وأول ما الفورم يفتح
+// بنعرضها فورًا (من غير أي "Loading names...") وفي نفس الوقت بنجيب
+// النسخة الجديدة من الشيت في الخلفية وبنحدث الشاشة لو فيه فرق.
+// النتيجة: التحضير بيبان فورًا من أول فتح تاني للفورم، وأي تعديل
+// في شيت الـ QTC أو الـ Queue List بيوصل خلال ثواني قليلة تلقائيًا.
+// ══════════════════════════════════════════════════════════════
+var NK_FORM_DATA_CACHE = "meti_form_data_cache_v1";
+
+function applyFormData(data){
+  if(!data || typeof data !== "object") return;
+  if(data.qtc && typeof data.qtc === "object"){
+    var newQtcStr = JSON.stringify(data.qtc);
+    var qtcChanged = newQtcStr !== JSON.stringify(QTC_DATA);
+    QTC_DATA = data.qtc;
+    qtcDataLoaded = true;
+    var currentShift = document.getElementById("qtcShiftSel") ? document.getElementById("qtcShiftSel").value : "";
+    // كنا بنعمل rebuild للكروت في كل مرة (كل 20 ثانية + كل رجوع للتاب)
+    // وده كان بيمسح اختيار المستخدم ويعمل قفزة سكرول.
+    // دلوقتي: rebuild بس لو البيانات فعلاً اتغيرت، ونحافظ على الاسم المختار.
+    if(currentShift && qtcChanged) buildQTCGrid(currentShift, selectedQTC);
+  }
+  if(Array.isArray(data.queue)){
+    renderQueueList(data.queue);
+  }
+}
+
+function loadAllFormData(){
+  // 1) اعرض فورًا آخر نسخة محفوظة (لو موجودة) عشان الفورم يبان جاهز على طول
+  try {
+    var cachedRaw = localStorage.getItem(NK_FORM_DATA_CACHE);
+    if(cachedRaw){
+      applyFormData(JSON.parse(cachedRaw));
+    }
+  } catch(e) { /* تجاهل أي خطأ في الكاش */ }
+
+  if(!GAS_WEBAPP_URL || GAS_WEBAPP_URL.indexOf("AKfycb...") > -1) return; // لسه مفيش رابط متظبط
+
+  // 2) في نفس الوقت، هات النسخة الأحدث من الشيت وحدث الشاشة والكاش
+  fetch(GAS_WEBAPP_URL + "?action=all", { cache: "no-store" })
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      applyFormData(data);
+      try { localStorage.setItem(NK_FORM_DATA_CACHE, JSON.stringify(data)); } catch(e) {}
+    })
+    .catch(function(){ /* لو فشل، هيفضل شغال بالكاش أو بالقائمة الافتراضية جوه الـ HTML */ });
+}
+
+loadAllFormData();
+
+// ══════════════════════════════════════════════════════════════
+// SCROLL RESTORE — عشان أي Reload للصفحة ميرميش المستخدم لفوق،
+// بنحفظ مكان الـ Scroll أول بأول وبنرجعه تلقائيًا بعد التحميل
+// ══════════════════════════════════════════════════════════════
+if("scrollRestoration" in history) history.scrollRestoration = "manual";
+
+var NK_SCROLL_POS = "meti_scroll_pos_v1";
+
+(function(){
+  var saveTimer = null;
+  function saveScroll(){
+    try { sessionStorage.setItem(NK_SCROLL_POS, String(window.scrollY)); } catch(e) {}
+  }
+  window.addEventListener("scroll", function(){
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(saveScroll, 150);
+  }, { passive: true });
+  window.addEventListener("beforeunload", saveScroll);
+
+  function restoreScroll(){
+    var y = 0;
+    try { y = parseInt(sessionStorage.getItem(NK_SCROLL_POS), 10) || 0; } catch(e) {}
+    if(y > 0) window.scrollTo(0, y);
+  }
+  // بنحاول نرجع المكان أكتر من مرة عشان لو المحتوى (Queue/QTC) اتحمل
+  // بعدين وغيّر طول الصفحة، الـ Scroll يفضل صح
+  restoreScroll();
+  setTimeout(restoreScroll, 100);
+  setTimeout(restoreScroll, 400);
+  window.addEventListener("load", restoreScroll);
+})();
+
+// كل 20 ثانية، هات آخر نسخة من الشيت تلقائيًا من غير ما المستخدم يعمل Refresh
+// (لو التاب فاتح من قبل التعديل، هيتحدث لوحده)
+setInterval(loadAllFormData, 20000);
+
+// كمان لما المستخدم يرجع للتاب بعد ما يكون سايبها (تبديل تاب/نافذة)، حدّث فورًا
+document.addEventListener("visibilitychange", function(){
+  if(document.visibilityState === "visible") loadAllFormData();
+});
+
+// ══════════════════════════════════════════════════════════════
+// Task Link listener — with auto-fill for Queue + Modality
+// ══════════════════════════════════════════════════════════════
+document.getElementById("taskLink").addEventListener("input",function(){
+  var url=this.value.trim(), PREFIX="https://labeling.robot.car/#";
+
+  // Trim trailing garbage after the expected URL pattern
+  var idMatch=url.match(/(https:\/\/labeling\.robot\.car\/#\/tasks\/do\/[^\/]+\/id\/\d+(\/queue\/[^\/\?#&]+)?)/);
+if(idMatch && url.length > idMatch[1].length){ this.value=idMatch[1]; url=idMatch[1]; }
+
+  var hint=document.getElementById("linkHint"),idEl=document.getElementById("taskId"),icon=document.getElementById("idIcon");
+  var hasStage=detectStage(url)!=="", hasId=!!url.match(/\/id\/\d+/);
+  if(url.length===0){this.style.borderColor="";hint.style.color="";}
+  else if(!url.startsWith(PREFIX)){this.style.borderColor="var(--error)";hint.style.color="var(--error)";}
+  else if(hasStage&&hasId){this.style.borderColor="#1a8a5a";hint.style.color="";}
+  else{this.style.borderColor="var(--error)";hint.style.color="";}
+
+  updateStageField(url);
+
+  // Extract Task ID
+  var idM=url.match(/\/id\/(\d+)/);
+  if(idM){linkTaskId=idM[1];idEl.value=idM[1];idEl.style.borderColor="#1a8a5a";icon.textContent="\u2713";icon.style.color="var(--success)";icon.style.opacity="1";document.getElementById("taskIdWarn").style.display="none";}
+  else{linkTaskId="";idEl.value="";idEl.style.borderColor="";icon.textContent="\u2014";icon.style.color="";icon.style.opacity=".4";document.getElementById("taskIdWarn").style.display="none";}
+
+  // Extract Pass (FP / QA)
+  var dM=url.match(/\/do\/([^\/]+)\//);
+  if(dM){var dp=dM[1].toUpperCase().endsWith("QA")?"QA":"FP";linkPassVal=dp;passDD.setValue(dp);var pi=document.getElementById("passIcon");pi.textContent="\u2713";pi.style.color="var(--success)";pi.style.opacity="1";document.getElementById("passWarn").style.display="none";}
+  else{linkPassVal="";passDD.reset();document.getElementById("passWarn").style.display="none";var pi2=document.getElementById("passIcon");pi2.textContent="\u2014";pi2.style.color="";pi2.style.opacity=".4";}
+
+  // ── NEW: Auto-fill Queue Name + Modality from URL ──────────
+  var queueSegM = url.match(/\/queue\/([^\/\?#&]+)/i);
+ if (queueSegM) {
+    var extractedQ = queueSegM[1].toLowerCase().trim();
+
+    // 1) Set Queue Name dropdown
+    queueDD.setValue(extractedQ);
+    showAutofillBadge("queueBadge", true);
+    autoFilledQueue = true;
+
+    // 2) Get raw stage segment from URL (e.g. "SellMSL", "SellIvandar")
+    var doSegArr = url.match(/\/do\/([^\/]+)\//i);
+    var stageSegRaw = doSegArr ? doSegArr[1] : "";
+    stageSegRaw = stageSegRaw.replace(/(?:QA|FP)$/i, "");
+    // 3) Detect + set Modality
+    var autoMod = detectModalityFromStageQueue(stageSegRaw, extractedQ);
+    if (autoMod) {
+      modalityDD.setValue(autoMod);
+      showAutofillBadge("modalityBadge", true);
+      autoFilledModality = true;
+    } else {
+      // Queue found but no modality rule → reset modality so user picks manually
+      modalityDD.reset();
+      showAutofillBadge("modalityBadge", false);
+      autoFilledModality = false;
+    }
+  } else {
+    // No /queue/ in URL → clear if they were auto-filled
+    if (autoFilledQueue) { queueDD.reset(); autoFilledQueue = false; }
+    showAutofillBadge("queueBadge", false);
+    if (autoFilledModality) { modalityDD.reset(); autoFilledModality = false; }
+    showAutofillBadge("modalityBadge", false);
+  }
+  // ── END auto-fill ───────────────────────────────────────────
+
+  // Validation warnings
+  var hasArabic=/[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(url);
+  var hasStage2=!!detectStage(url), idMatch2=url.match(/\/id\/(\d+)/);
+  var hasId2=!!idMatch2, idVal=idMatch2?idMatch2[1]:"", idTooShort=hasId2&&idVal.length<10;
+  var taskIdEl=document.getElementById("taskId");
+  document.getElementById("linkArabicWarn").style.display=hasArabic?"flex":"none";
+  document.getElementById("linkNoStageWarn").style.display=(!hasArabic&&url.length>10&&!hasStage2)?"flex":"none";
+  document.getElementById("linkNoIdWarn").style.display=(!hasArabic&&url.length>10&&!hasId2)?"flex":"none";
+  document.getElementById("linkShortIdWarn").style.display=(!hasArabic&&idTooShort)?"flex":"none";
+  document.getElementById("taskIdShortWarn").style.display=(!hasArabic&&idTooShort)?"flex":"none";
+  if(hasArabic){
+    this.style.borderColor="var(--error)"; hint.style.color="var(--error)";
+  } else if(idTooShort){
+    this.style.borderColor="var(--error)";
+    taskIdEl.style.borderColor="var(--error)";
+    taskIdEl.style.boxShadow="0 0 0 3px rgba(192,57,43,.1)";
+  } else if(url.length>0&&hasStage2&&hasId2){
+    taskIdEl.style.borderColor="#1a8a5a";
+    taskIdEl.style.boxShadow="";
+  } else {
+    taskIdEl.style.borderColor="";
+    taskIdEl.style.boxShadow="";
+  }
+  updateProgress();
+});
+
+var _activeBtn = null;
+
+function doSubmit(payload, btn) {
+  _activeBtn = btn;
+  btn.disabled = true;
+  btn.textContent = "Checking...";
+  btn.classList.remove("error-state");
+
+  function onSuccess() {
+    incrementCounter();
+    var _sp = (payload.labelerName && payload.labelerName.toLowerCase() === "radwa hassan") && (payload.pcNo && payload.pcNo.toString() === "12");
+    toast(_sp ? "🦉\u2713 Saved successfully🦉" : "\u2714 Saved successfully!", "ok");
+    btn.disabled = false;
+    btn.textContent = "\u2714\u00a0 Submit Task";
+    resetForm();
+  }
+
+  function onError(err) {
+    console.error("[Submission Error]:", err);
+    btn.disabled = false;
+    btn.textContent = "\u26a0\ufe0f Error \u2014 Please Try Again";
+    btn.classList.add("error-state");
+    var msg = (err && err.message) ? err.message : "Failed to submit — please check your connection";
+    toast("\u26a0 " + msg, "err");
+    setTimeout(function() {
+      btn.textContent = "\u2714\u00a0 Submit Task";
+      btn.classList.remove("error-state");
+    }, 6000);
+  }
+
+  // 1. Check if duplicate exists for this Task ID + Pass + Yubikey
+  var checkSql = "SELECT task_id, timestamp, labeler_name FROM task_submissions WHERE task_id = ? AND pass = ? AND yubikey_email = ? ORDER BY id DESC LIMIT 1;";
+  var checkArgs = [payload.taskId, payload.pass, payload.yubikeyEmail];
+
+  tursoQuery(checkSql, checkArgs, function(err, result) {
+    if (!err && result && result.rows && result.rows.length > 0) {
+      btn.disabled = false;
+      btn.textContent = "\u2714\u00a0 Submit Task";
+      var rawTs = result.rows[0][1] ? result.rows[0][1].value : new Date();
+      showDbDupDialog(payload.taskId, new Date(rawTs), null);
+      return;
+    }
+
+    // 2. Insert into Turso database
+    btn.textContent = "Submitting...";
+
+    var insertSql = "INSERT INTO task_submissions (timestamp, shift, unit, pc_no, labeler_name, national_id, qtc_shift, yubikey_email, qtc_name, stage, task_link, task_id, pass, modality, queue_name, object_count) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
+    var insertArgs = [
+      payload.timestamp || new Date().toLocaleString("en-US", { timeZone: "Africa/Cairo" }),
+      payload.shift,
+      payload.unit,
+      payload.pcNo,
+      payload.labelerName,
+      payload.nationalId,
+      payload.qtcShift || "",
+      payload.yubikeyEmail,
+      payload.qtcName || "",
+      payload.stage || "",
+      payload.taskLink,
+      payload.taskId,
+      payload.pass,
+      payload.modality || "",
+      payload.queueName || "",
+      parseInt(payload.objectCount, 10) || 0
+    ];
+
+    tursoQuery(insertSql, insertArgs, function(insertErr, insertResult) {
+      if (insertErr) {
+        if (insertErr.message && insertErr.message.indexOf("UNIQUE constraint failed") > -1) {
+          btn.disabled = false;
+          btn.textContent = "\u2714\u00a0 Submit Task";
+          showDbDupDialog(payload.taskId, new Date(), null);
+        } else {
+          onError(insertErr);
+        }
+        return;
+      }
+
+      onSuccess();
+    });
+  });
+}
+
+document.getElementById("F").addEventListener("submit",function(e){
+  e.preventDefault();
+  var err=false;
+  function chkDD(hidId,btnId){
+    if(!document.getElementById(hidId).value){document.getElementById(btnId).style.borderColor="var(--error)";document.getElementById(btnId).style.boxShadow="0 0 0 3px rgba(192,57,43,.1)";err=true;}
+    else{document.getElementById(btnId).style.borderColor="";document.getElementById(btnId).style.boxShadow="";}
+  }
+  var lab=document.getElementById("labName").value.trim(),lnk=document.getElementById("taskLink").value.trim(),yk=document.getElementById("yk").value.trim(),obj=document.getElementById("objCount").value;
+  var natId=document.getElementById("natId").value.trim();
+  chkDD("shift","shiftBtn"); chkDD("unit","unitBtn");
+  var pcVal=document.getElementById("pcNo").value.trim();
+  if(!pcVal){me("pcNo");err=true;}
+  else if(/^qtc$/i.test(pcVal)){document.getElementById("pcNo").value="QTC";ce("pcNo");}
+  else if(/^sv$/i.test(pcVal)){document.getElementById("pcNo").value="SV";ce("pcNo");}
+  else if(/^sl$/i.test(pcVal)){document.getElementById("pcNo").value="SL";ce("pcNo");}
+else if(/^buffer$/i.test(pcVal)){document.getElementById("pcNo").value="Buffer";ce("pcNo");}
+  else if(/^\d+$/.test(pcVal)){var pcNum=parseInt(pcVal,10);if(pcNum<1||pcNum>100){me("pcNo");err=true;toast("PC No. must be between 1 and 100","err");return;}else{ce("pcNo");}}
+  else{me("pcNo");err=true;toast("PC No.: Enter a number (1-100), QTC, SL or SV","err");return;}
+  if(!lab){me("labName");err=true;}
+  else if(!/^[a-zA-Z\s]+$/.test(lab)){me("labName");err=true;toast("Labeler Name: English letters only","err");return;}
+  else{ce("labName");}
+  if(!natId){me("natId");err=true;}
+  else if(!/^\d{14}$/.test(natId)){me("natId");err=true;toast("National ID: لازم يكون 14 رقم بالظبط","err");return;}
+  else{ce("natId");}
+  chkDD("qtcShiftSel","qtcShiftBtn");
+  if(!document.getElementById("qtcName").value){var w=document.getElementById("qtcPickerWrap");w.style.border="1.5px solid var(--error)";w.style.borderRadius="8px";w.style.padding="8px";err=true;}
+  else{var w2=document.getElementById("qtcPickerWrap");w2.style.border="";w2.style.padding="";}
+  if(!yk){me("yk");err=true;}
+  else{var is6=/^\d{6}$/.test(yk),isE=/^[a-zA-Z]{2}\d+@meti\.ai$/i.test(yk);if(!is6&&!isE){me("yk");err=true;toast("Yubikey: لازم يكون 6 ارقام او me123456@meti.ai","err");return;}else{ce("yk");}}
+  chkDD("modality","modalityBtn"); chkDD("qName","queueBtn");
+  if(!lnk.startsWith("https://labeling.robot.car/#")){me("taskLink");err=true;}else{ce("taskLink");}
+  var taskIdVal=document.getElementById("taskId").value.trim();
+  if(!taskIdVal){me("taskId");err=true;}else{ce("taskId");}
+  chkDD("pass","passBtn");
+  if(/[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(lnk)){me("taskLink");toast("الـ Link مش بيقبل حروف عربية","err");return;}
+  var stageVal=document.getElementById("stageField").value.trim();
+  var taskIdInLink=!!document.getElementById("taskLink").value.trim().match(/\/id\/\d+/);
+  if(!stageVal && !taskIdInLink){
+    var sfEl=document.getElementById("stageField");
+    sfEl.style.borderColor="var(--error)";sfEl.style.boxShadow="0 0 0 3px rgba(192,57,43,.1)";
+    me("taskLink");toast("Task Link: اللينك لازم يحتوي على Stage و Task ID","err");return;
+  } else if(!stageVal){
+    var sfEl=document.getElementById("stageField");
+    sfEl.style.borderColor="var(--error)";sfEl.style.boxShadow="0 0 0 3px rgba(192,57,43,.1)";
+    me("taskLink");toast("Task Link: اللينك لازم يحتوي على Stage صح","err");return;
+  } else if(!taskIdInLink){
+    me("taskLink");toast("Task Link: اللينك لازم يحتوي على Task ID","err");return;
+  } else {
+    var idInLink=lnk.match(/\/id\/(\d+)/);
+    if(idInLink && idInLink[1].length < 10){
+      me("taskLink"); me("taskId");toast("الـ Task ID لازم يكون 10 أرقام على الأقل","err");return;
+    }
+    var sfEl2=document.getElementById("stageField");
+    sfEl2.style.borderColor="#1a8a5a";sfEl2.style.boxShadow="";ce("taskLink");
+  }
+  if(obj===""){me("objCount");err=true;toast("Please enter number of objects","err");return;}
+  if(err){toast("Please fill all required fields","err");return;}
+  saveN(lab); saveYK(yk);
+  savePCH(document.getElementById("pcNo").value);
+  saveShiftH(document.getElementById("shift").value);
+  saveUnitH(document.getElementById("unit").value);
+  localStorage.setItem(NK_LAST_LAB, lab);
+  localStorage.setItem(NK_LAST_PC, document.getElementById("pcNo").value);
+  localStorage.setItem(NK_LAST_YK, yk);
+  localStorage.setItem(NK_LAST_NATID, natId);
+  var payload={
+    timestamp:document.getElementById("ts").value, shift:document.getElementById("shift").value,
+    unit:document.getElementById("unit").value, qtcName:document.getElementById("qtcName").value,
+    yubikeyEmail:yk, labelerName:lab, nationalId:natId, pcNo:document.getElementById("pcNo").value,
+    modality:document.getElementById("modality").value, queueName:document.getElementById("qName").value,
+    taskLink:lnk, taskId:taskIdVal, pass:document.getElementById("pass").value,
+    stage:stageVal, objectCount:obj
+  };
+  var btn=document.getElementById("subBtn"); btn.disabled=true;
+  doSubmit(payload, btn);
+});
+
+function resetForm(){
+  document.getElementById("F").reset();
+  tick(); selectedQTC=null; linkPassVal="";
+  document.getElementById("qtcName").value="";
+  document.getElementById("qtcGrid").innerHTML="";
+  document.getElementById("qtcSelectedDisplay").innerHTML="";
+  document.getElementById("qtcPickerWrap").style.display="none";
+  document.getElementById("qtcPickerWrap").style.border="";
+  document.getElementById("qtcPickerWrap").style.padding="";
+  document.getElementById("qtcShiftMsg").style.display="block";
+
+  linkTaskId="";
+  document.getElementById("taskLink").value="";
+  document.getElementById("taskLink").style.borderColor="";
+  document.getElementById("taskId").value="";
+  document.getElementById("taskId").style.borderColor="";
+  document.getElementById("taskId").style.boxShadow="";
+
+  document.getElementById("taskIdWarn").style.display="none";
+  document.getElementById("taskIdNumWarn").style.display="none";
+  document.getElementById("taskIdShortWarn").style.display="none";
+  document.getElementById("linkNoStageWarn").style.display="none";
+  document.getElementById("linkNoIdWarn").style.display="none";
+  document.getElementById("linkShortIdWarn").style.display="none";
+  document.getElementById("linkArabicWarn").style.display="none";
+  document.getElementById("labNameWarn").style.display="none";
+  document.getElementById("natIdWarn").style.display="none";
+  document.getElementById("passWarn").style.display="none";
+  var pIconR=document.getElementById("passIcon");
+  if(pIconR){pIconR.textContent="\u2014";pIconR.style.color="";pIconR.style.opacity=".4";}
+  document.getElementById("idIcon").textContent="\u2014";
+  document.getElementById("idIcon").style.color="";
+  document.getElementById("linkHint").style.color="";
+  updateStageField("");
+  var sfReset=document.getElementById("stageField");
+  if(sfReset){sfReset.style.borderColor="";sfReset.style.boxShadow="";}
+
+  // Hide auto-fill badges on reset
+  showAutofillBadge("modalityBadge", false);
+  showAutofillBadge("queueBadge", false);
+
+  var prevShift=document.getElementById("shift").value, prevUnit=document.getElementById("unit").value;
+  shiftDD.reset();unitDD.reset();qtcShiftDD.reset();modalityDD.reset();queueDD.reset();passDD.reset();
+  if(prevShift) shiftDD.setValue(prevShift);
+  if(prevUnit)  unitDD.setValue(prevUnit);
+  var savedQtcShift=localStorage.getItem(NK_QTC_SHIFT);
+  if(savedQtcShift) setTimeout(function(){ qtcShiftDD.setValue(savedQtcShift); buildQTCGrid(savedQtcShift); },0);
+  var lastLab=localStorage.getItem(NK_LAST_LAB), lastPC=localStorage.getItem(NK_LAST_PC);
+  if(lastLab) document.getElementById("labName").value=lastLab;
+  if(lastPC)  { document.getElementById("pcNo").value=lastPC; validatePC(lastPC); }
+  var lastYK=localStorage.getItem(NK_LAST_YK);
+if(lastYK){ document.getElementById("yk").value=lastYK; validateYK(lastYK); }
+  var lastNatId=localStorage.getItem(NK_LAST_NATID);
+  if(lastNatId) document.getElementById("natId").value=lastNatId;
+  ["labName","yk","pcNo","natId"].forEach(function(id){
+    var el=document.getElementById(id);
+    if(el){el.classList.remove("err-field");el.style.borderColor="";el.style.boxShadow="";}
+  });
+  var ykHint=document.getElementById("ykHint");
+  if(ykHint){ykHint.style.color="var(--text-muted)";ykHint.textContent="6-digit code | or email format: me123456@meti.ai";}
+  document.getElementById("yk").style.borderColor="";
+  ykAcL.classList.remove("open"); pcAcL.classList.remove("open");
+  var btn=document.getElementById("subBtn");
+  btn.textContent="\u2714\u00a0 Submit Task"; btn.classList.remove("error-state");
+  document.getElementById("progressBar").style.width="0%";
+}
+
+document.getElementById("storageToggle").addEventListener("click",function(){
+  var body=document.getElementById("storageBody"),arrow=document.getElementById("storageArrow"),open=body.style.display==="none";
+  body.style.display=open?"block":"none"; arrow.classList.toggle("open",open);
+  if(open)renderStorageManager();
+});
+function renderStorageManager(){
+  renderStorageGroup("storageNames",getN(),     delN,      function(){renderAC(labIn.value);  renderStorageManager();});
+  renderStorageGroup("storageYK",   getYK(),    delYK,     function(){renderYKAC(ykIn.value); renderStorageManager();});
+  renderStorageGroup("storagePC",   getPCH(),   delPCH,    function(){renderPCAC(pcIn.value); renderStorageManager();});
+  renderStorageGroup("storageShift",getShiftH(),delShiftH, function(){renderStorageManager();});
+  renderStorageGroup("storageUnit", getUnitH(), delUnitH,  function(){renderStorageManager();});
+}
+function renderStorageGroup(containerId,items,delFn,afterDel){
+  var container=document.getElementById(containerId);container.innerHTML="";
+  if(!items.length){var empty=document.createElement("div");empty.className="storage-empty";empty.textContent="No saved items";container.appendChild(empty);return;}
+  items.forEach(function(val){container.appendChild(makeStorageItem(val,function(){delFn(val);afterDel();}));});
+}
+function makeStorageItem(label,onDel){
+  var item=document.createElement("div");item.className="storage-item";
+  var txt=document.createElement("span");txt.textContent=label;
+  var btn=document.createElement("button");btn.className="storage-item-del";btn.type="button";btn.textContent="\u2715";btn.title="Delete";
+  btn.addEventListener("click",onDel);
+  item.appendChild(txt);item.appendChild(btn);
+  return item;
+}
+document.getElementById("clearNamesBtn").addEventListener("click",function(){localStorage.removeItem(NK);     renderAC(labIn.value);  renderStorageManager();});
+document.getElementById("clearYKBtn").addEventListener("click",   function(){localStorage.removeItem(NK_YK);  renderYKAC(ykIn.value); renderStorageManager();});
+document.getElementById("clearPCBtn").addEventListener("click",   function(){localStorage.removeItem(NK_PC_H);renderPCAC(pcIn.value); renderStorageManager();});
+document.getElementById("clearShiftBtn").addEventListener("click",function(){localStorage.removeItem(NK_SHIFT);renderStorageManager();});
+document.getElementById("clearUnitBtn").addEventListener("click", function(){localStorage.removeItem(NK_UNIT); renderStorageManager();});
+document.getElementById("counterResetBtn").addEventListener("click",function(){resetCounter();});
+document.getElementById("counterUndoBtn").addEventListener("click", function(){undoCounter();});
+
+renderCounter();
+(function(){
+  var lastShift    = getShiftH()[0];
+  var lastUnit     = getUnitH()[0];
+  var lastQtcShift = localStorage.getItem(NK_QTC_SHIFT);
+  var lastLab      = localStorage.getItem(NK_LAST_LAB);
+  var lastPC       = localStorage.getItem(NK_LAST_PC);
+  if(lastShift)    setTimeout(function(){ shiftDD.setValue(lastShift); }, 0);
+  if(lastUnit)     setTimeout(function(){ unitDD.setValue(lastUnit); }, 0);
+  if(lastQtcShift) setTimeout(function(){ qtcShiftDD.setValue(lastQtcShift); buildQTCGrid(lastQtcShift); }, 0);
+  if(lastLab)      document.getElementById("labName").value = lastLab;
+  if(lastPC)       { document.getElementById("pcNo").value = lastPC; validatePC(lastPC); }
+  var lastYK = localStorage.getItem(NK_LAST_YK);
+if(lastYK) { document.getElementById("yk").value = lastYK; validateYK(lastYK); }
+  var lastNatId = localStorage.getItem(NK_LAST_NATID);
+  if(lastNatId) document.getElementById("natId").value = lastNatId;
+})();
+
+(function(){
+  var floating = document.getElementById("floatingCounter");
+  var secCounter = document.querySelector(".sec-counter");
+  var stickyWrap = document.querySelector(".sticky-wrap");
+  window.addEventListener("scroll", function(){
+    var rect = secCounter.getBoundingClientRect();
+    var stickyH = stickyWrap.offsetHeight;
+    floating.classList.toggle("visible", rect.bottom < stickyH);
+  }, {passive: true});
+})();
+</script>
+
+<!-- Admin Modal -->
+<div class="admin-modal-overlay" id="adminModal">
+  <div class="admin-modal">
+    <div class="admin-modal-hd">
+      <div class="admin-modal-title">📊 Turso Database Telemetry & Export</div>
+      <button class="admin-modal-close" onclick="closeAdminModal()">✕</button>
+    </div>
+    <div class="admin-modal-body">
+      <div id="adminAuthSection" style="text-align:center; padding: 30px 20px;">
+        <h3 style="margin-bottom:10px; color:#132f6b;">Admin Access</h3>
+        <p style="font-size:0.85rem; color:#4a6375; margin-bottom:16px;">Please enter the admin PIN to access database records.</p>
+        <input type="password" id="adminPin" placeholder="Enter PIN (Default: 2026)" style="padding:10px 16px; border:1.5px solid #c5d3ec; border-radius:8px; width:220px; font-size:1rem; text-align:center; margin-bottom:14px;" onkeydown="if(event.key==='Enter')checkAdminPin()">
+        <br>
+        <button class="admin-btn" onclick="checkAdminPin()">Login to Admin</button>
+      </div>
+
+      <div id="adminContentSection" style="display:none;">
+        <div class="admin-stats-grid">
+          <div class="admin-stat-card">
+            <div class="val" id="statToday">0</div>
+            <div class="lbl">Tasks Today (Edge)</div>
+          </div>
+          <div class="admin-stat-card">
+            <div class="val" id="statTotal">0</div>
+            <div class="lbl">Total Database Tasks</div>
+          </div>
+          <div class="admin-stat-card">
+            <div class="val" id="statFreeRemaining">25,000,000</div>
+            <div class="lbl">Turso Free Limit / Month</div>
+          </div>
+        </div>
+
+        <div class="admin-actions-bar">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <button class="admin-btn" onclick="loadAdminData()">🔄 Refresh Records</button>
+            <span id="adminStatusText" style="font-size:0.75rem; color:#4a6375;"></span>
+          </div>
+          <button class="admin-btn admin-btn-sec" onclick="exportToCsv()">📥 Export to Excel (CSV)</button>
+        </div>
+
+        <div class="admin-table-wrap">
+          <table class="admin-table" id="adminTable">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Timestamp</th>
+                <th>Shift</th>
+                <th>Unit</th>
+                <th>PC</th>
+                <th>Labeler Name</th>
+                <th>QTC Name</th>
+                <th>Task ID</th>
+                <th>Pass</th>
+                <th>Objects</th>
+              </tr>
+            </thead>
+            <tbody id="adminTableBody">
+              <tr><td colspan="10" style="text-align:center; padding:20px; color:#7a96a8;">Loading live records from Turso...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+var _adminUnlocked = false;
+var _adminCachedRows = [];
+
+document.getElementById("adminBtn").addEventListener("click", function() {
+  document.getElementById("adminModal").classList.add("show");
+  if (_adminUnlocked) {
+    loadAdminData();
+  } else {
+    document.getElementById("adminPin").value = "";
+    document.getElementById("adminPin").focus();
+  }
+});
+
+function closeAdminModal() {
+  document.getElementById("adminModal").classList.remove("show");
+}
+
+function checkAdminPin() {
+  var pin = document.getElementById("adminPin").value.trim();
+  if (pin === "2026" || pin === "admin" || pin === "meti2026") {
+    _adminUnlocked = true;
+    document.getElementById("adminAuthSection").style.display = "none";
+    document.getElementById("adminContentSection").style.display = "block";
+    loadAdminData();
+  } else {
+    alert("Incorrect PIN. Please try again.");
+  }
+}
+
+function loadAdminData() {
+  var status = document.getElementById("adminStatusText");
+  status.textContent = "Querying Turso Edge DB...";
+
+  // 1. Get counts
+  tursoQuery("SELECT COUNT(*) FROM task_submissions;", [], function(err1, res1) {
+    if (!err1 && res1 && res1.rows && res1.rows[0]) {
+      var total = res1.rows[0][0].value;
+      document.getElementById("statTotal").textContent = Number(total).toLocaleString();
+    }
+  });
+
+  // 2. Get today count & recent 50 rows
+  var sql = "SELECT id, timestamp, shift, unit, pc_no, labeler_name, national_id, qtc_name, task_id, pass, object_count, stage, queue_name, modality, yubikey_email, task_link, created_at FROM task_submissions ORDER BY id DESC LIMIT 100;";
+  tursoQuery(sql, [], function(err, res) {
+    if (err) {
+      status.textContent = "Error loading: " + err.message;
+      return;
+    }
+    status.textContent = "Live data synced";
+    var rows = res ? res.rows : [];
+    _adminCachedRows = rows;
+
+    // Estimate today count
+    var todayStr = new Date().toLocaleDateString("en-US", { timeZone: "Africa/Cairo" });
+    var todayCount = rows.filter(function(r) {
+      var ts = r[1] ? String(r[1].value) : "";
+      return ts.indexOf(todayStr) > -1 || (r[16] && String(r[16].value).startsWith(new Date().toISOString().slice(0, 10)));
+    }).length;
+    document.getElementById("statToday").textContent = todayCount;
+
+    var tbody = document.getElementById("adminTableBody");
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; padding:24px; color:#7a96a8;">No records in database yet. Submit a task to see it here!</td></tr>';
+      return;
+    }
+
+    var html = "";
+    rows.slice(0, 50).forEach(function(r) {
+      html += "<tr>"
+        + "<td><strong>#" + (r[0] ? r[0].value : "") + "</strong></td>"
+        + "<td>" + (r[1] ? r[1].value : "") + "</td>"
+        + "<td>" + (r[2] ? r[2].value : "") + "</td>"
+        + "<td>" + (r[3] ? r[3].value : "") + "</td>"
+        + "<td>" + (r[4] ? r[4].value : "") + "</td>"
+        + "<td>" + (r[5] ? r[5].value : "") + "</td>"
+        + "<td>" + (r[7] ? r[7].value : "") + "</td>"
+        + "<td><code>" + (r[8] ? r[8].value : "") + "</code></td>"
+        + "<td><span style='font-weight:700; color:" + (r[9] && r[9].value === "QA" ? "#27ae60" : "#2980b9") + ";'>" + (r[9] ? r[9].value : "") + "</span></td>"
+        + "<td>" + (r[10] ? r[10].value : "0") + "</td>"
+        + "</tr>";
+    });
+    tbody.innerHTML = html;
+  });
+}
+
+function exportToCsv() {
+  if (!_adminCachedRows.length) {
+    alert("No records to export!");
+    return;
+  }
+  var headers = ["ID", "Timestamp", "Shift", "Unit", "PC No", "Labeler Name", "National ID", "QTC Name", "Task ID", "Pass", "Object Count", "Stage", "Queue Name", "Modality", "Yubikey Email", "Task Link", "Server Timestamp"];
+  var csvLines = [headers.join(",")];
+
+  _adminCachedRows.forEach(function(r) {
+    var line = r.map(function(cell) {
+      var val = cell ? String(cell.value || "") : "";
+      return '"' + val.replace(/"/g, '""') + '"';
+    }).join(",");
+    csvLines.push(line);
+  });
+
+  var csvContent = "\uFEFF" + csvLines.join("\r\n"); // Add UTF-8 BOM for Arabic support in Excel
+  var blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  var url = URL.createObjectURL(blob);
+  var link = document.createElement("a");
+  var d = new Date().toISOString().slice(0, 10);
+  link.setAttribute("href", url);
+  link.setAttribute("download", "meti_tasks_export_" + d + ".csv");
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+</script>
+
+</body>
+</html>
