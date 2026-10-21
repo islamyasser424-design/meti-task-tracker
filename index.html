@@ -2566,9 +2566,10 @@ if(lastYK) { document.getElementById("yk").value = lastYK; validateYK(lastYK); }
 
       <div id="adminContentSection" style="display:none;">
         <!-- Admin Navigation Tabs -->
-        <div class="admin-tabs" style="display:flex; gap:10px; margin-bottom:16px; border-bottom:2px solid #e1e8f0; padding-bottom:8px;">
+        <div class="admin-tabs" style="display:flex; gap:10px; margin-bottom:16px; border-bottom:2px solid #e1e8f0; padding-bottom:8px; flex-wrap:wrap;">
           <button id="tabRecordsBtn" class="admin-tab-btn active" onclick="switchAdminTab('records')">📊 Records & Export</button>
-          <button id="tabQueuesBtn" class="admin-tab-btn" onclick="switchAdminTab('queues')">📋 Manage Queues (إدارة الـ Queues)</button>
+          <button id="tabQueuesBtn" class="admin-tab-btn" onclick="switchAdminTab('queues')">📋 Manage Queues (الـ Queues)</button>
+          <button id="tabQtcBtn" class="admin-tab-btn" onclick="switchAdminTab('qtc')">👥 Manage QTC (إدارة الـ QTC)</button>
         </div>
 
         <!-- TAB 1: Records & Stats -->
@@ -2652,6 +2653,58 @@ if(lastYK) { document.getElementById("yk").value = lastYK; validateYK(lastYK); }
             </table>
           </div>
         </div><!-- /#adminQueuesTab -->
+
+        <!-- TAB 3: QTC Manager -->
+        <div id="adminQtcTab" style="display:none;">
+          <div style="background:#f7f9fd; border:1px solid #c5d3ec; border-radius:8px; padding:16px; margin-bottom:16px;">
+            <h4 style="color:#132f6b; margin-bottom:10px; font-size:0.9rem;">➕ Add New QTC Member</h4>
+            <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+              <select id="newQtcShift" style="padding:8px 12px; border:1.5px solid #c5d3ec; border-radius:6px; font-size:0.85rem; background:#fff; min-width:130px;">
+                <option value="Morning">Morning</option>
+                <option value="Night">Night</option>
+                <option value="Over Night">Over Night</option>
+              </select>
+              <input type="text" id="newQtcName" placeholder="e.g. Ahmed Ali (M)" style="flex:2; min-width:200px; padding:8px 12px; border:1.5px solid #c5d3ec; border-radius:6px; font-size:0.85rem;" onkeydown="if(event.key==='Enter')addNewQtcFromAdmin()">
+              <select id="newQtcRole" style="padding:8px 12px; border:1.5px solid #c5d3ec; border-radius:6px; font-size:0.85rem; background:#fff; min-width:100px;">
+                <option value="">No Role</option>
+                <option value="QT">QT</option>
+                <option value="SV">SV</option>
+              </select>
+              <button class="admin-btn" onclick="addNewQtcFromAdmin()">➕ Add QTC</button>
+            </div>
+            <div id="addQtcMsg" style="margin-top:6px; font-size:0.75rem; font-weight:600;"></div>
+          </div>
+
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:8px;">
+            <div style="display:flex; align-items:center; gap:10px;">
+              <h4 style="color:#132f6b; font-size:0.85rem;">Active QTCs (<span id="qtcCount">0</span>)</h4>
+              <select id="adminQtcFilterShift" onchange="renderAdminQtcTable()" style="padding:4px 8px; border:1px solid #c5d3ec; border-radius:4px; font-size:0.75rem; background:#fff;">
+                <option value="All">All Shifts</option>
+                <option value="Morning">Morning</option>
+                <option value="Night">Night</option>
+                <option value="Over Night">Over Night</option>
+              </select>
+            </div>
+            <button class="admin-btn" style="padding:4px 10px; font-size:0.75rem;" onclick="loadQtcInAdmin()">🔄 Refresh List</button>
+          </div>
+
+          <div class="admin-table-wrap" style="max-height:350px; overflow-y:auto;">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th style="width:40px;">#</th>
+                  <th>Shift</th>
+                  <th>QTC Name</th>
+                  <th>Role</th>
+                  <th style="width:80px; text-align:center;">Action</th>
+                </tr>
+              </thead>
+              <tbody id="adminQtcTableBody">
+                <tr><td colspan="5" style="text-align:center; padding:15px; color:#7a96a8;">Loading QTC members...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div><!-- /#adminQtcTab -->
 
       </div>
     </div>
@@ -2911,6 +2964,165 @@ function deleteQueueFromAdmin(id, name) {
 
 // Auto-load live queues from Turso when page loads
 loadLiveQueuesFromTurso();
+
+// ══════════════════════════════════════════════════════════════
+// QTC MANAGER & LIVE TURSO INTEGRATION
+// ══════════════════════════════════════════════════════════════
+var _cachedAdminQtc = [];
+
+// Switch tab handler
+var originalSwitchAdminTab = switchAdminTab;
+switchAdminTab = function(tab) {
+  _activeAdminTab = tab;
+  var recTab = document.getElementById("adminRecordsTab");
+  var qTab = document.getElementById("adminQueuesTab");
+  var qtcTab = document.getElementById("adminQtcTab");
+  var btnRec = document.getElementById("tabRecordsBtn");
+  var btnQ = document.getElementById("tabQueuesBtn");
+  var btnQtc = document.getElementById("tabQtcBtn");
+
+  recTab.style.display = (tab === 'records') ? "block" : "none";
+  qTab.style.display   = (tab === 'queues')  ? "block" : "none";
+  qtcTab.style.display = (tab === 'qtc')     ? "block" : "none";
+
+  btnRec.classList.toggle("active", tab === 'records');
+  btnQ.classList.toggle("active", tab === 'queues');
+  btnQtc.classList.toggle("active", tab === 'qtc');
+
+  if (tab === 'records') loadAdminData();
+  else if (tab === 'queues') loadQueuesInAdmin();
+  else if (tab === 'qtc') loadQtcInAdmin();
+};
+
+// Fetch all QTC from Turso database and populate QTC_DATA
+function loadLiveQTCFromTurso() {
+  tursoQuery("SELECT id, shift, name, role FROM custom_qtc ORDER BY name ASC;", [], function(err, res) {
+    if (!err && res && res.rows && res.rows.length > 0) {
+      var map = { "Morning": [], "Night": [], "Over Night": [] };
+      res.rows.forEach(function(r) {
+        var s = r[1] ? String(r[1].value) : "";
+        var n = r[2] ? String(r[2].value) : "";
+        var role = r[3] && r[3].value ? String(r[3].value) : "";
+        if (!map[s]) map[s] = [];
+        map[s].push({ name: n, role: role, id: r[0] ? r[0].value : null });
+      });
+      QTC_DATA = map;
+      qtcDataLoaded = true;
+
+      // If user has a shift selected in the form, re-render cards smoothly
+      var curShift = document.getElementById("qtcShiftSel") ? document.getElementById("qtcShiftSel").value : "";
+      if (curShift) buildQTCGrid(curShift);
+    }
+  });
+}
+
+// Load QTC list in Admin Table
+function loadQtcInAdmin() {
+  var tbody = document.getElementById("adminQtcTableBody");
+  tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:15px; color:#7a96a8;">Loading from Turso database...</td></tr>';
+
+  tursoQuery("SELECT id, shift, name, role FROM custom_qtc ORDER BY shift ASC, name ASC;", [], function(err, res) {
+    if (err) {
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:15px; color:#e74c3c;">Failed to load: ' + err.message + '</td></tr>';
+      return;
+    }
+    var rows = res ? res.rows : [];
+    _cachedAdminQtc = rows.map(function(r) {
+      return {
+        id: r[0].value,
+        shift: String(r[1].value),
+        name: String(r[2].value),
+        role: r[3] && r[3].value ? String(r[3].value) : ""
+      };
+    });
+    renderAdminQtcTable();
+  });
+}
+
+function renderAdminQtcTable() {
+  var filterShift = document.getElementById("adminQtcFilterShift") ? document.getElementById("adminQtcFilterShift").value : "All";
+  var tbody = document.getElementById("adminQtcTableBody");
+  var countEl = document.getElementById("qtcCount");
+
+  var filtered = _cachedAdminQtc.filter(function(item) {
+    return (filterShift === "All" || item.shift === filterShift);
+  });
+  countEl.textContent = filtered.length;
+
+  if (!filtered.length) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:15px; color:#7a96a8;">No QTC members found for ' + filterShift + '.</td></tr>';
+    return;
+  }
+
+  var html = "";
+  filtered.forEach(function(item, idx) {
+    html += '<tr>'
+      + '<td>' + (idx + 1) + '</td>'
+      + '<td><span style="font-weight:700; color:#1c4587;">' + escapeHtml(item.shift) + '</span></td>'
+      + '<td><strong>' + escapeHtml(item.name) + '</strong></td>'
+      + '<td>' + (item.role ? '<span class="qtc-role" style="display:inline-block; padding:2px 6px; font-size:0.65rem;">' + escapeHtml(item.role) + '</span>' : '—') + '</td>'
+      + '<td style="text-align:center;"><button class="btn-del-queue" onclick="deleteQtcFromAdmin(' + item.id + ', \'' + escapeHtml(item.name).replace(/'/g, "\\'") + '\')">🗑️ Delete</button></td>'
+      + '</tr>';
+  });
+  tbody.innerHTML = html;
+}
+
+// Add new QTC from Admin
+function addNewQtcFromAdmin() {
+  var shift = document.getElementById("newQtcShift").value;
+  var nameIn = document.getElementById("newQtcName");
+  var role = document.getElementById("newQtcRole").value;
+  var msg = document.getElementById("addQtcMsg");
+  var name = nameIn.value.trim();
+
+  if (!name) {
+    msg.style.color = "#e74c3c";
+    msg.textContent = "⚠️ Please enter QTC Name.";
+    return;
+  }
+
+  msg.style.color = "#4a6375";
+  msg.textContent = "Saving to Turso...";
+
+  var sql = "INSERT INTO custom_qtc (shift, name, role) VALUES (?, ?, ?);";
+  tursoQuery(sql, [shift, name, role], function(err, res) {
+    if (err) {
+      msg.style.color = "#e74c3c";
+      if (err.message && err.message.indexOf("UNIQUE") > -1) {
+        msg.textContent = "⚠️ This QTC name already exists for " + shift + " shift!";
+      } else {
+        msg.textContent = "⚠️ Error: " + err.message;
+      }
+      return;
+    }
+
+    nameIn.value = "";
+    msg.style.color = "#27ae60";
+    msg.textContent = "✔ QTC Member added successfully!";
+    toast("✔ QTC Member added to " + shift + "!", "ok");
+    loadQtcInAdmin();
+    loadLiveQTCFromTurso();
+    setTimeout(function() { msg.textContent = ""; }, 4000);
+  });
+}
+
+// Delete QTC from Admin
+function deleteQtcFromAdmin(id, name) {
+  if (!confirm("Are you sure you want to delete QTC: \n" + name + "?")) return;
+  tursoQuery("DELETE FROM custom_qtc WHERE id = ?;", [id], function(err, res) {
+    if (err) {
+      alert("Failed to delete QTC: " + err.message);
+      return;
+    }
+    toast("✔ QTC deleted!", "ok");
+    loadQtcInAdmin();
+    loadLiveQTCFromTurso();
+  });
+}
+
+// Run initial fetch on page load
+loadLiveQTCFromTurso();
+
 
 </script>
 
