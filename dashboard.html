@@ -2,6 +2,14 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <script>
+    (function(){
+      try {
+        var t = localStorage.getItem('meti_dashboard_theme') || 'light';
+        document.documentElement.setAttribute('data-theme', t);
+      } catch(e){}
+    })();
+  </script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>METI Operational Analytics & Admin Dashboard</title>
   <link rel="icon" type="image/x-icon" href="favicon.ico">
@@ -1092,6 +1100,178 @@
       }
     }
 
+
+    /* ============================================================ */
+    /* DARK MODE STYLES FOR DASHBOARD                               */
+    /* ============================================================ */
+    html[data-theme="dark"] {
+      --primary: #14b8a6;
+      --primary-dark: #f8fafc;
+      --primary-light: #2dd4bf;
+      --primary-xlight: #134e4a;
+      --primary-glow: rgba(20, 184, 166, 0.35);
+      --accent: #38bdf8;
+      --accent-light: rgba(56, 189, 248, 0.15);
+      --surface: #1e293b;
+      --surface-glass: rgba(30, 41, 59, 0.95);
+      --bg: #0b1120;
+      --border: #334155;
+      --border-focus: #14b8a6;
+      --border-hover: #475569;
+      --text: #f8fafc;
+      --text-secondary: #94a3b8;
+      --text-muted: #64748b;
+      --shadow-sm: 0 2px 6px rgba(0, 0, 0, 0.3);
+      --shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+      --shadow-hover: 0 8px 24px rgba(0, 0, 0, 0.5);
+    }
+    html[data-theme="dark"] body {
+      background: #0b1120;
+      color: #f8fafc;
+    }
+    html[data-theme="dark"] .app-layout {
+      background: #0b1120;
+    }
+    html[data-theme="dark"] .side-nav {
+      background: #0f172a;
+      border-right-color: #1e293b;
+      box-shadow: 2px 0 16px rgba(0, 0, 0, 0.4);
+    }
+    html[data-theme="dark"] .side-brand {
+      background: #0f172a;
+      border-bottom-color: #1e293b;
+    }
+    html[data-theme="dark"] .side-brand-title {
+      color: #f8fafc;
+    }
+    html[data-theme="dark"] .side-nav-btn {
+      color: #94a3b8;
+    }
+    html[data-theme="dark"] .side-nav-btn:hover {
+      background: #1e293b;
+      color: #f8fafc;
+    }
+    html[data-theme="dark"] .side-nav-btn.active {
+      background: rgba(20, 184, 166, 0.18);
+      color: #2dd4bf;
+    }
+    html[data-theme="dark"] .side-footer {
+      background: #090d16;
+      border-top-color: #1e293b;
+    }
+    html[data-theme="dark"] .side-user-name {
+      color: #f8fafc;
+    }
+    html[data-theme="dark"] .side-action-btn {
+      background: #1e293b;
+      color: #94a3b8;
+      border-color: #334155;
+    }
+    html[data-theme="dark"] .side-action-btn:hover {
+      background: #334155;
+      color: #f8fafc;
+    }
+    html[data-theme="dark"] .workspace-top-bar {
+      background: rgba(15, 23, 42, 0.95);
+      border-bottom-color: #1e293b;
+    }
+    html[data-theme="dark"] .workspace-title {
+      color: #f8fafc;
+    }
+    html[data-theme="dark"] .workspace-subtitle {
+      color: #94a3b8;
+    }
+    html[data-theme="dark"] .workspace-action-btn,
+    html[data-theme="dark"] .theme-toggle-btn {
+      background: #1e293b;
+      color: #cbd5e1;
+      border-color: #334155;
+    }
+    html[data-theme="dark"] .workspace-action-btn:hover,
+    html[data-theme="dark"] .theme-toggle-btn:hover {
+      background: #334155;
+      color: #2dd4bf;
+      border-color: #2dd4bf;
+    }
+    html[data-theme="dark"] .filter-card,
+    html[data-theme="dark"] .stat-card,
+    html[data-theme="dark"] .dash-card,
+    html[data-theme="dark"] .tasks-table-container,
+    html[data-theme="dark"] .qa-card,
+    html[data-theme="dark"] .user-manage-card,
+    html[data-theme="dark"] .modal-content,
+    html[data-theme="dark"] .modal-box,
+    html[data-theme="dark"] .analytics-frame-wrap {
+      background: #0f172a !important;
+      border-color: #1e293b !important;
+    }
+    html[data-theme="dark"] .filter-select,
+    html[data-theme="dark"] .filter-input,
+    html[data-theme="dark"] .form-input,
+    html[data-theme="dark"] .modal-input,
+    html[data-theme="dark"] .search-input {
+      background: #1e293b !important;
+      color: #f8fafc !important;
+      border-color: #334155 !important;
+    }
+    html[data-theme="dark"] .filter-select:focus,
+    html[data-theme="dark"] .filter-input:focus,
+    html[data-theme="dark"] .search-input:focus {
+      border-color: #14b8a6 !important;
+      background: #0f172a !important;
+    }
+    html[data-theme="dark"] table thead th {
+      background: #090d16 !important;
+      color: #f8fafc !important;
+      border-bottom-color: #1e293b !important;
+    }
+    html[data-theme="dark"] table tbody tr {
+      background: #0f172a !important;
+      border-bottom-color: #1e293b !important;
+    }
+    html[data-theme="dark"] table tbody tr:hover {
+      background: #1e293b !important;
+    }
+    html[data-theme="dark"] table tbody td {
+      color: #cbd5e1 !important;
+    }
+    html[data-theme="dark"] .tbl-task-link {
+      color: #38bdf8 !important;
+    }
+    html[data-theme="dark"] .modal-header {
+      border-bottom-color: #1e293b;
+    }
+    html[data-theme="dark"] .modal-footer {
+      border-top-color: #1e293b;
+    }
+    html[data-theme="dark"] .badge-perm-tag {
+      background: #1e293b;
+      color: #cbd5e1;
+      border-color: #334155;
+    }
+    .theme-toggle-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #ffffff;
+      color: var(--text-secondary);
+      font-size: 0.76rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      user-select: none;
+    }
+    .theme-toggle-btn:hover {
+      border-color: var(--primary);
+      color: var(--primary);
+      transform: translateY(-1px);
+    }
+    .theme-toggle-btn span {
+      line-height: 1;
+    }
   </style>
 </head>
 <body>
@@ -1198,6 +1378,7 @@
           </div>
         </div>
         <div class="side-footer-actions">
+          <button class="side-action-btn" onclick="toggleDashboardTheme()" id="sideThemeBtn" title="Toggle Dark/Light Mode">🌙 Dark</button>
           <button class="side-action-btn" onclick="openChangePasswordModal()" title="Change password">🔑 Password</button>
           <a href="index.html" class="side-action-btn" title="Open task entry form">📝 Form</a>
           <button class="side-action-btn" onclick="logout()" title="Logout">🚪 Logout</button>
@@ -1217,6 +1398,10 @@
           </div>
         </div>
         <div class="workspace-top-actions">
+          <button class="theme-toggle-btn" id="themeToggleBtn" onclick="toggleDashboardTheme()" title="Toggle Dark/Light Mode">
+            <span id="themeToggleIcon">🌙</span>
+            <span id="themeToggleText">Dark</span>
+          </button>
           <span class="workspace-sync-badge" id="liveSyncStatus">● Live Edge Synced</span>
           <button class="workspace-action-btn" onclick="refreshCurrentWorkspace()">🔄 Refresh</button>
           <a href="index.html" class="workspace-action-btn" style="text-decoration:none;">📝 Task Form</a>
@@ -2029,6 +2214,41 @@
     // ============================================================
     // TAB SWITCHER
     // ============================================================
+    
+    // ============================================================
+    // THEME MANAGEMENT (LIGHT / DARK MODE ENGINE)
+    // ============================================================
+    function toggleDashboardTheme() {
+      var current = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+      var next = current === 'dark' ? 'light' : 'dark';
+      applyDashboardTheme(next);
+      try {
+        localStorage.setItem('meti_dashboard_theme', next);
+      } catch(e){}
+    }
+
+    function applyDashboardTheme(theme) {
+      document.documentElement.setAttribute('data-theme', theme);
+      var isDark = theme === 'dark';
+      var icon = document.getElementById('themeToggleIcon');
+      var txt = document.getElementById('themeToggleText');
+      var sideIcon = document.getElementById('sideThemeBtn');
+      if (icon) icon.textContent = isDark ? '☀️' : '🌙';
+      if (txt) txt.textContent = isDark ? 'Light' : 'Dark';
+      if (sideIcon) sideIcon.innerHTML = (isDark ? '☀️ Light' : '🌙 Dark');
+
+      // Sync across all frames (Analytics iframe)
+      try {
+        var frame = document.getElementById('analyticsFrame');
+        if (frame && frame.contentWindow) {
+          frame.contentWindow.postMessage({ type: 'theme', theme: theme }, '*');
+          if (frame.contentDocument && frame.contentDocument.documentElement) {
+            frame.contentDocument.documentElement.setAttribute('data-theme', theme);
+          }
+        }
+      } catch(e){}
+    }
+
     function switchMainTab(tabName) {
       if (tabName === "telemetry") tabName = "tasks";
       if (!isPageAllowed(tabName)) {
@@ -2064,6 +2284,15 @@
       if (tabName === "users" && (_currentUser && _currentUser.role === "admin")) loadUsersList();
 
       if (cfg.isAnalytics) {
+        var frame = document.getElementById("analyticsFrame");
+        frame.onload = function() {
+          try {
+            var curTheme = document.documentElement.getAttribute('data-theme') || 'light';
+            if (frame.contentDocument && frame.contentDocument.documentElement) {
+              frame.contentDocument.documentElement.setAttribute('data-theme', curTheme);
+            }
+          } catch(e){}
+        };
         var frame = document.getElementById("analyticsFrame");
         var targetSrc = "analytics.html?embedded=1" + (cfg.hash || "#dashboard");
         if (!frame.src || frame.src === "about:blank" || !frame.src.includes("analytics.html")) {
@@ -3881,6 +4110,10 @@ setInterval(function() {
 
 // Attach Enter key listener to Search input
 document.addEventListener("DOMContentLoaded", function() {
+  try {
+    var savedTheme = localStorage.getItem('meti_dashboard_theme') || 'light';
+    applyDashboardTheme(savedTheme);
+  } catch(e){}
   var sq = document.getElementById("searchQuery");
   if (sq) {
     sq.addEventListener("keydown", function(e) {

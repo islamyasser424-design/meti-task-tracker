@@ -958,3 +958,183 @@ html.is-embedded[data-theme="dark"] body {
   color: #0f172a !important;
   box-shadow: 0 20px 45px rgba(15, 23, 42, 0.2) !important;
 }
+
+
+/* ============================================================ */
+/* DARK MODE OVERRIDES FOR EXECUTIVE ANALYTICS COMPONENTS       */
+/* ============================================================ */
+html[data-theme="dark"],
+html.is-embedded[data-theme="dark"],
+html[data-theme="dark"] body,
+html.is-embedded[data-theme="dark"] body {
+  background: #0b1120 !important;
+  color: #f8fafc !important;
+  --bg: #0b1120 !important;
+  --bg-1: #0b1120 !important;
+  --bg-2: #0f172a !important;
+  --bg-3: #1e293b !important;
+  --card: #1e293b !important;
+  --elevated: #1e293b !important;
+  --surface: #1e293b !important;
+  --border: #334155 !important;
+  --border-focus: #14b8a6 !important;
+  --border-hover: #475569 !important;
+  --text: #f8fafc !important;
+  --text-soft: #cbd5e1 !important;
+  --muted: #94a3b8 !important;
+}
+
+html[data-theme="dark"] .ux-heading h2,
+html[data-theme="dark"] .ux-panel h3,
+html[data-theme="dark"] .floor-panel-title h3,
+html[data-theme="dark"] .an-cat-title,
+html[data-theme="dark"] .an-overall-val,
+html[data-theme="dark"] .an-cat-stat-val,
+html[data-theme="dark"] .q-val-total,
+html[data-theme="dark"] .ux-kpi strong {
+  color: #f8fafc !important;
+}
+
+html[data-theme="dark"] .ux-shared-periods {
+  background: #111827 !important;
+  border-color: #1f2937 !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4) !important;
+}
+
+html[data-theme="dark"] .ux-shared-periods label {
+  color: #cbd5e1 !important;
+}
+
+html[data-theme="dark"] .ux-shared-periods select,
+html[data-theme="dark"] .ux-shared-periods input[type=date],
+html[data-theme="dark"] .queues-controls input,
+html[data-theme="dark"] .queues-controls select {
+  background: #1f2937 !important;
+  color: #f8fafc !important;
+  border-color: #374151 !important;
+}
+
+html[data-theme="dark"] .ux-shared-periods #sharedClearDates {
+  background: #1f2937 !important;
+  color: #cbd5e1 !important;
+  border-color: #374151 !important;
+}
+
+html[data-theme="dark"] .ux-shared-periods #sharedClearDates:hover {
+  background: #374151 !important;
+  color: #f8fafc !important;
+}
+
+html[data-theme="dark"] .ux-panel,
+html[data-theme="dark"] .an-cat-card,
+html[data-theme="dark"] .an-overall-bar,
+html[data-theme="dark"] .queues-controls,
+html[data-theme="dark"] .floor-performance-section,
+html[data-theme="dark"] .sec,
+html[data-theme="dark"] .ux-kpi .ux-face {
+  background: #111827 !important;
+  border-color: #1f2937 !important;
+  color: #f8fafc !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3) !important;
+}
+
+html[data-theme="dark"] .an-cat-stats {
+  background: #1f2937 !important;
+  border-color: #374151 !important;
+}
+
+html[data-theme="dark"] .perf-table,
+html[data-theme="dark"] .daily-table {
+  background: #111827 !important;
+  border-color: #1f2937 !important;
+}
+
+html[data-theme="dark"] .perf-table table,
+html[data-theme="dark"] .daily-table table {
+  background: #111827 !important;
+}
+
+html[data-theme="dark"] .perf-table table thead th,
+html[data-theme="dark"] .daily-table table thead th {
+  background: #0f172a !important;
+  color: #f8fafc !important;
+  border-bottom-color: #1f2937 !important;
+}
+
+html[data-theme="dark"] .perf-table table thead th:hover,
+html[data-theme="dark"] .daily-table table thead th:hover {
+  background: #1e293b !important;
+  color: #2dd4bf !important;
+}
+
+html[data-theme="dark"] .perf-table table tbody tr,
+html[data-theme="dark"] .daily-table table tbody tr {
+  background: #111827 !important;
+  border-bottom-color: #1f2937 !important;
+}
+
+html[data-theme="dark"] .perf-table table tbody tr:hover,
+html[data-theme="dark"] .daily-table table tbody tr:hover {
+  background: #1f2937 !important;
+}
+
+html[data-theme="dark"] .perf-table table tbody td,
+html[data-theme="dark"] .daily-table table tbody td {
+  color: #cbd5e1 !important;
+  border-bottom-color: #1f2937 !important;
+}
+
+html[data-theme="dark"] .an-slicer-dropdown > summary {
+  background: #111827 !important;
+  border-color: #374151 !important;
+  color: #f8fafc !important;
+}
+
+html[data-theme="dark"] .an-slicer-dropdown > .an-slicer {
+  background: #111827 !important;
+  border-color: #1f2937 !important;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.6) !important;
+}
+
+html[data-theme="dark"] .an-slicer-options label {
+  color: #cbd5e1 !important;
+}
+
+html[data-theme="dark"] .an-slicer-options label:hover {
+  background: rgba(20, 184, 166, 0.15) !important;
+  color: #2dd4bf !important;
+}
+
+html[data-theme="dark"] .btn-guide {
+  background: #1f2937 !important;
+  color: #f8fafc !important;
+  border-color: #374151 !important;
+}
+
+html[data-theme="dark"] .btn-guide:hover {
+  background: #374151 !important;
+  color: #2dd4bf !important;
+  border-color: #2dd4bf !important;
+}
+
+html[data-theme="dark"] .brand-logo-card {
+  background: #1e293b !important;
+  border-color: #334155 !important;
+}
+
+html[data-theme="dark"] #meegGlobalTooltip {
+  background: rgba(17, 24, 39, 0.98) !important;
+  color: #f8fafc !important;
+  border-color: #374151 !important;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6) !important;
+}
+
+html[data-theme="dark"] #meegGlobalTooltip .tip-row-val {
+  color: #f8fafc !important;
+}
+
+html[data-theme="dark"] #meegGlobalTooltip .tip-chip {
+  background: #1f2937 !important;
+  color: #f8fafc !important;
+  border-color: #374151 !important;
+}

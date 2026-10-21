@@ -699,6 +699,20 @@ html[data-theme="dark"] #fg___date .calendar-panel{background:#fff;color:#202124
     color: #0f172a !important;
   }
 </style>
+<script>
+  window.addEventListener('message', function(e) {
+    if (e && e.data && e.data.type === 'theme') {
+      document.documentElement.setAttribute('data-theme', e.data.theme);
+      try { localStorage.setItem('meeg_theme', e.data.theme); } catch(err){}
+    }
+  });
+  if (window !== window.top) {
+    try {
+      var pTheme = window.top.document.documentElement.getAttribute('data-theme');
+      if (pTheme) document.documentElement.setAttribute('data-theme', pTheme);
+    } catch(err){}
+  }
+</script>
 </head>
 <body>
 <div class="arcs-ov" id="arcsOv" onclick="if(event.target===this)closeArchiveSearch()"><div class="arcs-box">
