@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>METI Operational Analytics Dashboard</title>
+  <title>METI Operational Analytics & Admin Dashboard</title>
   <link rel="icon" type="image/x-icon" href="favicon.ico">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
@@ -23,6 +23,7 @@
       --success: #1a8a5a;
       --radius: 8px;
       --radius-lg: 12px;
+      --radius-xl: 18px;
     }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -56,7 +57,7 @@
       position: sticky;
       top: 0;
       z-index: 1000;
-      box-shadow: 0 2px 10px rgba(19,47,107,0.2);
+      box-shadow: 0 2px 12px rgba(19,47,107,0.25);
     }
     .nav-brand {
       display: flex;
@@ -67,14 +68,14 @@
       width: 32px;
       height: 32px;
       background: rgba(255,255,255,0.15);
-      border-radius: 6px;
+      border-radius: 8px;
       display: flex;
       align-items: center;
       justify-content: center;
     }
     .nav-title {
       font-family: 'Plus Jakarta Sans', sans-serif;
-      font-size: 0.92rem;
+      font-size: 0.95rem;
       font-weight: 700;
       letter-spacing: 0.4px;
     }
@@ -89,7 +90,7 @@
       color: #fff;
       border: 1px solid rgba(255,255,255,0.22);
       border-radius: 6px;
-      padding: 5px 12px;
+      padding: 6px 13px;
       font-size: 0.75rem;
       font-weight: 600;
       cursor: pointer;
@@ -121,10 +122,58 @@
       max-width: 1550px;
       width: 100%;
       margin: 0 auto;
-      padding: 18px 20px 40px;
+      padding: 20px;
       flex: 1;
       position: relative;
       z-index: 1;
+    }
+
+    /* Top Dashboard Navigation Tabs Bar */
+    .dash-tabs-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 22px;
+      border-bottom: 2px solid #e1e8f0;
+      padding-bottom: 12px;
+      flex-wrap: wrap;
+    }
+    .dash-tab-btn {
+      background: #fff;
+      border: 1.5px solid var(--border);
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: var(--text-secondary);
+      padding: 9px 18px;
+      border-radius: 8px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
+    .dash-tab-btn:hover {
+      background: #eaeffb;
+      color: var(--primary-dark);
+      border-color: var(--primary-light);
+    }
+    .dash-tab-btn.active {
+      background: var(--primary);
+      color: #fff;
+      border-color: var(--primary);
+      box-shadow: 0 4px 14px rgba(28,69,135,0.25);
+    }
+    .dash-tab-badge {
+      background: rgba(255,255,255,0.25);
+      padding: 1px 7px;
+      border-radius: 12px;
+      font-size: 0.72rem;
+    }
+    .dash-tab-btn:not(.active) .dash-tab-badge {
+      background: var(--primary-xlight);
+      color: var(--primary);
     }
 
     /* Login Screen */
@@ -221,7 +270,7 @@
       min-height: 18px;
     }
 
-    /* Dashboard KPIs */
+    /* KPI Summary Cards */
     .dash-kpis {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -316,7 +365,7 @@
       box-shadow: 0 0 0 2px rgba(28,69,135,0.1);
     }
     .btn-action {
-      padding: 7px 13px;
+      padding: 7px 14px;
       background: var(--primary);
       color: #fff;
       border: none;
@@ -342,7 +391,7 @@
       background: #d9e5f7;
     }
 
-    /* Expandable Advanced Column Filters Panel */
+    /* Expandable Dedicated Column Filters Grid */
     .col-filters-panel {
       background: #f8fafc;
       border: 1px solid #e1e8f0;
@@ -476,6 +525,68 @@
       color: #495057;
     }
 
+    /* Admin Management Section Styling */
+    .admin-mgmt-card {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      box-shadow: 0 4px 16px rgba(28,69,135,0.06);
+      margin-bottom: 24px;
+    }
+    .admin-mgmt-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 18px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid #e1e8f0;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .admin-mgmt-title {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 1.1rem;
+      font-weight: 800;
+      color: var(--primary-dark);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .admin-mgmt-desc {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      margin-top: 3px;
+    }
+    .admin-form-box {
+      background: #f8fafc;
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px 20px;
+      margin-bottom: 22px;
+    }
+    .admin-form-box h4 {
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--primary-dark);
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .del-btn {
+      background: #e74c3c;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      padding: 4px 10px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .del-btn:hover { background: #c0392b; }
+
     /* Modals */
     .modal-overlay {
       display: none;
@@ -530,18 +641,8 @@
       padding: 22px 24px;
       overflow-y: auto;
     }
-    .del-btn {
-      background: #e74c3c;
-      color: #fff;
-      border: none;
-      border-radius: 4px;
-      padding: 3px 8px;
-      font-size: 0.7rem;
-      cursor: pointer;
-    }
-    .del-btn:hover { background: #c0392b; }
 
-    /* Advanced Date Filter Popup Box (Image 2 style) */
+    /* Advanced Date Filter Popup Box */
     .date-popup-box {
       background: #fff;
       border-radius: 12px;
@@ -601,10 +702,6 @@
       color: #2c3e50;
       box-sizing: border-box;
     }
-    .date-control-select:focus, .date-control-input:focus {
-      outline: none;
-      border-color: var(--primary);
-    }
     .date-popup-actions {
       display: flex;
       justify-content: flex-end;
@@ -657,7 +754,6 @@
         <span id="currentUserName">Admin</span>
       </div>
       <button class="nav-btn" onclick="openChangePasswordModal()" title="Change your login password">🔑 Change Password</button>
-      <button class="nav-btn" id="btnManageUsers" onclick="openUsersModal()" style="display:none;">👥 Manage Users</button>
       <a href="index.html" class="nav-btn">📝 Task Entry Form</a>
       <button class="nav-btn" onclick="logout()">🚪 Logout</button>
     </div>
@@ -668,7 +764,7 @@
     <div class="login-card">
       <div class="login-icon">🔒</div>
       <h2 class="login-title">Dashboard Login</h2>
-      <p class="login-subtitle">Enter your authorized credentials to access live telemetry</p>
+      <p class="login-subtitle">Enter your authorized credentials to access live telemetry and admin controls</p>
       
       <form onsubmit="handleLogin(event)">
         <div class="form-group">
@@ -685,203 +781,390 @@
     </div>
   </div>
 
-  <!-- Main Dashboard View -->
+  <!-- Main Dashboard View Container -->
   <main class="container" id="dashView" style="display:none;">
     
-    <!-- KPI Summary Cards -->
-    <section class="dash-kpis">
-      <div class="kpi-card">
-        <div class="kpi-val" id="kpiTodayCount">0</div>
-        <div class="kpi-lbl">Tasks Done Today</div>
-      </div>
-      <div class="kpi-card green">
-        <div class="kpi-val" id="kpiTodayObjects">0</div>
-        <div class="kpi-lbl">Objects Today</div>
-      </div>
-      <div class="kpi-card purple">
-        <div class="kpi-val" id="kpiTotalTasks">0</div>
-        <div class="kpi-lbl">Total Tasks (Turso DB)</div>
-      </div>
-      <div class="kpi-card orange">
-        <div class="kpi-val" id="kpiActiveLabelers">0</div>
-        <div class="kpi-lbl">Active Labelers Today</div>
-      </div>
-    </section>
+    <!-- Top Navigation Tabs Bar -->
+    <nav class="dash-tabs-bar">
+      <button class="dash-tab-btn active" id="tabBtnTelemetry" onclick="switchMainTab('telemetry')">
+        <span>📊</span>
+        <span>Task Telemetry & KPIs</span>
+      </button>
+      <button class="dash-tab-btn" id="tabBtnQueues" onclick="switchMainTab('queues')">
+        <span>🗂️</span>
+        <span>Manage Queues</span>
+        <span class="dash-tab-badge" id="tabQueuesBadge">0</span>
+      </button>
+      <button class="dash-tab-btn" id="tabBtnQTC" onclick="switchMainTab('qtc')">
+        <span>👥</span>
+        <span>Manage QTC Names</span>
+        <span class="dash-tab-badge" id="tabQTCBadge">0</span>
+      </button>
+      <button class="dash-tab-btn" id="tabBtnUsers" onclick="switchMainTab('users')" style="display:none;">
+        <span>🔐</span>
+        <span>Manage Users</span>
+      </button>
+    </nav>
 
-    <!-- Filters & Actions Card -->
-    <section class="filter-card">
-      <!-- Primary Filters Row -->
-      <div class="filter-primary-row">
-        <div class="filter-left-group">
-          <!-- Date Filter Dropdown (Image 1 style) -->
-          <select class="filter-select" id="filterDate" onchange="onDateFilterChange()" style="font-weight:600;">
-            <option value="today">📅 Today</option>
-            <option value="yesterday">📅 Yesterday</option>
-            <option value="all">📅 All Dates</option>
-            <option value="custom" id="optCustomDate" style="display:none;">📅 Custom Range</option>
-            <option value="open_advanced">⚙️ Advanced Date Range...</option>
-          </select>
-
-          <!-- Shift -->
-          <select class="filter-select" id="filterShift" onchange="applyFilters()">
-            <option value="all">All Shifts</option>
-            <option value="Morning">Morning</option>
-            <option value="Night">Night</option>
-            <option value="Over Night">Over Night</option>
-          </select>
-
-          <!-- Modality -->
-          <select class="filter-select" id="filterModality" onchange="applyFilters()">
-            <option value="all">All Modalities</option>
-            <option value="Lidar">Lidar</option>
-            <option value="Lane Line">Lane Line</option>
-            <option value="Relabeling">Relabeling</option>
-          </select>
-
-          <!-- Pass -->
-          <select class="filter-select" id="filterPass" onchange="applyFilters()">
-            <option value="all">All Passes</option>
-            <option value="FP">FP</option>
-            <option value="QA">QA</option>
-          </select>
-
-          <!-- QTC Name Dropdown -->
-          <select class="filter-select" id="filterQTC" onchange="applyFilters()" style="max-width:210px;">
-            <option value="all">All QTCs</option>
-          </select>
-
-          <!-- Global Search -->
-          <input type="text" class="filter-input" id="searchQuery" placeholder="🔍 Quick search labeler, Task ID, PC..." oninput="applyFilters()" style="min-width: 220px; flex:1;">
+    <!-- ============================================================ -->
+    <!-- TAB 1: OPERATIONAL TELEMETRY & KPIS -->
+    <!-- ============================================================ -->
+    <div id="panelTelemetry">
+      <!-- KPI Summary Cards -->
+      <section class="dash-kpis">
+        <div class="kpi-card">
+          <div class="kpi-val" id="kpiTodayCount">0</div>
+          <div class="kpi-lbl">Tasks Done Today</div>
         </div>
-
-        <div class="filter-right-group">
-          <button class="btn-action secondary" id="btnToggleCols" onclick="toggleColFilters()">
-            <span>🎛️ Column Filters</span>
-            <span id="activeFilterBadge" style="background:var(--primary); color:#fff; border-radius:10px; padding:1px 6px; font-size:0.68rem; display:none;">0</span>
-          </button>
-          <button class="btn-action secondary" onclick="resetAllFilters()" title="Reset all filters">🧹 Clear</button>
-          <button class="btn-action" onclick="fetchLiveData()">🔄 Refresh</button>
-          <button class="btn-action success" onclick="exportFilteredData()">📥 Export Excel (CSV)</button>
+        <div class="kpi-card green">
+          <div class="kpi-val" id="kpiTodayObjects">0</div>
+          <div class="kpi-lbl">Objects Today</div>
         </div>
-      </div>
-
-      <!-- Expandable Dedicated Column Filters Grid -->
-      <div class="col-filters-panel" id="colFiltersPanel">
-        <div class="col-filters-title">
-          <span>Detailed Column Filters (Filter by any specific field)</span>
-          <button type="button" onclick="resetAllFilters()" style="background:none; border:none; color:var(--primary); font-size:0.75rem; font-weight:700; cursor:pointer;">Reset Column Filters</button>
+        <div class="kpi-card purple">
+          <div class="kpi-val" id="kpiTotalTasks">0</div>
+          <div class="kpi-lbl">Total Tasks (Turso DB)</div>
         </div>
-        <div class="col-filters-grid">
-          <div class="col-filter-item">
-            <label>Shift</label>
-            <select id="colFilterShift" onchange="applyFilters()">
-              <option value="all">All</option>
+        <div class="kpi-card orange">
+          <div class="kpi-val" id="kpiActiveLabelers">0</div>
+          <div class="kpi-lbl">Active Labelers Today</div>
+        </div>
+      </section>
+
+      <!-- Filters & Actions Card -->
+      <section class="filter-card">
+        <div class="filter-primary-row">
+          <div class="filter-left-group">
+            <select class="filter-select" id="filterDate" onchange="onDateFilterChange()" style="font-weight:600;">
+              <option value="today">📅 Today</option>
+              <option value="yesterday">📅 Yesterday</option>
+              <option value="all">📅 All Dates</option>
+              <option value="custom" id="optCustomDate" style="display:none;">📅 Custom Range</option>
+              <option value="open_advanced">⚙️ Advanced Date Range...</option>
+            </select>
+
+            <select class="filter-select" id="filterShift" onchange="applyFilters()">
+              <option value="all">All Shifts</option>
               <option value="Morning">Morning</option>
               <option value="Night">Night</option>
               <option value="Over Night">Over Night</option>
             </select>
-          </div>
-          <div class="col-filter-item">
-            <label>Unit</label>
-            <input type="text" id="colFilterUnit" placeholder="e.g. Unit 1" oninput="applyFilters()">
-          </div>
-          <div class="col-filter-item">
-            <label>QTC Name</label>
-            <select id="colFilterQTC" onchange="applyFilters()">
-              <option value="all">All QTCs</option>
-            </select>
-          </div>
-          <div class="col-filter-item">
-            <label>Yubikey Email</label>
-            <input type="text" id="colFilterYubikey" placeholder="e.g. user@yubikey" oninput="applyFilters()">
-          </div>
-          <div class="col-filter-item">
-            <label>Labeler Name</label>
-            <input type="text" id="colFilterLabeler" placeholder="Labeler name..." oninput="applyFilters()">
-          </div>
-          <div class="col-filter-item">
-            <label>National ID</label>
-            <input type="text" id="colFilterNationalId" placeholder="14-digit ID..." oninput="applyFilters()">
-          </div>
-          <div class="col-filter-item">
-            <label>PC No</label>
-            <input type="text" id="colFilterPcNo" placeholder="PC number..." oninput="applyFilters()">
-          </div>
-          <div class="col-filter-item">
-            <label>Modality</label>
-            <select id="colFilterModality" onchange="applyFilters()">
-              <option value="all">All</option>
+
+            <select class="filter-select" id="filterModality" onchange="applyFilters()">
+              <option value="all">All Modalities</option>
               <option value="Lidar">Lidar</option>
               <option value="Lane Line">Lane Line</option>
               <option value="Relabeling">Relabeling</option>
             </select>
-          </div>
-          <div class="col-filter-item">
-            <label>Queue Name</label>
-            <select id="colFilterQueue" onchange="applyFilters()">
-              <option value="all">All Queues</option>
-            </select>
-          </div>
-          <div class="col-filter-item">
-            <label>Pass</label>
-            <select id="colFilterPass" onchange="applyFilters()">
-              <option value="all">All</option>
+
+            <select class="filter-select" id="filterPass" onchange="applyFilters()">
+              <option value="all">All Passes</option>
               <option value="FP">FP</option>
               <option value="QA">QA</option>
             </select>
-          </div>
-          <div class="col-filter-item">
-            <label>Stage</label>
-            <select id="colFilterStage" onchange="applyFilters()">
-              <option value="all">All Stages</option>
-              <option value="Stage 1">Stage 1</option>
-              <option value="Stage 2">Stage 2</option>
-            </select>
-          </div>
-        </div>
-      </div>
-    </section>
 
-    <!-- Data Table Card -->
-    <section class="table-card">
-      <div class="table-header">
-        <div class="table-title">
-          <span>📋 Operational Task Telemetry</span>
-          <span style="font-size:0.75rem; color:var(--text-muted); font-weight:600;" id="tableCounterText">(0 records)</span>
+            <select class="filter-select" id="filterQTC" onchange="applyFilters()" style="max-width:210px;">
+              <option value="all">All QTCs</option>
+            </select>
+
+            <input type="text" class="filter-input" id="searchQuery" placeholder="🔍 Quick search labeler, Task ID, PC..." oninput="applyFilters()" style="min-width: 220px; flex:1;">
+          </div>
+
+          <div class="filter-right-group">
+            <button class="btn-action secondary" id="btnToggleCols" onclick="toggleColFilters()">
+              <span>🎛️ Column Filters</span>
+              <span id="activeFilterBadge" style="background:var(--primary); color:#fff; border-radius:10px; padding:1px 6px; font-size:0.68rem; display:none;">0</span>
+            </button>
+            <button class="btn-action secondary" onclick="resetAllFilters()" title="Reset all filters">🧹 Clear</button>
+            <button class="btn-action" onclick="fetchLiveData()">🔄 Refresh</button>
+            <button class="btn-action success" onclick="exportFilteredData()">📥 Export Excel (CSV)</button>
+          </div>
         </div>
-        <span id="syncStatus" style="font-size:0.75rem; color:var(--primary); font-weight:600;">● Live Edge Synced</span>
+
+        <!-- Expandable Column Filters Panel -->
+        <div class="col-filters-panel" id="colFiltersPanel">
+          <div class="col-filters-title">
+            <span>Detailed Column Filters (Filter by any specific field)</span>
+            <button type="button" onclick="resetAllFilters()" style="background:none; border:none; color:var(--primary); font-size:0.75rem; font-weight:700; cursor:pointer;">Reset Column Filters</button>
+          </div>
+          <div class="col-filters-grid">
+            <div class="col-filter-item">
+              <label>Shift</label>
+              <select id="colFilterShift" onchange="applyFilters()">
+                <option value="all">All</option>
+                <option value="Morning">Morning</option>
+                <option value="Night">Night</option>
+                <option value="Over Night">Over Night</option>
+              </select>
+            </div>
+            <div class="col-filter-item">
+              <label>Unit</label>
+              <input type="text" id="colFilterUnit" placeholder="e.g. Unit 1" oninput="applyFilters()">
+            </div>
+            <div class="col-filter-item">
+              <label>QTC Name</label>
+              <select id="colFilterQTC" onchange="applyFilters()">
+                <option value="all">All QTCs</option>
+              </select>
+            </div>
+            <div class="col-filter-item">
+              <label>Yubikey Email</label>
+              <input type="text" id="colFilterYubikey" placeholder="e.g. user@yubikey" oninput="applyFilters()">
+            </div>
+            <div class="col-filter-item">
+              <label>Labeler Name</label>
+              <input type="text" id="colFilterLabeler" placeholder="Labeler name..." oninput="applyFilters()">
+            </div>
+            <div class="col-filter-item">
+              <label>National ID</label>
+              <input type="text" id="colFilterNationalId" placeholder="14-digit ID..." oninput="applyFilters()">
+            </div>
+            <div class="col-filter-item">
+              <label>PC No</label>
+              <input type="text" id="colFilterPcNo" placeholder="PC number..." oninput="applyFilters()">
+            </div>
+            <div class="col-filter-item">
+              <label>Modality</label>
+              <select id="colFilterModality" onchange="applyFilters()">
+                <option value="all">All</option>
+                <option value="Lidar">Lidar</option>
+                <option value="Lane Line">Lane Line</option>
+                <option value="Relabeling">Relabeling</option>
+              </select>
+            </div>
+            <div class="col-filter-item">
+              <label>Queue Name</label>
+              <select id="colFilterQueue" onchange="applyFilters()">
+                <option value="all">All Queues</option>
+              </select>
+            </div>
+            <div class="col-filter-item">
+              <label>Pass</label>
+              <select id="colFilterPass" onchange="applyFilters()">
+                <option value="all">All</option>
+                <option value="FP">FP</option>
+                <option value="QA">QA</option>
+              </select>
+            </div>
+            <div class="col-filter-item">
+              <label>Stage</label>
+              <select id="colFilterStage" onchange="applyFilters()">
+                <option value="all">All Stages</option>
+                <option value="Stage 1">Stage 1</option>
+                <option value="Stage 2">Stage 2</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Data Table Card -->
+      <section class="table-card">
+        <div class="table-header">
+          <div class="table-title">
+            <span>📋 Operational Task Telemetry</span>
+            <span style="font-size:0.75rem; color:var(--text-muted); font-weight:600;" id="tableCounterText">(0 records)</span>
+          </div>
+          <span id="syncStatus" style="font-size:0.75rem; color:var(--primary); font-weight:600;">● Live Edge Synced</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>#ID</th>
+                <th>Timestamp</th>
+                <th>Shift</th>
+                <th>Unit</th>
+                <th>PC No</th>
+                <th>Labeler Name</th>
+                <th>National ID</th>
+                <th>Yubikey Email</th>
+                <th>QTC Name</th>
+                <th>Task ID</th>
+                <th>Modality</th>
+                <th>Queue Name</th>
+                <th>Pass</th>
+                <th>Objects</th>
+                <th>Stage</th>
+              </tr>
+            </thead>
+            <tbody id="tableBody">
+              <tr><td colspan="15" style="text-align:center; padding:24px; color:var(--text-muted);">Loading live records from Turso...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- TAB 2: MANAGE QUEUES (إدارة الكيوهات بدلاً من الشيت) -->
+    <!-- ============================================================ -->
+    <div id="panelQueues" style="display:none;">
+      <div class="admin-mgmt-card">
+        <div class="admin-mgmt-header">
+          <div>
+            <div class="admin-mgmt-title">🗂️ Manage Queues (إدارة الكيوهات)</div>
+            <div class="admin-mgmt-desc">Add new queue names or remove existing ones. Any addition immediately appears in the Task Entry form for all labelers in real time!</div>
+          </div>
+          <button class="btn-action" onclick="loadLiveQueuesAdmin()">🔄 Refresh Queues</button>
+        </div>
+
+        <!-- Add New Queue Form -->
+        <div class="admin-form-box">
+          <h4>➕ Add New Queue to Turso Database</h4>
+          <div style="display:flex; flex-wrap:wrap; gap:12px; align-items:center;">
+            <input type="text" id="adminNewQueueName" placeholder="Enter Queue Name (e.g. sc3_full_scene_lanes_3d_v4)" style="flex:2; min-width:280px; padding:10px 14px; border:1.5px solid var(--border); border-radius:6px; font-size:0.9rem;">
+            <label style="display:inline-flex; align-items:center; gap:6px; font-size:0.85rem; font-weight:600; cursor:pointer;">
+              <input type="checkbox" id="adminQueueHighlight">
+              <span>⭐ Highlight in Gold (VIP)</span>
+            </label>
+            <button class="btn-action" onclick="addNewQueueFromDashboard()">➕ Add Queue</button>
+          </div>
+          <div id="adminQueueMsg" style="margin-top:8px; font-size:0.8rem; font-weight:600;"></div>
+        </div>
+
+        <!-- Queues Table -->
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
+          <input type="text" id="searchQueueTableInput" placeholder="🔍 Search active queues..." oninput="filterQueuesTable()" style="max-width:280px; padding:7px 12px; border:1.5px solid var(--border); border-radius:6px; font-size:0.85rem;">
+          <span style="font-size:0.8rem; color:var(--text-secondary); font-weight:600;" id="queuesCountLabel">Loading queues...</span>
+        </div>
+        <div class="table-wrap" style="border:1px solid var(--border); border-radius:8px; max-height:450px;">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:50px;">#</th>
+                <th>Queue Name</th>
+                <th style="width:120px;">Highlight</th>
+                <th style="width:160px;">Date Added</th>
+                <th style="width:100px; text-align:center;">Action</th>
+              </tr>
+            </thead>
+            <tbody id="queuesAdminTableBody">
+              <tr><td colspan="5" style="text-align:center; padding:18px; color:var(--text-muted);">Loading queues from Turso...</td></tr>
+            </tbody>
+          </table>
+        </div>
       </div>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>#ID</th>
-              <th>Timestamp</th>
-              <th>Shift</th>
-              <th>Unit</th>
-              <th>PC No</th>
-              <th>Labeler Name</th>
-              <th>National ID</th>
-              <th>Yubikey Email</th>
-              <th>QTC Name</th>
-              <th>Task ID</th>
-              <th>Modality</th>
-              <th>Queue Name</th>
-              <th>Pass</th>
-              <th>Objects</th>
-              <th>Stage</th>
-            </tr>
-          </thead>
-          <tbody id="tableBody">
-            <tr><td colspan="15" style="text-align:center; padding:24px; color:var(--text-muted);">Loading live records from Turso...</td></tr>
-          </tbody>
-        </table>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- TAB 3: MANAGE QTC NAMES (إدارة مشرفي الـ QTC بدلاً من الشيت) -->
+    <!-- ============================================================ -->
+    <div id="panelQTC" style="display:none;">
+      <div class="admin-mgmt-card">
+        <div class="admin-mgmt-header">
+          <div>
+            <div class="admin-mgmt-title">👥 Manage QTC Team (إدارة مشرفي الـ QTC)</div>
+            <div class="admin-mgmt-desc">Add new QTC members or remove existing ones by shift. Immediately saves to Turso and appears in the station form card!</div>
+          </div>
+          <button class="btn-action" onclick="loadLiveQTCAdmin()">🔄 Refresh QTCs</button>
+        </div>
+
+        <!-- Add New QTC Form -->
+        <div class="admin-form-box">
+          <h4>➕ Add New QTC Member to Turso Database</h4>
+          <div style="display:flex; flex-wrap:wrap; gap:12px; align-items:center;">
+            <select id="adminNewQTCShift" style="padding:10px 14px; border:1.5px solid var(--border); border-radius:6px; font-size:0.9rem; background:#fff; min-width:140px;">
+              <option value="Morning">Morning</option>
+              <option value="Night">Night</option>
+              <option value="Over Night">Over Night</option>
+            </select>
+            <input type="text" id="adminNewQTCName" placeholder="QTC Name (e.g. Ahmed Ali (M))" style="flex:1.5; min-width:220px; padding:10px 14px; border:1.5px solid var(--border); border-radius:6px; font-size:0.9rem;">
+            <select id="adminNewQTCRole" style="padding:10px 14px; border:1.5px solid var(--border); border-radius:6px; font-size:0.9rem; background:#fff; min-width:110px;">
+              <option value="QTC">Role: QTC</option>
+              <option value="QT">Role: QT</option>
+              <option value="SV">Role: SV</option>
+              <option value="QC">Role: QC</option>
+              <option value="TL">Role: TL</option>
+            </select>
+            <button class="btn-action" onclick="addNewQTCFromDashboard()">➕ Add QTC Member</button>
+          </div>
+          <div id="adminQTCMsg" style="margin-top:8px; font-size:0.8rem; font-weight:600;"></div>
+        </div>
+
+        <!-- QTC Table -->
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
+          <div style="display:flex; gap:8px; align-items:center;">
+            <select id="filterQTCAdminShift" onchange="filterQTCTable()" style="padding:7px 12px; border:1.5px solid var(--border); border-radius:6px; font-size:0.85rem; background:#fff;">
+              <option value="all">All Shifts</option>
+              <option value="Morning">Morning</option>
+              <option value="Night">Night</option>
+              <option value="Over Night">Over Night</option>
+            </select>
+            <input type="text" id="searchQTCTableInput" placeholder="🔍 Search QTC by name..." oninput="filterQTCTable()" style="min-width:240px; padding:7px 12px; border:1.5px solid var(--border); border-radius:6px; font-size:0.85rem;">
+          </div>
+          <span style="font-size:0.8rem; color:var(--text-secondary); font-weight:600;" id="qtcCountLabel">Loading QTCs...</span>
+        </div>
+        <div class="table-wrap" style="border:1px solid var(--border); border-radius:8px; max-height:450px;">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:50px;">#</th>
+                <th style="width:130px;">Shift</th>
+                <th>QTC Name</th>
+                <th style="width:110px;">Role</th>
+                <th style="width:160px;">Date Added</th>
+                <th style="width:100px; text-align:center;">Action</th>
+              </tr>
+            </thead>
+            <tbody id="qtcAdminTableBody">
+              <tr><td colspan="6" style="text-align:center; padding:18px; color:var(--text-muted);">Loading QTC members from Turso...</td></tr>
+            </tbody>
+          </table>
+        </div>
       </div>
-    </section>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- TAB 4: MANAGE USERS -->
+    <!-- ============================================================ -->
+    <div id="panelUsers" style="display:none;">
+      <div class="admin-mgmt-card">
+        <div class="admin-mgmt-header">
+          <div>
+            <div class="admin-mgmt-title">🔐 Manage Dashboard Users & Permissions</div>
+            <div class="admin-mgmt-desc">Create individual username and password accounts for team members, supervisors, and admins.</div>
+          </div>
+          <button class="btn-action" onclick="loadUsersList()">🔄 Refresh Users</button>
+        </div>
+
+        <div class="admin-form-box">
+          <h4>➕ Add Authorized Dashboard User</h4>
+          <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
+            <input type="text" id="newUserUsername" placeholder="Username (e.g. supervisor1)" style="flex:1; min-width:130px; padding:9px 12px; border:1.5px solid var(--border); border-radius:6px; font-size:0.85rem;">
+            <input type="password" id="newUserPassword" placeholder="Password" style="flex:1; min-width:120px; padding:9px 12px; border:1.5px solid var(--border); border-radius:6px; font-size:0.85rem;">
+            <input type="text" id="newUserFullName" placeholder="Full Name" style="flex:1.5; min-width:150px; padding:9px 12px; border:1.5px solid var(--border); border-radius:6px; font-size:0.85rem;">
+            <select id="newUserRole" style="padding:9px 12px; border:1.5px solid var(--border); border-radius:6px; font-size:0.85rem; background:#fff;">
+              <option value="viewer">Viewer (View & Export)</option>
+              <option value="admin">Admin (Full Control)</option>
+            </select>
+            <button class="btn-action" onclick="addNewUser()">Create User</button>
+          </div>
+          <div id="addUserMsg" style="margin-top:6px; font-size:0.75rem; font-weight:600;"></div>
+        </div>
+
+        <h4 style="color:var(--primary-dark); font-size:0.9rem; margin-bottom:12px;">Authorized Dashboard Users</h4>
+        <div class="table-wrap" style="border:1px solid var(--border); border-radius:8px; max-height:350px;">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:50px;">#</th>
+                <th>Username</th>
+                <th>Full Name</th>
+                <th>Role</th>
+                <th style="text-align:center; width:100px;">Action</th>
+              </tr>
+            </thead>
+            <tbody id="usersTableBody">
+              <tr><td colspan="5" style="text-align:center; padding:16px; color:var(--text-muted);">Loading users...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
   </main>
 
   <!-- ============================================================ -->
-  <!-- ADVANCED DATE FILTER MODAL (Image 2 Replication) -->
+  <!-- ADVANCED DATE FILTER MODAL -->
   <!-- ============================================================ -->
   <div class="modal-overlay" id="advDateModal">
     <div class="date-popup-box">
@@ -892,10 +1175,8 @@
         </select>
       </div>
 
-      <!-- Relative/Advanced Form (Image 2) -->
       <div id="advDateRelativeForm">
         <div class="date-columns-grid">
-          <!-- Start Date Column -->
           <div class="date-col">
             <div class="date-col-header">Start Date</div>
             <div class="date-col-preview" id="startPreviewText">Sat, Aug 1, 2026</div>
@@ -919,7 +1200,6 @@
             </select>
           </div>
 
-          <!-- End Date Column -->
           <div class="date-col">
             <div class="date-col-header">End Date</div>
             <div class="date-col-preview" id="endPreviewText">Thu, Oct 22, 2026</div>
@@ -945,7 +1225,6 @@
         </div>
       </div>
 
-      <!-- Calendar / Exact Date Pickers Form -->
       <div id="advDateCalendarForm" style="display:none; margin-bottom: 22px;">
         <div class="date-columns-grid">
           <div class="date-col">
@@ -959,7 +1238,6 @@
         </div>
       </div>
 
-      <!-- Action Buttons -->
       <div class="date-popup-actions">
         <button type="button" class="btn-popup-cancel" onclick="closeAdvDateModal()">Cancel</button>
         <button type="button" class="btn-popup-apply" onclick="applyAdvDateFilter()">Apply</button>
@@ -968,7 +1246,7 @@
   </div>
 
   <!-- ============================================================ -->
-  <!-- CHANGE PASSWORD MODAL (For any logged in user) -->
+  <!-- CHANGE PASSWORD MODAL -->
   <!-- ============================================================ -->
   <div class="modal-overlay" id="changePasswordModal">
     <div class="modal-box" style="max-width:440px;">
@@ -1000,52 +1278,6 @@
             <button type="submit" class="btn-action" id="cpSubmitBtn">Save New Password</button>
           </div>
         </form>
-      </div>
-    </div>
-  </div>
-
-  <!-- ============================================================ -->
-  <!-- USER MANAGEMENT MODAL (Admin Only) -->
-  <!-- ============================================================ -->
-  <div class="modal-overlay" id="usersModal">
-    <div class="modal-box" style="max-width:760px;">
-      <div class="modal-hd">
-        <div class="modal-title">👥 Dashboard Users & Access Control</div>
-        <button class="modal-close" onclick="closeUsersModal()">✕</button>
-      </div>
-      <div class="modal-bd">
-        <div style="background:#f7f9fd; border:1px solid var(--border); border-radius:8px; padding:16px; margin-bottom:18px;">
-          <h4 style="color:var(--primary-dark); font-size:0.9rem; margin-bottom:10px;">➕ Add Authorized User</h4>
-          <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
-            <input type="text" id="newUserUsername" placeholder="Username (e.g. supervisor1)" style="flex:1; min-width:130px; padding:8px 12px; border:1.5px solid var(--border); border-radius:6px; font-size:0.85rem;">
-            <input type="password" id="newUserPassword" placeholder="Password" style="flex:1; min-width:120px; padding:8px 12px; border:1.5px solid var(--border); border-radius:6px; font-size:0.85rem;">
-            <input type="text" id="newUserFullName" placeholder="Full Name" style="flex:1.5; min-width:150px; padding:8px 12px; border:1.5px solid var(--border); border-radius:6px; font-size:0.85rem;">
-            <select id="newUserRole" style="padding:8px 12px; border:1.5px solid var(--border); border-radius:6px; font-size:0.85rem; background:#fff;">
-              <option value="viewer">Viewer (View & Export)</option>
-              <option value="admin">Admin (Full Control)</option>
-            </select>
-            <button class="btn-action" onclick="addNewUser()">Create User</button>
-          </div>
-          <div id="addUserMsg" style="margin-top:6px; font-size:0.75rem; font-weight:600;"></div>
-        </div>
-
-        <h4 style="color:var(--primary-dark); font-size:0.85rem; margin-bottom:10px;">Authorized Dashboard Users</h4>
-        <div class="table-wrap" style="max-height:280px; border:1px solid var(--border); border-radius:6px;">
-          <table>
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Username</th>
-                <th>Full Name</th>
-                <th>Role</th>
-                <th style="text-align:center;">Action</th>
-              </tr>
-            </thead>
-            <tbody id="usersTableBody">
-              <tr><td colspan="5" style="text-align:center; padding:14px; color:var(--text-muted);">Loading users...</td></tr>
-            </tbody>
-          </table>
-        </div>
       </div>
     </div>
   </div>
@@ -1104,24 +1336,52 @@
     // APPLICATION STATE
     // ============================================================
     var _currentUser = null;
+    var _activeTab = "telemetry";
     var _allSubmissions = [];
     var _filteredSubmissions = [];
-    var _customDateRange = null; // { startStr: 'YYYY-MM-DD', endStr: 'YYYY-MM-DD', label: '...' }
+    var _customDateRange = null;
     var _allQueuesList = [];
     var _allQTCList = [];
+    var _adminQueuesCache = [];
+    var _adminQTCCache = [];
+
+    // ============================================================
+    // TAB SWITCHER
+    // ============================================================
+    function switchMainTab(tabName) {
+      _activeTab = tabName;
+      document.getElementById("panelTelemetry").style.display = (tabName === "telemetry") ? "block" : "none";
+      document.getElementById("panelQueues").style.display = (tabName === "queues") ? "block" : "none";
+      document.getElementById("panelQTC").style.display = (tabName === "qtc") ? "block" : "none";
+      document.getElementById("panelUsers").style.display = (tabName === "users") ? "block" : "none";
+
+      document.getElementById("tabBtnTelemetry").classList.toggle("active", tabName === "telemetry");
+      document.getElementById("tabBtnQueues").classList.toggle("active", tabName === "queues");
+      document.getElementById("tabBtnQTC").classList.toggle("active", tabName === "qtc");
+      document.getElementById("tabBtnUsers").classList.toggle("active", tabName === "users");
+
+      if (tabName === "queues") loadLiveQueuesAdmin();
+      if (tabName === "qtc") loadLiveQTCAdmin();
+      if (tabName === "users") loadUsersList();
+    }
 
     // ============================================================
     // AUTHENTICATION
     // ============================================================
     function initAuth() {
+      // Check URL tab parameter
+      var params = new URLSearchParams(window.location.search);
+      var targetTab = params.get("tab") || window.location.hash.replace("#", "");
+
       try {
         var saved = sessionStorage.getItem("meti_dash_user");
         if (saved) {
           _currentUser = JSON.parse(saved);
-          showDashboard();
+          showDashboard(targetTab);
           return;
         }
       } catch(e) {}
+
       showLogin();
     }
 
@@ -1131,20 +1391,33 @@
       document.getElementById("navActions").style.display = "none";
     }
 
-    function showDashboard() {
+    function showDashboard(initialTab) {
       document.getElementById("loginView").style.display = "none";
       document.getElementById("dashView").style.display = "block";
       document.getElementById("navActions").style.display = "flex";
 
       document.getElementById("currentUserName").textContent = _currentUser.full_name + " (" + _currentUser.role + ")";
       if (_currentUser.role === 'admin') {
-        document.getElementById("btnManageUsers").style.display = "inline-flex";
+        document.getElementById("tabBtnUsers").style.display = "inline-flex";
       } else {
-        document.getElementById("btnManageUsers").style.display = "none";
+        document.getElementById("tabBtnUsers").style.display = "none";
       }
 
       loadDropdownMeta();
       fetchLiveData();
+
+      // Switch to initial tab if requested
+      if (initialTab === "queues") {
+        switchMainTab("queues");
+      } else if (initialTab === "qtc") {
+        switchMainTab("qtc");
+      } else if (initialTab === "admin") {
+        switchMainTab("queues");
+      } else if (initialTab === "users" && _currentUser.role === "admin") {
+        switchMainTab("users");
+      } else {
+        switchMainTab("telemetry");
+      }
     }
 
     function handleLogin(e) {
@@ -1177,7 +1450,10 @@
             role: row[3].value
           };
           sessionStorage.setItem("meti_dash_user", JSON.stringify(_currentUser));
-          showDashboard();
+
+          var params = new URLSearchParams(window.location.search);
+          var targetTab = params.get("tab") || "telemetry";
+          showDashboard(targetTab);
         } else {
           errEl.textContent = "Invalid username or password.";
         }
@@ -1188,6 +1464,226 @@
       sessionStorage.removeItem("meti_dash_user");
       _currentUser = null;
       showLogin();
+    }
+
+    // ============================================================
+    // MANAGE QUEUES TAB LOGIC (بدلاً من الشيت)
+    // ============================================================
+    function loadLiveQueuesAdmin() {
+      var tbody = document.getElementById("queuesAdminTableBody");
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:18px; color:var(--text-muted);">Loading active queues from Turso...</td></tr>';
+
+      tursoQuery("SELECT id, name, highlight, created_at FROM custom_queues ORDER BY id DESC;", [], function(err, res) {
+        if (err) {
+          tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:18px; color:var(--error);">Failed: ' + err.message + '</td></tr>';
+          return;
+        }
+
+        var rows = res ? res.rows : [];
+        _adminQueuesCache = rows.map(function(r) {
+          return {
+            id: r[0] ? r[0].value : "",
+            name: r[1] ? String(r[1].value) : "",
+            highlight: r[2] ? parseInt(r[2].value, 10) : 0,
+            created_at: r[3] ? String(r[3].value) : ""
+          };
+        });
+
+        document.getElementById("tabQueuesBadge").textContent = _adminQueuesCache.length;
+        document.getElementById("queuesCountLabel").textContent = "Total: " + _adminQueuesCache.length + " active queues";
+        renderQueuesAdminTable(_adminQueuesCache);
+      });
+    }
+
+    function renderQueuesAdminTable(list) {
+      var tbody = document.getElementById("queuesAdminTableBody");
+      if (!list.length) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--text-muted);">No queues found. Add one above!</td></tr>';
+        return;
+      }
+
+      var html = "";
+      list.forEach(function(q, idx) {
+        var hlBadge = q.highlight
+          ? '<span style="color:#d97706; font-weight:700; background:#fef3c7; border:1px solid #fde68a; border-radius:4px; padding:1px 6px;">⭐ VIP</span>'
+          : '<span style="color:var(--text-muted);">Standard</span>';
+
+        html += '<tr>'
+          + '<td style="color:var(--text-muted);">' + (idx + 1) + '</td>'
+          + '<td><code style="font-weight:700; color:var(--primary-dark); font-size:0.85rem;">' + q.name + '</code></td>'
+          + '<td>' + hlBadge + '</td>'
+          + '<td style="color:var(--text-secondary); font-size:0.75rem;">' + q.created_at + '</td>'
+          + '<td style="text-align:center;"><button class="del-btn" onclick="deleteQueueFromDashboard(' + q.id + ', '' + q.name + '')">🗑️ Delete</button></td>'
+          + '</tr>';
+      });
+      tbody.innerHTML = html;
+    }
+
+    function filterQueuesTable() {
+      var q = document.getElementById("searchQueueTableInput").value.toLowerCase().trim();
+      var filtered = _adminQueuesCache.filter(function(item) {
+        return item.name.toLowerCase().indexOf(q) > -1;
+      });
+      renderQueuesAdminTable(filtered);
+    }
+
+    function addNewQueueFromDashboard() {
+      var nameIn = document.getElementById("adminNewQueueName");
+      var hlIn = document.getElementById("adminQueueHighlight");
+      var msg = document.getElementById("adminQueueMsg");
+
+      var name = nameIn.value.trim();
+      var hl = hlIn.checked ? 1 : 0;
+
+      if (!name) {
+        msg.style.color = "var(--error)";
+        msg.textContent = "Please enter a queue name.";
+        return;
+      }
+
+      msg.style.color = "var(--text-secondary)";
+      msg.textContent = "Saving queue to Turso database...";
+
+      var sql = "INSERT INTO custom_queues (name, highlight) VALUES (?, ?);";
+      tursoQuery(sql, [name, hl], function(err, res) {
+        if (err) {
+          msg.style.color = "var(--error)";
+          msg.textContent = err.message.indexOf("UNIQUE") > -1 ? "Queue name already exists!" : "Error: " + err.message;
+          return;
+        }
+
+        nameIn.value = "";
+        hlIn.checked = false;
+        msg.style.color = "var(--success)";
+        msg.textContent = "✔ Queue added successfully! It is now live across all forms.";
+        loadLiveQueuesAdmin();
+        loadDropdownMeta();
+        setTimeout(function() { msg.textContent = ""; }, 3500);
+      });
+    }
+
+    function deleteQueueFromDashboard(id, name) {
+      if (!confirm("Are you sure you want to delete queue: \n" + name + "?")) return;
+      tursoQuery("DELETE FROM custom_queues WHERE id = ?;", [id], function(err, res) {
+        if (err) {
+          alert("Failed to delete queue: " + err.message);
+          return;
+        }
+        loadLiveQueuesAdmin();
+        loadDropdownMeta();
+      });
+    }
+
+    // ============================================================
+    // MANAGE QTC TAB LOGIC (بدلاً من الشيت)
+    // ============================================================
+    function loadLiveQTCAdmin() {
+      var tbody = document.getElementById("qtcAdminTableBody");
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:18px; color:var(--text-muted);">Loading QTC members from Turso...</td></tr>';
+
+      tursoQuery("SELECT id, shift, name, role, created_at FROM custom_qtc ORDER BY shift ASC, name ASC;", [], function(err, res) {
+        if (err) {
+          tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:18px; color:var(--error);">Failed: ' + err.message + '</td></tr>';
+          return;
+        }
+
+        var rows = res ? res.rows : [];
+        _adminQTCCache = rows.map(function(r) {
+          return {
+            id: r[0] ? r[0].value : "",
+            shift: r[1] ? String(r[1].value) : "",
+            name: r[2] ? String(r[2].value) : "",
+            role: r[3] ? String(r[3].value) : "",
+            created_at: r[4] ? String(r[4].value) : ""
+          };
+        });
+
+        document.getElementById("tabQTCBadge").textContent = _adminQTCCache.length;
+        document.getElementById("qtcCountLabel").textContent = "Total: " + _adminQTCCache.length + " QTC members";
+        filterQTCTable();
+      });
+    }
+
+    function filterQTCTable() {
+      var shiftFilter = document.getElementById("filterQTCAdminShift").value;
+      var q = document.getElementById("searchQTCTableInput").value.toLowerCase().trim();
+
+      var filtered = _adminQTCCache.filter(function(item) {
+        if (shiftFilter !== "all" && item.shift !== shiftFilter) return false;
+        if (q && item.name.toLowerCase().indexOf(q) === -1 && item.role.toLowerCase().indexOf(q) === -1) return false;
+        return true;
+      });
+
+      renderQTCAdminTable(filtered);
+    }
+
+    function renderQTCAdminTable(list) {
+      var tbody = document.getElementById("qtcAdminTableBody");
+      if (!list.length) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px; color:var(--text-muted);">No QTC members match your search.</td></tr>';
+        return;
+      }
+
+      var html = "";
+      list.forEach(function(m, idx) {
+        html += '<tr>'
+          + '<td style="color:var(--text-muted);">' + (idx + 1) + '</td>'
+          + '<td><span class="badge-shift">' + m.shift + '</span></td>'
+          + '<td style="font-weight:700; color:var(--primary-dark); font-size:0.88rem;">' + m.name + '</td>'
+          + '<td><span style="color:var(--primary); font-weight:600;">' + (m.role || "QTC") + '</span></td>'
+          + '<td style="color:var(--text-secondary); font-size:0.75rem;">' + m.created_at + '</td>'
+          + '<td style="text-align:center;"><button class="del-btn" onclick="deleteQTCFromDashboard(' + m.id + ', '' + m.name + '')">🗑️ Delete</button></td>'
+          + '</tr>';
+      });
+      tbody.innerHTML = html;
+    }
+
+    function addNewQTCFromDashboard() {
+      var shiftIn = document.getElementById("adminNewQTCShift");
+      var nameIn = document.getElementById("adminNewQTCName");
+      var roleIn = document.getElementById("adminNewQTCRole");
+      var msg = document.getElementById("adminQTCMsg");
+
+      var shift = shiftIn.value;
+      var name = nameIn.value.trim();
+      var role = roleIn.value.trim();
+
+      if (!name) {
+        msg.style.color = "var(--error)";
+        msg.textContent = "Please enter QTC Name.";
+        return;
+      }
+
+      msg.style.color = "var(--text-secondary)";
+      msg.textContent = "Saving QTC member to Turso database...";
+
+      var sql = "INSERT INTO custom_qtc (shift, name, role) VALUES (?, ?, ?);";
+      tursoQuery(sql, [shift, name, role], function(err, res) {
+        if (err) {
+          msg.style.color = "var(--error)";
+          msg.textContent = err.message.indexOf("UNIQUE") > -1 ? "This QTC member already exists in " + shift + " shift!" : "Error: " + err.message;
+          return;
+        }
+
+        nameIn.value = "";
+        msg.style.color = "var(--success)";
+        msg.textContent = "✔ QTC member added successfully to " + shift + " shift!";
+        loadLiveQTCAdmin();
+        loadDropdownMeta();
+        setTimeout(function() { msg.textContent = ""; }, 3500);
+      });
+    }
+
+    function deleteQTCFromDashboard(id, name) {
+      if (!confirm("Are you sure you want to delete QTC: \n" + name + "?")) return;
+      tursoQuery("DELETE FROM custom_qtc WHERE id = ?;", [id], function(err, res) {
+        if (err) {
+          alert("Failed to delete QTC: " + err.message);
+          return;
+        }
+        loadLiveQTCAdmin();
+        loadDropdownMeta();
+      });
     }
 
     // ============================================================
@@ -1232,7 +1728,6 @@
       msg.style.color = "var(--text-secondary)";
       msg.textContent = "Verifying current password...";
 
-      // Verify current password against Turso
       var checkSql = "SELECT id FROM dashboard_users WHERE id = ? AND password = ? LIMIT 1;";
       tursoQuery(checkSql, [_currentUser.id, curr], function(err, res) {
         if (err) {
@@ -1251,7 +1746,6 @@
           return;
         }
 
-        // Current password verified, proceed with update
         var updateSql = "UPDATE dashboard_users SET password = ? WHERE id = ?;";
         tursoQuery(updateSql, [newP, _currentUser.id], function(uErr, uRes) {
           btn.disabled = false;
@@ -1273,18 +1767,17 @@
     }
 
     // ============================================================
-    // LOAD METADATA (Queues & QTCs for dropdowns)
+    // LOAD METADATA
     // ============================================================
     function loadDropdownMeta() {
-      // Fetch Queues
       tursoQuery("SELECT name FROM custom_queues ORDER BY name ASC;", [], function(err, res) {
         if (!err && res && res.rows) {
           _allQueuesList = res.rows.map(function(r) { return r[0].value; });
           populateQueueDropdowns();
+          document.getElementById("tabQueuesBadge").textContent = _allQueuesList.length;
         }
       });
 
-      // Fetch QTCs
       tursoQuery("SELECT name, shift FROM custom_qtc ORDER BY name ASC;", [], function(err, res) {
         if (!err && res && res.rows) {
           var seen = new Set();
@@ -1297,6 +1790,7 @@
             }
           });
           populateQTCDropdowns();
+          document.getElementById("tabQTCBadge").textContent = _allQTCList.length;
         }
       });
     }
@@ -1334,7 +1828,7 @@
     }
 
     // ============================================================
-    // DATA FETCHING & KPIs
+    // DATA FETCHING & KPIS
     // ============================================================
     function fetchLiveData() {
       var sync = document.getElementById("syncStatus");
@@ -1370,7 +1864,6 @@
           };
         });
 
-        // Also add any dynamic QTCs / Queues from submissions into dropdowns if missing
         _allSubmissions.forEach(function(s) {
           if (s.queue_name && !_allQueuesList.includes(s.queue_name)) {
             _allQueuesList.push(s.queue_name);
@@ -1435,7 +1928,6 @@
       var sel = document.getElementById("filterDate");
       if (sel.value === "open_advanced") {
         openAdvDateModal();
-        // Reset selection temporarily until applied
         sel.value = _customDateRange ? "custom" : "today";
         return;
       }
@@ -1455,7 +1947,6 @@
       document.getElementById("filterQTC").value = "all";
       document.getElementById("searchQuery").value = "";
 
-      // Column filters
       document.getElementById("colFilterShift").value = "all";
       document.getElementById("colFilterUnit").value = "";
       document.getElementById("colFilterQTC").value = "all";
@@ -1474,14 +1965,12 @@
     function applyFilters() {
       var dateVal = document.getElementById("filterDate").value;
 
-      // Primary filters
       var pShift = document.getElementById("filterShift").value;
       var pMod = document.getElementById("filterModality").value;
       var pPass = document.getElementById("filterPass").value;
       var pQTC = document.getElementById("filterQTC").value;
       var q = document.getElementById("searchQuery").value.toLowerCase().trim();
 
-      // Column filters
       var cShift = document.getElementById("colFilterShift").value;
       var cUnit = document.getElementById("colFilterUnit").value.toLowerCase().trim();
       var cQTC = document.getElementById("colFilterQTC").value;
@@ -1494,7 +1983,6 @@
       var cPass = document.getElementById("colFilterPass").value;
       var cStage = document.getElementById("colFilterStage").value;
 
-      // Sync primary and column dropdowns if user changes either
       if (pShift !== "all" && cShift === "all") cShift = pShift;
       if (cShift !== "all" && pShift === "all") document.getElementById("filterShift").value = cShift;
 
@@ -1507,7 +1995,6 @@
       if (pQTC !== "all" && cQTC === "all") cQTC = pQTC;
       if (cQTC !== "all" && pQTC === "all") document.getElementById("filterQTC").value = cQTC;
 
-      // Count active filters for badge
       var activeCount = 0;
       if (dateVal !== "all") activeCount++;
       if (cShift !== "all") activeCount++;
@@ -1531,7 +2018,6 @@
         badge.style.display = "none";
       }
 
-      // Pre-compute date bounds
       var todayCairo = new Date().toLocaleDateString("en-US", { timeZone: "Africa/Cairo" });
       var todayISO = new Date().toISOString().slice(0, 10);
 
@@ -1543,7 +2029,6 @@
       _filteredSubmissions = _allSubmissions.filter(function(r) {
         var recISO = extractISODate(r);
 
-        // Date Check
         if (dateVal === "today") {
           if (r.timestamp.indexOf(todayCairo) === -1 && recISO !== todayISO) return false;
         } else if (dateVal === "yesterday") {
@@ -1553,40 +2038,18 @@
           if (recISO < _customDateRange.startStr || recISO > _customDateRange.endStr) return false;
         }
 
-        // Shift
         if (cShift !== "all" && r.shift.toLowerCase() !== cShift.toLowerCase()) return false;
-
-        // Unit
         if (cUnit && r.unit.toLowerCase().indexOf(cUnit) === -1) return false;
-
-        // QTC Name
         if (cQTC !== "all" && r.qtc_name.toLowerCase() !== cQTC.toLowerCase()) return false;
-
-        // Yubikey Email
         if (cYubikey && r.yubikey_email.toLowerCase().indexOf(cYubikey) === -1) return false;
-
-        // Labeler Name
         if (cLabeler && r.labeler_name.toLowerCase().indexOf(cLabeler) === -1) return false;
-
-        // National ID
         if (cNatId && r.national_id.indexOf(cNatId) === -1) return false;
-
-        // PC No
         if (cPcNo && r.pc_no.toLowerCase().indexOf(cPcNo) === -1) return false;
-
-        // Modality
         if (cMod !== "all" && r.modality.toLowerCase() !== cMod.toLowerCase()) return false;
-
-        // Queue Name
         if (cQueue !== "all" && r.queue_name.toLowerCase() !== cQueue.toLowerCase()) return false;
-
-        // Pass
         if (cPass !== "all" && r.pass.toUpperCase() !== cPass.toUpperCase()) return false;
-
-        // Stage
         if (cStage !== "all" && r.stage.toLowerCase() !== cStage.toLowerCase()) return false;
 
-        // Global Quick Search
         if (q) {
           var combined = (r.labeler_name + " " + r.task_id + " " + r.pc_no + " " + r.national_id + " " + r.queue_name + " " + r.yubikey_email + " " + r.qtc_name).toLowerCase();
           if (combined.indexOf(q) === -1) return false;
@@ -1646,7 +2109,7 @@
     }
 
     // ============================================================
-    // ADVANCED DATE FILTER MODAL LOGIC (Replicating Image 2)
+    // ADVANCED DATE FILTER MODAL LOGIC
     // ============================================================
     function openAdvDateModal() {
       document.getElementById("advDateModal").classList.add("show");
@@ -1666,7 +2129,6 @@
       } else {
         document.getElementById("advDateRelativeForm").style.display = "none";
         document.getElementById("advDateCalendarForm").style.display = "block";
-        // Default calendar inputs
         var today = new Date().toISOString().slice(0, 10);
         if (!document.getElementById("calStartDate").value) {
           var past = new Date();
@@ -1680,7 +2142,7 @@
     }
 
     function computeRelativeDate(dir, amount, unit) {
-      var d = new Date(); // base: today
+      var d = new Date();
       amount = parseInt(amount, 10) || 0;
       var sign = (dir === "minus") ? -1 : 1;
       var delta = sign * amount;
@@ -1773,7 +2235,7 @@
     }
 
     // ============================================================
-    // EXPORT TO CSV (UTF-8 BOM for Arabic support)
+    // EXPORT TO CSV
     // ============================================================
     function exportFilteredData() {
       if (!_filteredSubmissions.length) {
@@ -1821,7 +2283,8 @@
         csvLines.push(line.join(","));
       });
 
-      var csvContent = "\uFEFF" + csvLines.join("\r\n"); // UTF-8 BOM
+      var csvContent = "﻿" + csvLines.join("
+");
       var blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
       var url = URL.createObjectURL(blob);
       var link = document.createElement("a");
@@ -1833,30 +2296,21 @@
     }
 
     // ============================================================
-    // USER MANAGEMENT MODAL LOGIC (Admin Only)
+    // USER MANAGEMENT
     // ============================================================
-    function openUsersModal() {
-      document.getElementById("usersModal").classList.add("show");
-      loadUsersList();
-    }
-
-    function closeUsersModal() {
-      document.getElementById("usersModal").classList.remove("show");
-    }
-
     function loadUsersList() {
       var tbody = document.getElementById("usersTableBody");
-      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:12px; color:var(--text-muted);">Loading users...</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:14px; color:var(--text-muted);">Loading users...</td></tr>';
 
       tursoQuery("SELECT id, username, full_name, role, created_at FROM dashboard_users ORDER BY id ASC;", [], function(err, res) {
         if (err) {
-          tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:12px; color:var(--error);">Failed: ' + err.message + '</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:14px; color:var(--error);">Failed: ' + err.message + '</td></tr>';
           return;
         }
 
         var rows = res ? res.rows : [];
         if (!rows.length) {
-          tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:12px; color:var(--text-muted);">No users found.</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:14px; color:var(--text-muted);">No users found.</td></tr>';
           return;
         }
 
@@ -1870,7 +2324,7 @@
 
           var delBtn = isMe
             ? '<span style="font-size:0.7rem; color:var(--text-muted);">(Current)</span>'
-            : '<button class="del-btn" onclick="deleteUser(' + uId + ', \'' + uName + '\')">Delete</button>';
+            : '<button class="del-btn" onclick="deleteUser(' + uId + ', '' + uName + '')">Delete</button>';
 
           html += '<tr>'
             + '<td>' + (idx + 1) + '</td>'
