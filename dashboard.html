@@ -836,6 +836,10 @@
         <span>🔐</span>
         <span>Manage Users</span>
       </button>
+      <button class="dash-tab-btn" id="tabBtnAnalytics" onclick="switchMainTab('analytics')" style="display:none;">
+        <span>📈</span>
+        <span>Executive Intelligence</span>
+      </button>
     </nav>
 
     <!-- ============================================================ -->
@@ -1242,6 +1246,30 @@
       </div>
     </div>
 
+    <!-- ============================================================ -->
+    <!-- TAB 5: EXECUTIVE INTELLIGENCE & DEEP ANALYTICS (ADMIN ONLY) -->
+    <!-- ============================================================ -->
+    <div id="panelAnalytics" style="display:none;">
+      <div style="background:#fff; border-radius:12px; border:1px solid var(--border); box-shadow:var(--shadow-sm); overflow:hidden; margin-bottom:24px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 18px; background:#f8fafc; border-bottom:1px solid var(--border); flex-wrap:wrap; gap:10px;">
+          <div style="display:flex; align-items:center; gap:10px;">
+            <span style="font-size:1.3rem;">📈</span>
+            <div>
+              <strong style="color:var(--primary-dark); font-size:0.95rem;">Executive Intelligence & Performance Workspace</strong>
+              <div style="color:var(--text-muted); font-size:0.75rem;">Deep analytics, cross-modality matrices, queue telemetry & floor reports powered directly by Turso DB</div>
+            </div>
+          </div>
+          <div style="display:flex; gap:8px;">
+            <button class="btn-action" onclick="reloadAnalyticsFrame()" style="padding:6px 12px; font-size:0.8rem;">🔄 Reload View</button>
+            <a href="analytics.html" target="_blank" class="btn-action" style="padding:6px 12px; font-size:0.8rem; text-decoration:none; display:inline-flex; align-items:center; gap:4px;">↗️ Fullscreen Mode</a>
+          </div>
+        </div>
+        <div style="position:relative; width:100%; height:calc(100vh - 170px); min-height:800px; background:#f1f5f9;">
+          <iframe id="analyticsFrame" src="about:blank" style="width:100%; height:100%; border:none; display:block;" title="Executive Analytics"></iframe>
+        </div>
+      </div>
+    </div>
+
   <!-- Edit Task Modal (Admin Only) -->
   <div class="modal-overlay" id="modalEditTask" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.6); backdrop-filter:blur(4px); z-index:9999; align-items:center; justify-content:center; padding:16px;" onclick="if(event.target===this)closeEditTaskModal()">
     <div style="background:#fff; border-radius:12px; width:100%; max-width:540px; box-shadow:0 20px 40px rgba(0,0,0,0.2); overflow:hidden; border:1px solid var(--border);">
@@ -1564,7 +1592,10 @@
       if (role === "qt" && tabName !== "telemetry") {
         tabName = "telemetry";
       }
-      if ((role === "sv" || role === "wla") && tabName === "users") {
+      if ((role === "sv" || role === "wla") && (tabName === "users" || tabName === "analytics")) {
+        tabName = "telemetry";
+      }
+      if (tabName === "analytics" && role !== "admin") {
         tabName = "telemetry";
       }
 
@@ -1573,15 +1604,30 @@
       document.getElementById("panelQueues").style.display = (tabName === "queues") ? "block" : "none";
       document.getElementById("panelQTC").style.display = (tabName === "qtc") ? "block" : "none";
       document.getElementById("panelUsers").style.display = (tabName === "users") ? "block" : "none";
+      var panelAnalytics = document.getElementById("panelAnalytics");
+      if (panelAnalytics) panelAnalytics.style.display = (tabName === "analytics") ? "block" : "none";
 
       document.getElementById("tabBtnTelemetry").classList.toggle("active", tabName === "telemetry");
       document.getElementById("tabBtnQueues").classList.toggle("active", tabName === "queues");
       document.getElementById("tabBtnQTC").classList.toggle("active", tabName === "qtc");
       document.getElementById("tabBtnUsers").classList.toggle("active", tabName === "users");
+      var btnAnalytics = document.getElementById("tabBtnAnalytics");
+      if (btnAnalytics) btnAnalytics.classList.toggle("active", tabName === "analytics");
 
       if (tabName === "queues") loadLiveQueuesAdmin();
       if (tabName === "qtc") loadLiveQTCAdmin();
       if (tabName === "users" && role === "admin") loadUsersList();
+      if (tabName === "analytics" && role === "admin") {
+        var frame = document.getElementById("analyticsFrame");
+        if (frame && (frame.src === "about:blank" || !frame.src || frame.src.endsWith("about:blank"))) {
+          frame.src = "analytics.html";
+        }
+      }
+    }
+
+    function reloadAnalyticsFrame() {
+      var frame = document.getElementById("analyticsFrame");
+      if (frame) frame.src = "analytics.html?_t=" + Date.now();
     }
 
     // ============================================================
@@ -1627,22 +1673,26 @@
       var btnQueues = document.getElementById("tabBtnQueues");
       var btnQTC = document.getElementById("tabBtnQTC");
       var btnUsers = document.getElementById("tabBtnUsers");
+      var btnAnalytics = document.getElementById("tabBtnAnalytics");
 
       if (role === "admin") {
         btnTelemetry.style.display = "inline-flex";
         btnQueues.style.display = "inline-flex";
         btnQTC.style.display = "inline-flex";
         btnUsers.style.display = "inline-flex";
+        if (btnAnalytics) btnAnalytics.style.display = "inline-flex";
       } else if (role === "sv" || role === "wla") {
         btnTelemetry.style.display = "inline-flex";
         btnQueues.style.display = "inline-flex";
         btnQTC.style.display = "inline-flex";
         btnUsers.style.display = "none";
+        if (btnAnalytics) btnAnalytics.style.display = "none";
       } else { // qt
         btnTelemetry.style.display = "inline-flex";
         btnQueues.style.display = "none";
         btnQTC.style.display = "none";
         btnUsers.style.display = "none";
+        if (btnAnalytics) btnAnalytics.style.display = "none";
       }
 
       loadDropdownMeta();
@@ -1666,6 +1716,8 @@
           switchMainTab("qtc");
         } else if (initialTab === "users") {
           switchMainTab("users");
+        } else if (initialTab === "analytics") {
+          switchMainTab("analytics");
         } else {
           switchMainTab("telemetry");
         }

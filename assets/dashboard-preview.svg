@@ -1,0 +1,396 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 680" width="1200" height="680">
+  <defs>
+    <!-- Background Gradient -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#040910" />
+      <stop offset="50%" stop-color="#060e18" />
+      <stop offset="100%" stop-color="#03070d" />
+    </linearGradient>
+
+    <!-- Header Gradient -->
+    <linearGradient id="hdrGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#07131e" />
+      <stop offset="100%" stop-color="#050c14" />
+    </linearGradient>
+
+    <!-- Card Background Gradient -->
+    <linearGradient id="cardGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#091827" stop-opacity="0.9" />
+      <stop offset="100%" stop-color="#06101a" stop-opacity="0.95" />
+    </linearGradient>
+
+    <!-- Accent Neon Teal & Blue -->
+    <linearGradient id="tealBlue" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#00e5d4" />
+      <stop offset="100%" stop-color="#1f6feb" />
+    </linearGradient>
+
+    <!-- Subtle Grid Pattern -->
+    <pattern id="gridPattern" width="34" height="34" patternUnits="userSpaceOnUse">
+      <path d="M 34 0 L 0 0 0 34" fill="none" stroke="#00e5d4" stroke-width="0.6" stroke-opacity="0.06"/>
+    </pattern>
+
+    <!-- Drop Shadow Filter -->
+    <filter id="cardShadow" x="-10%" y="-10%" width="125%" height="125%">
+      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#000000" flood-opacity="0.6"/>
+    </filter>
+
+    <filter id="neonGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="6" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <style>
+    .font-sans { font-family: -apple-system, BlinkMacSystemFont, "Space Grotesk", "Segoe UI", Roboto, sans-serif; }
+    .font-mono { font-family: "JetBrains Mono", Consolas, "Courier New", monospace; }
+  </style>
+
+  <!-- Background Base -->
+  <rect width="1200" height="680" fill="url(#bgGrad)" />
+  <rect width="1200" height="680" fill="url(#gridPattern)" />
+
+  <!-- Ambient Light Orbs -->
+  <circle cx="150" cy="80" r="180" fill="#00e5d4" opacity="0.06" filter="url(#neonGlow)" />
+  <circle cx="1050" cy="550" r="220" fill="#1f6feb" opacity="0.07" filter="url(#neonGlow)" />
+
+  <!-- ========================================================================= -->
+  <!-- LEFT SIDEBAR (X: 0 to 240)                                                -->
+  <!-- ========================================================================= -->
+  <rect x="0" y="0" width="230" height="680" fill="#050c14" stroke="#00e5d4" stroke-opacity="0.15" stroke-width="1" />
+
+  <!-- Brand Block -->
+  <g transform="translate(24, 28)">
+    <polygon points="0,3 24,3 17,13 0,13" fill="url(#tealBlue)"/>
+    <polygon points="4,15 28,15 21,25 4,25" fill="url(#tealBlue)" opacity="0.75"/>
+    <polygon points="8,27 32,27 25,37 8,37" fill="url(#tealBlue)" opacity="0.45"/>
+    
+    <text x="42" y="18" fill="#dff8fb" font-size="16" font-weight="800" class="font-sans" letter-spacing="1.5">MEEG</text>
+    <text x="42" y="32" fill="#4f7f92" font-size="8.5" font-weight="700" class="font-mono" letter-spacing="1">PRODUCTIVITY</text>
+  </g>
+
+  <text x="24" y="98" fill="#4f7f92" font-size="8.5" font-weight="700" class="font-mono" letter-spacing="1.5">WORKSPACES</text>
+
+  <!-- Nav Items -->
+  <!-- 1. Dashboard (Active) -->
+  <g transform="translate(14, 115)">
+    <rect width="202" height="36" rx="6" fill="#00e5d4" fill-opacity="0.12" stroke="#00e5d4" stroke-opacity="0.4" stroke-width="1" />
+    <text x="14" y="23" fill="#00e5d4" font-size="12" font-weight="700" class="font-sans">▦ &nbsp; Executive Dashboard</text>
+  </g>
+
+  <!-- 2. Analysis Overview -->
+  <g transform="translate(14, 160)">
+    <rect width="202" height="34" rx="6" fill="transparent" />
+    <text x="14" y="22" fill="#8fc9d6" font-size="11.5" font-weight="600" class="font-sans">◈ &nbsp; Analysis Overview</text>
+  </g>
+
+  <!-- 3. Queues Analysis -->
+  <g transform="translate(14, 202)">
+    <rect width="202" height="34" rx="6" fill="transparent" />
+    <text x="14" y="22" fill="#8fc9d6" font-size="11.5" font-weight="600" class="font-sans">☷ &nbsp; Queues Analysis</text>
+  </g>
+
+  <!-- 4. Performance per Labelers -->
+  <g transform="translate(14, 244)">
+    <rect width="202" height="34" rx="6" fill="transparent" />
+    <text x="14" y="22" fill="#8fc9d6" font-size="11.5" font-weight="600" class="font-sans">▤ &nbsp; Labelers Performance</text>
+  </g>
+
+  <!-- 5. Performance per QTC & Floor -->
+  <g transform="translate(14, 286)">
+    <rect width="202" height="34" rx="6" fill="transparent" />
+    <text x="14" y="22" fill="#8fc9d6" font-size="11.5" font-weight="600" class="font-sans">🏢 &nbsp; QTC &amp; Floor Analysis</text>
+  </g>
+
+  <!-- 6. Daily Report -->
+  <g transform="translate(14, 328)">
+    <rect width="202" height="34" rx="6" fill="transparent" />
+    <text x="14" y="22" fill="#8fc9d6" font-size="11.5" font-weight="600" class="font-sans">▦ &nbsp; Daily Report</text>
+  </g>
+
+  <!-- Sidebar Footer -->
+  <g transform="translate(18, 605)">
+    <line x1="0" y1="0" x2="194" y2="0" stroke="#00e5d4" stroke-opacity="0.15" stroke-width="1" />
+    <text x="0" y="22" fill="#4f7f92" font-size="8.5" class="font-mono">AUTHOR: Islam Yasser</text>
+    <text x="0" y="38" fill="#4f7f92" font-size="8.5" class="font-mono">WFM &amp; Data Analytics Lead</text>
+    <text x="0" y="54" fill="#00e5d4" font-size="8.5" font-weight="700" class="font-mono">METI Company &bull; Internal</text>
+  </g>
+
+  <!-- ========================================================================= -->
+  <!-- TOP HEADER (X: 230 to 1200)                                               -->
+  <!-- ========================================================================= -->
+  <g transform="translate(230, 0)">
+    <rect width="970" height="64" fill="url(#hdrGrad)" stroke="#00e5d4" stroke-opacity="0.15" stroke-width="1" />
+    
+    <!-- Title -->
+    <text x="24" y="32" fill="#dff8fb" font-size="14.5" font-weight="700" class="font-sans">
+      MEEG <tspan fill="#00e5d4">Productivity</tspan> Workspace
+    </text>
+    <text x="24" y="48" fill="#4f7f92" font-size="9.5" font-weight="600" class="font-mono">
+      METI Company &bull; Live Workforce Telemetry &bull; Lidar &amp; Lane Line FP / QA
+    </text>
+
+    <!-- Header Badges -->
+    <g transform="translate(420, 20)">
+      <rect width="95" height="24" rx="4" fill="#091b29" stroke="#00e5d4" stroke-opacity="0.25" stroke-width="1" />
+      <text x="10" y="16" fill="#8fc9d6" font-size="9" font-weight="700" class="font-mono">📊 ALL SHIFTS</text>
+
+      <g transform="translate(105, 0)">
+        <rect width="70" height="24" rx="4" fill="#06261f" stroke="#059669" stroke-width="1" />
+        <circle cx="12" cy="12" r="3.5" fill="#10b981" />
+        <text x="22" y="16" fill="#34d399" font-size="9" font-weight="700" class="font-mono">LIVE</text>
+      </g>
+
+      <g transform="translate(185, 0)">
+        <rect width="115" height="24" rx="4" fill="#091b29" stroke="#00e5d4" stroke-opacity="0.25" stroke-width="1" />
+        <text x="10" y="16" fill="#00e5d4" font-size="9" font-weight="700" class="font-mono">⚡ 14,820 ROWS</text>
+      </g>
+    </g>
+
+    <!-- Header Action Buttons -->
+    <g transform="translate(750, 18)">
+      <rect width="80" height="28" rx="4" fill="#0b1e2e" stroke="#00e5d4" stroke-opacity="0.3" stroke-width="1" />
+      <text x="12" y="18" fill="#8fc9d6" font-size="9.5" font-weight="700" class="font-mono">⚖️ COMPARE</text>
+
+      <rect x="88" y="0" width="60" height="28" rx="4" fill="#00e5d4" fill-opacity="0.15" stroke="#00e5d4" stroke-width="1" />
+      <text x="98" y="18" fill="#00e5d4" font-size="9.5" font-weight="700" class="font-mono">⟳ SYNC</text>
+
+      <rect x="156" y="0" width="54" height="28" rx="4" fill="#0b1e2e" stroke="#00e5d4" stroke-opacity="0.3" stroke-width="1" />
+      <text x="164" y="18" fill="#8fc9d6" font-size="9.5" font-weight="700" class="font-mono">🌙 DK</text>
+    </g>
+  </g>
+
+  <!-- ========================================================================= -->
+  <!-- SHIFT SELECTOR BAR (X: 250, Y: 80)                                        -->
+  <!-- ========================================================================= -->
+  <g transform="translate(254, 78)">
+    <text x="0" y="17" fill="#00e5d4" font-size="10" font-weight="800" class="font-mono" letter-spacing="1">📋 ACTIVE SHIFTS:</text>
+    
+    <g transform="translate(125, 2)" class="font-sans" font-size="9.5" font-weight="700">
+      <!-- Shift 1 Active -->
+      <rect width="90" height="22" rx="4" fill="#1f6feb" stroke="#1f6feb" />
+      <text x="10" y="15" fill="#ffffff">● Over Night</text>
+
+      <g transform="translate(98, 0)">
+        <rect width="85" height="22" rx="4" fill="#091b29" stroke="#00e5d4" stroke-opacity="0.25" />
+        <text x="10" y="15" fill="#8fc9d6">○ O.Night 12H</text>
+      </g>
+
+      <g transform="translate(191, 0)">
+        <rect width="95" height="22" rx="4" fill="#1f6feb" stroke="#1f6feb" />
+        <text x="10" y="15" fill="#ffffff">● Morning 12H</text>
+      </g>
+
+      <g transform="translate(294, 0)">
+        <rect width="65" height="22" rx="4" fill="#091b29" stroke="#00e5d4" stroke-opacity="0.25" />
+        <text x="10" y="15" fill="#8fc9d6">○ Night</text>
+      </g>
+
+      <g transform="translate(367, 0)">
+        <rect width="78" height="22" rx="4" fill="#1f6feb" stroke="#1f6feb" />
+        <text x="10" y="15" fill="#ffffff">● Morning</text>
+      </g>
+
+      <g transform="translate(453, 0)">
+        <rect width="85" height="22" rx="4" fill="#091b29" stroke="#00e5d4" stroke-opacity="0.25" />
+        <text x="10" y="15" fill="#8fc9d6">○ O.Shift(M)</text>
+      </g>
+
+      <g transform="translate(546, 0)">
+        <rect width="85" height="22" rx="4" fill="#091b29" stroke="#00e5d4" stroke-opacity="0.25" />
+        <text x="10" y="15" fill="#8fc9d6">○ O.Shift(N)</text>
+      </g>
+    </g>
+  </g>
+
+  <!-- ========================================================================= -->
+  <!-- 4 EXECUTIVE KPI SUMMARY CARDS (Y: 118)                                    -->
+  <!-- ========================================================================= -->
+  <g transform="translate(254, 118)">
+    
+    <!-- KPI Card 1: Total Submissions -->
+    <g transform="translate(0, 0)">
+      <rect width="216" height="108" rx="8" fill="url(#cardGrad)" stroke="#00e5d4" stroke-opacity="0.3" stroke-width="1.2" filter="url(#cardShadow)" />
+      <text x="16" y="26" fill="#8fc9d6" font-size="10.5" font-weight="700" class="font-sans">TOTAL SUBMISSIONS</text>
+      <text x="16" y="62" fill="#00e5d4" font-size="28" font-weight="800" class="font-mono">14,820</text>
+      <g transform="translate(16, 78)">
+        <rect width="56" height="18" rx="9" fill="#064e3b" />
+        <text x="8" y="13" fill="#34d399" font-size="9" font-weight="700" class="font-mono">+12.4%</text>
+        <text x="64" y="13" fill="#4f7f92" font-size="9" class="font-sans">vs weekly target</text>
+      </g>
+    </g>
+
+    <!-- KPI Card 2: Active Workforce -->
+    <g transform="translate(236, 0)">
+      <rect width="216" height="108" rx="8" fill="url(#cardGrad)" stroke="#1f6feb" stroke-opacity="0.3" stroke-width="1.2" filter="url(#cardShadow)" />
+      <text x="16" y="26" fill="#8fc9d6" font-size="10.5" font-weight="700" class="font-sans">ACTIVE WORKFORCE</text>
+      <text x="16" y="62" fill="#60a5fa" font-size="28" font-weight="800" class="font-mono">186 <tspan font-size="14" fill="#8fc9d6">Labelers</tspan></text>
+      <g transform="translate(16, 78)">
+        <rect width="64" height="18" rx="9" fill="#1e3a8a" />
+        <text x="8" y="13" fill="#93c5fd" font-size="9" font-weight="700" class="font-mono">3 Floors</text>
+        <text x="72" y="13" fill="#4f7f92" font-size="9" class="font-sans">balanced allocation</text>
+      </g>
+    </g>
+
+    <!-- KPI Card 3: Quality Audit Rate -->
+    <g transform="translate(472, 0)">
+      <rect width="216" height="108" rx="8" fill="url(#cardGrad)" stroke="#10b981" stroke-opacity="0.3" stroke-width="1.2" filter="url(#cardShadow)" />
+      <text x="16" y="26" fill="#8fc9d6" font-size="10.5" font-weight="700" class="font-sans">AUDIT QUALITY (QA)</text>
+      <text x="16" y="62" fill="#34d399" font-size="28" font-weight="800" class="font-mono">99.2%</text>
+      <g transform="translate(16, 78)">
+        <rect width="52" height="18" rx="9" fill="#064e3b" />
+        <text x="8" y="13" fill="#34d399" font-size="9" font-weight="700" class="font-mono">0.8%</text>
+        <text x="60" y="13" fill="#4f7f92" font-size="9" class="font-sans">defect rate threshold</text>
+      </g>
+    </g>
+
+    <!-- KPI Card 4: Queue Velocity -->
+    <g transform="translate(708, 0)">
+      <rect width="216" height="108" rx="8" fill="url(#cardGrad)" stroke="#f59e0b" stroke-opacity="0.3" stroke-width="1.2" filter="url(#cardShadow)" />
+      <text x="16" y="26" fill="#8fc9d6" font-size="10.5" font-weight="700" class="font-sans">QUEUE THROUGHPUT</text>
+      <text x="16" y="62" fill="#fbbf24" font-size="28" font-weight="800" class="font-mono">1,240 <tspan font-size="14" fill="#8fc9d6">/hr</tspan></text>
+      <g transform="translate(16, 78)">
+        <rect width="56" height="18" rx="9" fill="#78350f" />
+        <text x="8" y="13" fill="#fde68a" font-size="9" font-weight="700" class="font-mono">OPTIMAL</text>
+        <text x="64" y="13" fill="#4f7f92" font-size="9" class="font-sans">zero SLA bottleneck</text>
+      </g>
+    </g>
+  </g>
+
+  <!-- ========================================================================= -->
+  <!-- MAIN ANALYTICAL PANELS (Y: 246)                                           -->
+  <!-- ========================================================================= -->
+
+  <!-- Panel 1: Throughput Trends & Hourly Telemetry (Left X: 254 to 770) -->
+  <g transform="translate(254, 246)">
+    <rect width="506" height="404" rx="8" fill="url(#cardGrad)" stroke="#00e5d4" stroke-opacity="0.2" stroke-width="1.2" filter="url(#cardShadow)" />
+    
+    <text x="20" y="30" fill="#dff8fb" font-size="13" font-weight="700" class="font-sans">HOURLY SUBMISSION TREND &amp; FORECAST VELOCITY</text>
+    <text x="20" y="48" fill="#4f7f92" font-size="9" class="font-mono">Telemetry across Over Night, Morning &amp; Night shifts</text>
+
+    <!-- Sparkline / Trend SVG Area -->
+    <g transform="translate(20, 70)">
+      <!-- Grid lines -->
+      <line x1="0" y1="40" x2="466" y2="40" stroke="#1e293b" stroke-dasharray="3,3" />
+      <line x1="0" y1="80" x2="466" y2="80" stroke="#1e293b" stroke-dasharray="3,3" />
+      <line x1="0" y1="120" x2="466" y2="120" stroke="#1e293b" stroke-dasharray="3,3" />
+      <line x1="0" y1="160" x2="466" y2="160" stroke="#1e293b" stroke-dasharray="3,3" />
+
+      <!-- Area fill -->
+      <polygon points="0,150 45,130 90,140 135,100 180,85 225,95 270,55 315,45 360,60 405,35 450,25 466,20 466,160 0,160" fill="url(#tealBlue)" opacity="0.15" />
+      
+      <!-- Trendline -->
+      <polyline points="0,150 45,130 90,140 135,100 180,85 225,95 270,55 315,45 360,60 405,35 450,25 466,20" fill="none" stroke="#00e5d4" stroke-width="3" filter="url(#neonGlow)" />
+      
+      <!-- Data points -->
+      <circle cx="270" cy="55" r="4.5" fill="#ffffff" stroke="#00e5d4" stroke-width="2.5" />
+      <circle cx="450" cy="25" r="5" fill="#ffffff" stroke="#1f6feb" stroke-width="3" />
+      <text x="430" y="16" fill="#00e5d4" font-size="10" font-weight="800" class="font-mono">PEAK: 1,840</text>
+    </g>
+
+    <!-- Modality Breakdown Bars -->
+    <g transform="translate(20, 260)">
+      <text x="0" y="0" fill="#8fc9d6" font-size="11" font-weight="700" class="font-sans">DATA MODALITY DISTRIBUTION</text>
+      
+      <!-- Lidar 3D Point Cloud -->
+      <g transform="translate(0, 16)">
+        <text x="0" y="12" fill="#dff8fb" font-size="10" class="font-mono">3D Lidar Point Cloud (FP/QA)</text>
+        <text x="420" y="12" fill="#00e5d4" font-size="10.5" font-weight="800" class="font-mono">9,188 (62%)</text>
+        <rect x="0" y="20" width="466" height="8" rx="4" fill="#0c1e30" />
+        <rect x="0" y="20" width="288" height="8" rx="4" fill="#00e5d4" />
+      </g>
+
+      <!-- Lane Line 2D Segmentation -->
+      <g transform="translate(0, 58)">
+        <text x="0" y="12" fill="#dff8fb" font-size="10" class="font-mono">Lane Line &amp; Free Space 2D</text>
+        <text x="420" y="12" fill="#60a5fa" font-size="10.5" font-weight="800" class="font-mono">5,632 (38%)</text>
+        <rect x="0" y="20" width="466" height="8" rx="4" fill="#0c1e30" />
+        <rect x="0" y="20" width="178" height="8" rx="4" fill="#1f6feb" />
+      </g>
+    </g>
+
+    <!-- Footer Status -->
+    <g transform="translate(20, 375)">
+      <circle cx="6" cy="6" r="4" fill="#10b981" />
+      <text x="18" y="10" fill="#34d399" font-size="9.5" font-weight="700" class="font-mono">REAL-TIME INGESTION ACTIVE &bull; SYNC EVERY 30s</text>
+    </g>
+  </g>
+
+  <!-- Panel 2: Leaderboard & Floor Breakdown (Right X: 780 to 1180) -->
+  <g transform="translate(780, 246)">
+    <rect width="396" height="404" rx="8" fill="url(#cardGrad)" stroke="#1f6feb" stroke-opacity="0.2" stroke-width="1.2" filter="url(#cardShadow)" />
+    
+    <text x="20" y="30" fill="#dff8fb" font-size="13" font-weight="700" class="font-sans">TOP PERFORMERS &bull; QTC &amp; LABELERS</text>
+    <text x="20" y="48" fill="#4f7f92" font-size="9" class="font-mono">Benchmarked by velocity and quality compliance</text>
+
+    <!-- Leaderboard Rows -->
+    <g transform="translate(20, 72)" class="font-mono" font-size="10.5">
+      <!-- Row 1 -->
+      <g transform="translate(0, 0)">
+        <rect width="356" height="36" rx="6" fill="#0a1e30" stroke="#00e5d4" stroke-opacity="0.3" />
+        <text x="12" y="23" fill="#f59e0b" font-weight="800">🥇</text>
+        <text x="36" y="23" fill="#ffffff" font-weight="700">Dina Khaled</text>
+        <text x="165" y="23" fill="#8fc9d6" font-size="9.5">Floor 2 &bull; Morning</text>
+        <text x="295" y="23" fill="#00e5d4" font-weight="800">482 <tspan font-size="8" fill="#4f7f92">tasks</tspan></text>
+      </g>
+
+      <!-- Row 2 -->
+      <g transform="translate(0, 44)">
+        <rect width="356" height="36" rx="6" fill="#071726" />
+        <text x="12" y="23" fill="#94a3b8" font-weight="800">🥈</text>
+        <text x="36" y="23" fill="#ffffff" font-weight="700">Ali Mahmoud</text>
+        <text x="165" y="23" fill="#8fc9d6" font-size="9.5">Floor 1 &bull; O.Night</text>
+        <text x="295" y="23" fill="#00e5d4" font-weight="800">461 <tspan font-size="8" fill="#4f7f92">tasks</tspan></text>
+      </g>
+
+      <!-- Row 3 -->
+      <g transform="translate(0, 88)">
+        <rect width="356" height="36" rx="6" fill="#071726" />
+        <text x="12" y="23" fill="#b45309" font-weight="800">🥉</text>
+        <text x="36" y="23" fill="#ffffff" font-weight="700">Mohamed Hassan</text>
+        <text x="165" y="23" fill="#8fc9d6" font-size="9.5">Floor 3 &bull; Morning</text>
+        <text x="295" y="23" fill="#00e5d4" font-weight="800">438 <tspan font-size="8" fill="#4f7f92">tasks</tspan></text>
+      </g>
+
+      <!-- Row 4 -->
+      <g transform="translate(0, 132)">
+        <rect width="356" height="36" rx="6" fill="#071726" />
+        <text x="14" y="23" fill="#4f7f92" font-weight="700">#4</text>
+        <text x="36" y="23" fill="#ffffff" font-weight="700">Heba Ahmed</text>
+        <text x="165" y="23" fill="#8fc9d6" font-size="9.5">Floor 2 &bull; Night</text>
+        <text x="295" y="23" fill="#00e5d4" font-weight="800">415 <tspan font-size="8" fill="#4f7f92">tasks</tspan></text>
+      </g>
+    </g>
+
+    <!-- Floor Capacity Distribution Widget -->
+    <g transform="translate(20, 260)">
+      <text x="0" y="0" fill="#8fc9d6" font-size="11" font-weight="700" class="font-sans">FLOOR CAPACITY UTILIZATION</text>
+      
+      <g transform="translate(0, 18)" class="font-mono" font-size="10">
+        <!-- Floor 1 -->
+        <rect width="112" height="60" rx="6" fill="#091b29" stroke="#00e5d4" stroke-opacity="0.2" />
+        <text x="12" y="20" fill="#4f7f92">FLOOR 01</text>
+        <text x="12" y="44" fill="#00e5d4" font-size="16" font-weight="800">96.4%</text>
+
+        <!-- Floor 2 -->
+        <g transform="translate(122, 0)">
+          <rect width="112" height="60" rx="6" fill="#091b29" stroke="#1f6feb" stroke-opacity="0.2" />
+          <text x="12" y="20" fill="#4f7f92">FLOOR 02</text>
+          <text x="12" y="44" fill="#60a5fa" font-size="16" font-weight="800">98.8%</text>
+        </g>
+
+        <!-- Floor 3 -->
+        <g transform="translate(244, 0)">
+          <rect width="112" height="60" rx="6" fill="#091b29" stroke="#10b981" stroke-opacity="0.2" />
+          <text x="12" y="20" fill="#4f7f92">FLOOR 03</text>
+          <text x="12" y="44" fill="#34d399" font-size="16" font-weight="800">94.1%</text>
+        </g>
+      </g>
+    </g>
+
+    <!-- Footer Note -->
+    <g transform="translate(20, 375)">
+      <text x="0" y="10" fill="#4f7f92" font-size="9.5" class="font-mono">SOP COMPLIANCE: 100% AUDITED</text>
+    </g>
+  </g>
+</svg>
