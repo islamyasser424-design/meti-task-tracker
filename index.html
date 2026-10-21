@@ -1055,7 +1055,17 @@ input[type=number] { -moz-appearance:textfield }
       </div>
       <span class="topbar-company">Micro Engineering Tech Inc.</span>
     </div>
-    <span class="topbar-time" id="topTime">Loading...</span>
+    <div style="display:flex; align-items:center; gap:8px;">
+      <a href="dashboard.html" class="topbar-admin-btn" style="text-decoration:none;" title="Open Operational Analytics Dashboard">
+        <span>📈</span>
+        <span>Dashboard</span>
+      </a>
+      <button type="button" id="adminBtn" class="topbar-admin-btn" title="Quick Admin / Manage Queues and QTC">
+        <span>⚙️</span>
+        <span>Admin</span>
+      </button>
+      <span class="topbar-time" id="topTime">Loading...</span>
+    </div>
   </div>
 
   <header class="main-header">
@@ -2715,15 +2725,18 @@ if(lastYK) { document.getElementById("yk").value = lastYK; validateYK(lastYK); }
 var _adminUnlocked = false;
 var _adminCachedRows = [];
 
-document.getElementById("adminBtn").addEventListener("click", function() {
-  document.getElementById("adminModal").classList.add("show");
-  if (_adminUnlocked) {
-    loadAdminData();
-  } else {
-    document.getElementById("adminPin").value = "";
-    document.getElementById("adminPin").focus();
-  }
-});
+var _adminBtnEl = document.getElementById("adminBtn");
+if (_adminBtnEl) {
+  _adminBtnEl.addEventListener("click", function() {
+    document.getElementById("adminModal").classList.add("show");
+    if (_adminUnlocked) {
+      loadAdminData();
+    } else {
+      document.getElementById("adminPin").value = "";
+      document.getElementById("adminPin").focus();
+    }
+  });
+}
 
 function closeAdminModal() {
   document.getElementById("adminModal").classList.remove("show");
