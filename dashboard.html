@@ -791,7 +791,7 @@
     <nav class="dash-tabs-bar">
       <button class="dash-tab-btn active" id="tabBtnTelemetry" onclick="switchMainTab('telemetry')">
         <span>📊</span>
-        <span>Task Telemetry & KPIs</span>
+        <span>Task Telemetry</span>
       </button>
       <button class="dash-tab-btn" id="tabBtnQueues" onclick="switchMainTab('queues')">
         <span>🗂️</span>
@@ -813,25 +813,6 @@
     <!-- TAB 1: OPERATIONAL TELEMETRY & KPIS -->
     <!-- ============================================================ -->
     <div id="panelTelemetry">
-      <!-- KPI Summary Cards -->
-      <section class="dash-kpis">
-        <div class="kpi-card">
-          <div class="kpi-val" id="kpiTodayCount">0</div>
-          <div class="kpi-lbl">Tasks Done Today</div>
-        </div>
-        <div class="kpi-card green">
-          <div class="kpi-val" id="kpiTodayObjects">0</div>
-          <div class="kpi-lbl">Objects Today</div>
-        </div>
-        <div class="kpi-card purple">
-          <div class="kpi-val" id="kpiTotalTasks">0</div>
-          <div class="kpi-lbl">Total Tasks (Turso DB)</div>
-        </div>
-        <div class="kpi-card orange">
-          <div class="kpi-val" id="kpiActiveLabelers">0</div>
-          <div class="kpi-lbl">Active Labelers Today</div>
-        </div>
-      </section>
 
       <!-- Filters & Actions Card -->
       <section class="filter-card">
@@ -988,6 +969,7 @@
                 <th>Pass</th>
                 <th>Objects</th>
                 <th>Stage</th>
+                <th id="thTaskAction" style="text-align:center; display:none; width:95px;">Action</th>
               </tr>
             </thead>
             <tbody id="tableBody">
@@ -999,13 +981,13 @@
     </div>
 
     <!-- ============================================================ -->
-    <!-- TAB 2: MANAGE QUEUES (إدارة الكيوهات بدلاً من الشيت) -->
+    <!-- TAB 2: MANAGE QUEUES -->
     <!-- ============================================================ -->
     <div id="panelQueues" style="display:none;">
       <div class="admin-mgmt-card">
         <div class="admin-mgmt-header">
           <div>
-            <div class="admin-mgmt-title">🗂️ Manage Queues (إدارة الكيوهات)</div>
+            <div class="admin-mgmt-title">🗂️ Manage Queues</div>
             <div class="admin-mgmt-desc">Add new queue names or remove existing ones. Any addition immediately appears in the Task Entry form for all labelers in real time!</div>
           </div>
           <button class="btn-action" onclick="loadLiveQueuesAdmin()">🔄 Refresh Queues</button>
@@ -1016,10 +998,7 @@
           <h4>➕ Add New Queue to Turso Database</h4>
           <div style="display:flex; flex-wrap:wrap; gap:12px; align-items:center;">
             <input type="text" id="adminNewQueueName" placeholder="Enter Queue Name (e.g. sc3_full_scene_lanes_3d_v4)" style="flex:2; min-width:280px; padding:10px 14px; border:1.5px solid var(--border); border-radius:6px; font-size:0.9rem;">
-            <label style="display:inline-flex; align-items:center; gap:6px; font-size:0.85rem; font-weight:600; cursor:pointer;">
-              <input type="checkbox" id="adminQueueHighlight">
-              <span>⭐ Highlight in Gold (VIP)</span>
-            </label>
+            <input type="text" id="adminQueueHighlight" class="form-input" placeholder="Highlight tag (e.g. v4, parallel, 3d_only...)" style="flex:1; min-width:180px; padding:10px 14px; border:1.5px solid var(--border); border-radius:6px; font-size:0.85rem;">
             <button class="btn-action" onclick="addNewQueueFromDashboard()">➕ Add Queue</button>
           </div>
           <div id="adminQueueMsg" style="margin-top:8px; font-size:0.8rem; font-weight:600;"></div>
@@ -1050,13 +1029,13 @@
     </div>
 
     <!-- ============================================================ -->
-    <!-- TAB 3: MANAGE QTC NAMES (إدارة مشرفي الـ QTC بدلاً من الشيت) -->
+    <!-- TAB 3: MANAGE QTC NAMES -->
     <!-- ============================================================ -->
     <div id="panelQTC" style="display:none;">
       <div class="admin-mgmt-card">
         <div class="admin-mgmt-header">
           <div>
-            <div class="admin-mgmt-title">👥 Manage QTC Team (إدارة مشرفي الـ QTC)</div>
+            <div class="admin-mgmt-title">👥 Manage QTC Team</div>
             <div class="admin-mgmt-desc">Add new QTC members or remove existing ones by shift. Immediately saves to Turso and appears in the station form card!</div>
           </div>
           <button class="btn-action" onclick="loadLiveQTCAdmin()">🔄 Refresh QTCs</button>
@@ -1137,8 +1116,9 @@
             <input type="password" id="newUserPassword" placeholder="Password" style="flex:1; min-width:120px; padding:9px 12px; border:1.5px solid var(--border); border-radius:6px; font-size:0.85rem;">
             <input type="text" id="newUserFullName" placeholder="Full Name" style="flex:1.5; min-width:150px; padding:9px 12px; border:1.5px solid var(--border); border-radius:6px; font-size:0.85rem;">
             <select id="newUserRole" style="padding:9px 12px; border:1.5px solid var(--border); border-radius:6px; font-size:0.85rem; background:#fff;">
-              <option value="viewer">Viewer (View & Export)</option>
-              <option value="admin">Admin (Full Control)</option>
+              <option value="admin">ADMIN (Full Control + Manage Users + Edit/Delete Data)</option>
+              <option value="sv">SV (View Tasks + Manage Queues & QTC)</option>
+              <option value="qt">QT (View Tasks Only)</option>
             </select>
             <button class="btn-action" onclick="addNewUser()">Create User</button>
           </div>
@@ -1164,6 +1144,58 @@
         </div>
       </div>
     </div>
+
+  <!-- Edit Task Modal (Admin Only) -->
+  <div class="modal-overlay" id="modalEditTask" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.6); backdrop-filter:blur(4px); z-index:9999; align-items:center; justify-content:center; padding:16px;" onclick="if(event.target===this)closeEditTaskModal()">
+    <div style="background:#fff; border-radius:12px; width:100%; max-width:540px; box-shadow:0 20px 40px rgba(0,0,0,0.2); overflow:hidden; border:1px solid var(--border);">
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:14px 20px; background:#f8fafc; border-bottom:1px solid var(--border);">
+        <h3 style="font-size:1rem; color:var(--primary-dark); font-weight:700;">✏️ Edit Task Submission <span id="editTaskModalId" style="color:var(--primary);">#</span></h3>
+        <button type="button" onclick="closeEditTaskModal()" style="background:none; border:none; font-size:1.2rem; cursor:pointer; color:var(--text-secondary);">&times;</button>
+      </div>
+      <div style="padding:20px; display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+        <div>
+          <label style="font-size:0.75rem; font-weight:700; color:var(--text-secondary); display:block; margin-bottom:4px;">Labeler Name</label>
+          <input type="text" id="editTaskLabeler" style="width:100%; padding:8px 12px; border:1.5px solid var(--border); border-radius:6px; font-size:0.85rem;">
+        </div>
+        <div>
+          <label style="font-size:0.75rem; font-weight:700; color:var(--text-secondary); display:block; margin-bottom:4px;">PC No</label>
+          <input type="text" id="editTaskPcNo" style="width:100%; padding:8px 12px; border:1.5px solid var(--border); border-radius:6px; font-size:0.85rem;">
+        </div>
+        <div>
+          <label style="font-size:0.75rem; font-weight:700; color:var(--text-secondary); display:block; margin-bottom:4px;">Pass (FP / QA)</label>
+          <select id="editTaskPass" style="width:100%; padding:8px 12px; border:1.5px solid var(--border); border-radius:6px; font-size:0.85rem; background:#fff;">
+            <option value="FP">FP</option>
+            <option value="QA">QA</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:0.75rem; font-weight:700; color:var(--text-secondary); display:block; margin-bottom:4px;">Object Count</label>
+          <input type="number" id="editTaskObjects" min="0" style="width:100%; padding:8px 12px; border:1.5px solid var(--border); border-radius:6px; font-size:0.85rem;">
+        </div>
+        <div style="grid-column: 1 / -1;">
+          <label style="font-size:0.75rem; font-weight:700; color:var(--text-secondary); display:block; margin-bottom:4px;">Queue Name</label>
+          <input type="text" id="editTaskQueue" style="width:100%; padding:8px 12px; border:1.5px solid var(--border); border-radius:6px; font-size:0.85rem;">
+        </div>
+        <div>
+          <label style="font-size:0.75rem; font-weight:700; color:var(--text-secondary); display:block; margin-bottom:4px;">Modality</label>
+          <select id="editTaskModality" style="width:100%; padding:8px 12px; border:1.5px solid var(--border); border-radius:6px; font-size:0.85rem; background:#fff;">
+            <option value="Lidar">Lidar</option>
+            <option value="Lane Line">Lane Line</option>
+            <option value="Relabeling">Relabeling</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:0.75rem; font-weight:700; color:var(--text-secondary); display:block; margin-bottom:4px;">Stage</label>
+          <input type="text" id="editTaskStage" style="width:100%; padding:8px 12px; border:1.5px solid var(--border); border-radius:6px; font-size:0.85rem;">
+        </div>
+      </div>
+      <div style="display:flex; justify-content:flex-end; gap:10px; padding:14px 20px; background:#f8fafc; border-top:1px solid var(--border);">
+        <button type="button" class="btn-action secondary" onclick="closeEditTaskModal()">Cancel</button>
+        <button type="button" class="btn-action" id="btnSaveTaskEdit" onclick="saveTaskEdit()">💾 Save Changes</button>
+      </div>
+    </div>
+  </div>
+
   </main>
 
   <!-- ============================================================ -->
@@ -1352,6 +1384,14 @@
     // TAB SWITCHER
     // ============================================================
     function switchMainTab(tabName) {
+      var role = (_currentUser && _currentUser.role ? _currentUser.role : "qt").toLowerCase();
+      if (role === "qt" && tabName !== "telemetry") {
+        tabName = "telemetry";
+      }
+      if (role === "sv" && tabName === "users") {
+        tabName = "telemetry";
+      }
+
       _activeTab = tabName;
       document.getElementById("panelTelemetry").style.display = (tabName === "telemetry") ? "block" : "none";
       document.getElementById("panelQueues").style.display = (tabName === "queues") ? "block" : "none";
@@ -1365,7 +1405,7 @@
 
       if (tabName === "queues") loadLiveQueuesAdmin();
       if (tabName === "qtc") loadLiveQTCAdmin();
-      if (tabName === "users") loadUsersList();
+      if (tabName === "users" && role === "admin") loadUsersList();
     }
 
     // ============================================================
@@ -1399,27 +1439,60 @@
       document.getElementById("dashView").style.display = "block";
       document.getElementById("navActions").style.display = "flex";
 
-      document.getElementById("currentUserName").textContent = _currentUser.full_name + " (" + _currentUser.role + ")";
-      if (_currentUser.role === 'admin') {
-        document.getElementById("tabBtnUsers").style.display = "inline-flex";
-      } else {
-        document.getElementById("tabBtnUsers").style.display = "none";
+      var role = (_currentUser && _currentUser.role ? _currentUser.role : "qt").toLowerCase();
+      document.getElementById("currentUserName").textContent = _currentUser.full_name + " (" + role.toUpperCase() + ")";
+
+      var thAction = document.getElementById("thTaskAction");
+      if (thAction) {
+        thAction.style.display = (role === "admin") ? "table-cell" : "none";
+      }
+
+      var btnTelemetry = document.getElementById("tabBtnTelemetry");
+      var btnQueues = document.getElementById("tabBtnQueues");
+      var btnQTC = document.getElementById("tabBtnQTC");
+      var btnUsers = document.getElementById("tabBtnUsers");
+
+      if (role === "admin") {
+        btnTelemetry.style.display = "inline-flex";
+        btnQueues.style.display = "inline-flex";
+        btnQTC.style.display = "inline-flex";
+        btnUsers.style.display = "inline-flex";
+      } else if (role === "sv") {
+        btnTelemetry.style.display = "inline-flex";
+        btnQueues.style.display = "inline-flex";
+        btnQTC.style.display = "inline-flex";
+        btnUsers.style.display = "none";
+      } else { // qt
+        btnTelemetry.style.display = "inline-flex";
+        btnQueues.style.display = "none";
+        btnQTC.style.display = "none";
+        btnUsers.style.display = "none";
       }
 
       loadDropdownMeta();
       fetchLiveData();
 
-      // Switch to initial tab if requested
-      if (initialTab === "queues") {
-        switchMainTab("queues");
-      } else if (initialTab === "qtc") {
-        switchMainTab("qtc");
-      } else if (initialTab === "admin") {
-        switchMainTab("queues");
-      } else if (initialTab === "users" && _currentUser.role === "admin") {
-        switchMainTab("users");
-      } else {
+      // Switch to initial tab if requested and permitted
+      if (role === "qt") {
         switchMainTab("telemetry");
+      } else if (role === "sv") {
+        if (initialTab === "queues" || initialTab === "admin") {
+          switchMainTab("queues");
+        } else if (initialTab === "qtc") {
+          switchMainTab("qtc");
+        } else {
+          switchMainTab("telemetry");
+        }
+      } else { // admin
+        if (initialTab === "queues" || initialTab === "admin") {
+          switchMainTab("queues");
+        } else if (initialTab === "qtc") {
+          switchMainTab("qtc");
+        } else if (initialTab === "users") {
+          switchMainTab("users");
+        } else {
+          switchMainTab("telemetry");
+        }
       }
     }
 
@@ -1511,7 +1584,7 @@
           return {
             id: r[0] ? r[0].value : "",
             name: r[1] ? String(r[1].value) : "",
-            highlight: r[2] ? parseInt(r[2].value, 10) : 0,
+            highlight: r[2] ? String(r[2].value).trim() : "",
             created_at: r[3] ? String(r[3].value) : ""
           };
         });
@@ -1529,21 +1602,46 @@
         return;
       }
 
+      var role = (_currentUser && _currentUser.role ? _currentUser.role : "qt").toLowerCase();
+      var canManage = (role === "admin" || role === "sv");
+
       var html = "";
       list.forEach(function(q, idx) {
-        var hlBadge = q.highlight
-          ? '<span style="color:#d97706; font-weight:700; background:#fef3c7; border:1px solid #fde68a; border-radius:4px; padding:1px 6px;">⭐ VIP</span>'
-          : '<span style="color:var(--text-muted);">Standard</span>';
+        var hlText = (q.highlight && q.highlight !== "0" && q.highlight.toLowerCase() !== "standard") ? q.highlight : "";
+        var hlBadge = hlText
+          ? '<span style="color:#3730a3; font-weight:700; background:#e0e7ff; border:1px solid #c7d2fe; border-radius:6px; padding:2px 8px; font-size:0.75rem;">🏷️ ' + hlText + '</span>'
+          : '<span style="color:var(--text-muted); font-size:0.75rem;">—</span>';
+
+        var editHlBtn = canManage
+          ? ' <button class="btn-action secondary" style="padding:2px 6px; font-size:0.7rem; margin-left:4px;" title="Edit Highlight tag" onclick="editQueueHighlight(' + q.id + ', _adminQueuesCache[' + idx + '].highlight)">✏️</button>'
+          : '';
+
+        var delBtn = canManage
+          ? '<button class="del-btn" onclick="deleteQueueFromDashboard(' + q.id + ')">🗑️ Delete</button>'
+          : '<span style="color:var(--text-muted); font-size:0.75rem;">View Only</span>';
 
         html += '<tr>'
           + '<td style="color:var(--text-muted);">' + (idx + 1) + '</td>'
           + '<td><code style="font-weight:700; color:var(--primary-dark); font-size:0.85rem;">' + q.name + '</code></td>'
-          + '<td>' + hlBadge + '</td>'
+          + '<td>' + hlBadge + editHlBtn + '</td>'
           + '<td style="color:var(--text-secondary); font-size:0.75rem;">' + q.created_at + '</td>'
-          + '<td style="text-align:center;"><button class="del-btn" onclick="deleteQueueFromDashboard(' + q.id + ')">🗑️ Delete</button></td>'
+          + '<td style="text-align:center;">' + delBtn + '</td>'
           + '</tr>';
       });
       tbody.innerHTML = html;
+    }
+
+    function editQueueHighlight(id, currentTag) {
+      var tag = prompt("Enter new highlight tag for this queue (e.g. v4, parallel, 3d_only, etc.):", currentTag || "");
+      if (tag === null) return;
+      tag = tag.trim();
+      tursoQuery("UPDATE custom_queues SET highlight = ? WHERE id = ?;", [tag, id], function(err, res) {
+        if (err) {
+          alert("Failed to update highlight: " + err.message);
+          return;
+        }
+        loadLiveQueuesAdmin();
+      });
     }
 
     function filterQueuesTable() {
@@ -1560,7 +1658,7 @@
       var msg = document.getElementById("adminQueueMsg");
 
       var name = nameIn.value.trim();
-      var hl = hlIn.checked ? 1 : 0;
+      var hl = hlIn.value.trim();
 
       if (!name) {
         msg.style.color = "var(--error)";
@@ -1929,7 +2027,8 @@
     }
 
     function calculateKPIs() {
-      document.getElementById("kpiTotalTasks").textContent = _allSubmissions.length.toLocaleString();
+      var totalEl = document.getElementById("kpiTotalTasks");
+      if (totalEl) totalEl.textContent = _allSubmissions.length.toLocaleString();
 
       var todayCairo = new Date().toLocaleDateString("en-US", { timeZone: "Africa/Cairo" });
       var todayISO = new Date().toISOString().slice(0, 10);
@@ -1938,13 +2037,16 @@
         return r.timestamp.indexOf(todayCairo) > -1 || extractISODate(r) === todayISO;
       });
 
-      document.getElementById("kpiTodayCount").textContent = todayTasks.length.toLocaleString();
+      var todayCountEl = document.getElementById("kpiTodayCount");
+      if (todayCountEl) todayCountEl.textContent = todayTasks.length.toLocaleString();
 
       var todayObjTotal = todayTasks.reduce(function(acc, cur) { return acc + cur.object_count; }, 0);
-      document.getElementById("kpiTodayObjects").textContent = todayObjTotal.toLocaleString();
+      var todayObjEl = document.getElementById("kpiTodayObjects");
+      if (todayObjEl) todayObjEl.textContent = todayObjTotal.toLocaleString();
 
       var labelerSet = new Set(todayTasks.map(function(r) { return r.labeler_name.toLowerCase().trim(); }));
-      document.getElementById("kpiActiveLabelers").textContent = labelerSet.size;
+      var activeLabelersEl = document.getElementById("kpiActiveLabelers");
+      if (activeLabelersEl) activeLabelersEl.textContent = labelerSet.size;
     }
 
     // ============================================================
@@ -2097,8 +2199,16 @@
       var counter = document.getElementById("tableCounterText");
       counter.textContent = "(" + _filteredSubmissions.length.toLocaleString() + " records)";
 
+      var isAdmin = _currentUser && (_currentUser.role === "admin");
+      var thAction = document.getElementById("thTaskAction");
+      if (thAction) {
+        thAction.style.display = isAdmin ? "table-cell" : "none";
+      }
+
+      var totalCols = isAdmin ? 16 : 15;
+
       if (!_filteredSubmissions.length) {
-        tbody.innerHTML = '<tr><td colspan="15" style="text-align:center; padding:32px; color:var(--text-muted);">No records match the selected filters.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="' + totalCols + '" style="text-align:center; padding:32px; color:var(--text-muted);">No records match the selected filters.</td></tr>';
         return;
       }
 
@@ -2112,6 +2222,13 @@
         if (taskDisplay && taskDisplay.length > 28) {
           taskDisplay = taskDisplay.slice(0, 26) + "...";
         }
+
+        var actionCell = isAdmin
+          ? '<td style="text-align:center; white-space:nowrap;">'
+            + '<button class="btn-action secondary" style="padding:2px 7px; font-size:0.72rem; margin-right:4px;" title="Edit Task" onclick="openEditTaskModal(' + r.id + ')">✏️</button>'
+            + '<button class="del-btn" style="padding:2px 7px; font-size:0.72rem;" title="Delete Task" onclick="deleteSubmission(' + r.id + ')">🗑️</button>'
+            + '</td>'
+          : '';
 
         html += '<tr>'
           + '<td style="font-weight:700; color:var(--primary-dark);">#' + r.id + '</td>'
@@ -2129,14 +2246,82 @@
           + '<td>' + passBadge + '</td>'
           + '<td style="font-weight:700; text-align:right;">' + r.object_count + '</td>'
           + '<td>' + (r.stage || "-") + '</td>'
+          + actionCell
           + '</tr>';
       });
 
       if (_filteredSubmissions.length > 1000) {
-        html += '<tr><td colspan="15" style="text-align:center; padding:12px; background:#f7f9fd; color:var(--text-secondary); font-style:italic;">Showing first 1,000 of ' + _filteredSubmissions.length.toLocaleString() + ' records. Export to Excel for the complete dataset.</td></tr>';
+        html += '<tr><td colspan="' + totalCols + '" style="text-align:center; padding:12px; background:#f7f9fd; color:var(--text-secondary); font-style:italic;">Showing first 1,000 of ' + _filteredSubmissions.length.toLocaleString() + ' records. Export to Excel for the complete dataset.</td></tr>';
       }
 
       tbody.innerHTML = html;
+    }
+
+    function deleteSubmission(id) {
+      if (!_currentUser || _currentUser.role !== "admin") {
+        alert("Only Admins can delete tasks.");
+        return;
+      }
+      if (!confirm("Are you sure you want to permanently delete task #" + id + "?")) return;
+      tursoQuery("DELETE FROM task_submissions WHERE id = ?;", [id], function(err, res) {
+        if (err) {
+          alert("Failed to delete task: " + err.message);
+          return;
+        }
+        fetchLiveData();
+      });
+    }
+
+    var _editingTaskId = null;
+    function openEditTaskModal(id) {
+      if (!_currentUser || _currentUser.role !== "admin") {
+        alert("Only Admins can edit tasks.");
+        return;
+      }
+      var task = _allSubmissions.find(function(t) { return t.id == id; });
+      if (!task) return;
+      _editingTaskId = id;
+      document.getElementById("editTaskModalId").textContent = "#" + id;
+      document.getElementById("editTaskLabeler").value = task.labeler_name || "";
+      document.getElementById("editTaskPcNo").value = task.pc_no || "";
+      document.getElementById("editTaskPass").value = (task.pass || "FP").toUpperCase();
+      document.getElementById("editTaskObjects").value = task.object_count || 0;
+      document.getElementById("editTaskQueue").value = task.queue_name || "";
+      document.getElementById("editTaskModality").value = task.modality || "Lane Line";
+      document.getElementById("editTaskStage").value = task.stage || "";
+      document.getElementById("modalEditTask").style.display = "flex";
+    }
+
+    function closeEditTaskModal() {
+      document.getElementById("modalEditTask").style.display = "none";
+      _editingTaskId = null;
+    }
+
+    function saveTaskEdit() {
+      if (!_editingTaskId) return;
+      var btn = document.getElementById("btnSaveTaskEdit");
+      btn.disabled = true;
+      btn.textContent = "Saving...";
+
+      var lab = document.getElementById("editTaskLabeler").value.trim();
+      var pc = document.getElementById("editTaskPcNo").value.trim();
+      var pass = document.getElementById("editTaskPass").value;
+      var obj = parseInt(document.getElementById("editTaskObjects").value, 10) || 0;
+      var qName = document.getElementById("editTaskQueue").value.trim();
+      var mod = document.getElementById("editTaskModality").value;
+      var stage = document.getElementById("editTaskStage").value.trim();
+
+      var sql = "UPDATE task_submissions SET labeler_name = ?, pc_no = ?, pass = ?, object_count = ?, queue_name = ?, modality = ?, stage = ? WHERE id = ?;";
+      tursoQuery(sql, [lab, pc, pass, obj, qName, mod, stage, _editingTaskId], function(err, res) {
+        btn.disabled = false;
+        btn.textContent = "💾 Save Changes";
+        if (err) {
+          alert("Failed to update task: " + err.message);
+          return;
+        }
+        closeEditTaskModal();
+        fetchLiveData();
+      });
     }
 
     // ============================================================
@@ -2356,11 +2541,20 @@
             ? '<span style="font-size:0.7rem; color:var(--text-muted);">(Current)</span>'
             : '<button class="del-btn" onclick="deleteUser(' + uId + ', \'' + uName + '\')">Delete</button>';
 
+          var roleBadge = '<span style="font-weight:700; color:var(--text-secondary);">' + role + '</span>';
+          if (role === 'admin') {
+            roleBadge = '<span style="color:#b91c1c; background:#fee2e2; border:1px solid #fecaca; border-radius:6px; padding:2px 8px; font-size:0.75rem; font-weight:700;">ADMIN</span>';
+          } else if (role === 'sv') {
+            roleBadge = '<span style="color:#047857; background:#d1fae5; border:1px solid #a7f3d0; border-radius:6px; padding:2px 8px; font-size:0.75rem; font-weight:700;">SV</span>';
+          } else if (role === 'qt') {
+            roleBadge = '<span style="color:#1d4ed8; background:#dbeafe; border:1px solid #bfdbfe; border-radius:6px; padding:2px 8px; font-size:0.75rem; font-weight:700;">QT</span>';
+          }
+
           html += '<tr>'
             + '<td>' + (idx + 1) + '</td>'
             + '<td><code>' + uName + '</code></td>'
             + '<td>' + fName + '</td>'
-            + '<td><span style="font-weight:700; color:' + (role === "admin" ? "var(--primary)" : "var(--text-secondary)") + ';">' + role + '</span></td>'
+            + '<td>' + roleBadge + '</td>'
             + '<td style="text-align:center;">' + delBtn + '</td>'
             + '</tr>';
         });
