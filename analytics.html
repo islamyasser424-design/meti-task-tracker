@@ -5,50 +5,81 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>MEEG Productivity</title>
 <meta name="app-version" content="7"/>
-<link rel="icon" type="image/png" href="assets/meeg-logo.png">
+<link rel="icon" type="image/jpeg" href="logo.jpg">
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 54 46'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%2300e5d4'/%3E%3Cstop offset='100%25' stop-color='%230f8fff'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpolygon points='0,4 30,4 21,16 0,16' fill='url(%23g)'/%3E%3Cpolygon points='5,19 35,19 26,31 5,31' fill='url(%23g)'/%3E%3Cpolygon points='10,34 40,34 31,46 10,46' fill='url(%23g)'/%3E%3C/svg%3E"/>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --teal:#0d9488;--blue:#1f6feb;--teal-deep:#0a7568;--blue-deep:#1552b8;
-  --bg-1:#eef3f9;--bg-2:#e7edf6;--bg-3:#f4f7fb;
-  --bg:#eef2f7;
-  --card:rgba(255,255,255,0.86);--elevated:rgba(255,255,255,0.7);
-  --border:rgba(21,82,184,0.22);--border-light:rgba(21,82,184,0.12);
-  --glass:rgba(255,255,255,0.78);--glass-hover:rgba(255,255,255,0.92);
-  --primary:#0d3f66;--primary-light:rgba(13,148,136,0.14);
-  --accent:#1f6feb;--accent-light:rgba(31,111,235,0.12);
-  --success:#0d9488;--warning:#b7791f;--danger:#c4293f;--info:#1f6feb;
-  --cmp-a:#1f6feb;--cmp-b:#0d9488;
-  --text:#0a1e2e;--text-soft:#3c5670;--muted:#6b8299;
-  --font:'Space Grotesk',system-ui,sans-serif;--display:'JetBrains Mono',monospace;--mono:'JetBrains Mono',monospace;
-  --radius:6px;--radius-lg:8px;--radius-xl:10px;
-  --shadow:0 1px 2px rgba(10,30,60,0.06),0 4px 14px rgba(10,30,60,0.06);
-  --shadow-hover:0 2px 4px rgba(10,30,60,0.08),0 8px 22px rgba(10,30,60,0.1);
-  --bevel-hi:rgba(255,255,255,0.9);--bevel-lo:rgba(21,82,184,0.14);
-  --blur:blur(14px);
-  --chrome-grad:linear-gradient(180deg,#ffffff 0%,#f1f6fc 100%);
-  --scrollbar:rgba(21,82,184,0.3);
-  --grid-line:rgba(21,82,184,0.08);
+  --primary: #0d9488;
+  --primary-dark: #0f172a;
+  --primary-light: #14b8a6;
+  --primary-xlight: #f0fdfa;
+  --primary-glow: rgba(20, 184, 166, 0.25);
+  --accent: #0284c7;
+  --accent-light: rgba(2, 132, 199, 0.12);
+  --teal: #0d9488;
+  --teal-deep: #0f766e;
+  --blue: #0284c7;
+  --blue-deep: #0369a1;
+  --bg-1: #f8fafc;
+  --bg-2: #f1f5f9;
+  --bg-3: #ffffff;
+  --bg: #f8fafc;
+  --card: #ffffff;
+  --elevated: #ffffff;
+  --surface: #ffffff;
+  --surface-glass: rgba(255, 255, 255, 0.94);
+  --glass: #ffffff;
+  --glass-hover: #f8fafc;
+  --border: #e2e8f0;
+  --border-light: #f1f5f9;
+  --border-focus: #0d9488;
+  --border-hover: #cbd5e1;
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --info: #0284c7;
+  --cmp-a: #0284c7;
+  --cmp-b: #0d9488;
+  --text: #0f172a;
+  --text-secondary: #475569;
+  --text-soft: #475569;
+  --muted: #94a3b8;
+  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --display: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --mono: 'JetBrains Mono', monospace;
+  --radius: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+  --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.05);
+  --shadow: 0 2px 8px rgba(15, 23, 42, 0.04), 0 1px 2px rgba(15, 23, 42, 0.02);
+  --shadow-hover: 0 8px 24px rgba(15, 23, 42, 0.08);
+  --bevel-hi: rgba(255, 255, 255, 0.9);
+  --bevel-lo: rgba(15, 23, 42, 0.04);
+  --blur: blur(14px);
+  --chrome-grad: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  --scrollbar: rgba(15, 23, 42, 0.15);
+  --grid-line: rgba(15, 23, 42, 0.02);
 }
 html[data-theme="dark"]{
-  --bg-1:#050a10;--bg-2:#060d14;--bg-3:#040910;
-  --bg:#060b12;
-  --card:rgba(8,16,26,0.66);--elevated:rgba(10,20,32,0.6);
-  --border:rgba(0,229,212,0.2);--border-light:rgba(0,229,212,0.1);
-  --glass:rgba(6,12,20,0.62);--glass-hover:rgba(10,20,32,0.82);
-  --primary-light:rgba(0,229,212,0.12);--accent-light:rgba(15,143,255,0.16);
-  --primary:#5cf3e2;
-  --dk-accent:#5cf3e2;
-  --text:#dff8fb;--text-soft:#8fc9d6;--muted:#4f7f92;
-  --shadow:0 0 0 1px rgba(0,229,212,0.06),0 4px 18px rgba(0,0,0,0.5);
-  --shadow-hover:0 0 0 1px rgba(0,229,212,0.14),0 6px 26px rgba(0,0,0,0.6);
-  --bevel-hi:rgba(120,240,230,0.1);--bevel-lo:rgba(0,0,0,0.6);
-  --chrome-grad:linear-gradient(180deg,#081722 0%,#050d15 100%);
-  --scrollbar:rgba(0,229,212,0.3);
-  --grid-line:rgba(0,229,212,0.06);
+  --bg-1:#0f172a;--bg-2:#1e293b;--bg-3:#0f172a;
+  --bg:#0b1120;
+  --card:#1e293b;--elevated:#1e293b;
+  --border:rgba(255,255,255,0.12);--border-light:rgba(255,255,255,0.06);
+  --glass:rgba(30,41,59,0.9);--glass-hover:rgba(30,41,59,0.98);
+  --primary-light:rgba(20,184,166,0.15);--accent-light:rgba(2,132,199,0.18);
+  --primary:#14b8a6;
+  --accent:#38bdf8;
+  --dk-accent:#14b8a6;
+  --text:#f8fafc;--text-soft:#cbd5e1;--muted:#94a3b8;
+  --shadow:0 2px 8px rgba(0,0,0,0.3);
+  --shadow-hover:0 8px 24px rgba(0,0,0,0.4);
+  --bevel-hi:rgba(255,255,255,0.08);--bevel-lo:rgba(0,0,0,0.5);
+  --chrome-grad:linear-gradient(180deg,#1e293b 0%,#0f172a 100%);
+  --scrollbar:rgba(255,255,255,0.2);
+  --grid-line:rgba(255,255,255,0.02);
 }
 html,body{height:100%}
 body{background:var(--bg);background-attachment:fixed;color:var(--text);font-family:var(--font);overflow-x:hidden;min-height:100vh;transition:background .5s,color .3s;position:relative;}
@@ -609,18 +640,63 @@ html[data-theme="dark"] #fg___date .calendar-panel{background:#fff;color:#202124
 <script>
   if (window !== window.top || location.search.includes('embedded=1')) {
     document.documentElement.classList.add('is-embedded');
+    document.documentElement.setAttribute('data-theme', 'light');
+    try { localStorage.setItem('meeg_theme', 'light'); } catch(e){}
   }
 </script>
 <style>
-  html.is-embedded body, body.is-embedded {
+  html.is-embedded, html.is-embedded body, body.is-embedded {
     padding-left: 0 !important;
     background: transparent !important;
+    color: #0f172a !important;
+  }
+  html.is-embedded body::before,
+  html.is-embedded .orb {
+    display: none !important;
   }
   html.is-embedded .ux-sidebar,
   html.is-embedded .ux-mobile,
   html.is-embedded .ux-backdrop,
   html.is-embedded .hdr {
     display: none !important;
+  }
+  html.is-embedded,
+  html.is-embedded[data-theme="dark"],
+  html.is-embedded body,
+  html.is-embedded[data-theme="dark"] body {
+    --primary: #0d9488 !important;
+    --primary-dark: #0f172a !important;
+    --primary-light: #14b8a6 !important;
+    --primary-xlight: #f0fdfa !important;
+    --accent: #0284c7 !important;
+    --accent-light: rgba(2, 132, 199, 0.12) !important;
+    --teal: #0d9488 !important;
+    --teal-deep: #0f766e !important;
+    --blue: #0284c7 !important;
+    --blue-deep: #0369a1 !important;
+    --bg-1: #f8fafc !important;
+    --bg-2: #f1f5f9 !important;
+    --bg-3: #ffffff !important;
+    --bg: #f8fafc !important;
+    --card: #ffffff !important;
+    --elevated: #ffffff !important;
+    --surface: #ffffff !important;
+    --surface-glass: rgba(255, 255, 255, 0.94) !important;
+    --glass: #ffffff !important;
+    --glass-hover: #f8fafc !important;
+    --border: #e2e8f0 !important;
+    --border-light: #f1f5f9 !important;
+    --border-focus: #0d9488 !important;
+    --border-hover: #cbd5e1 !important;
+    --text: #0f172a !important;
+    --text-secondary: #475569 !important;
+    --text-soft: #475569 !important;
+    --muted: #94a3b8 !important;
+    --chrome-grad: #ffffff !important;
+    --shadow: 0 2px 8px rgba(15, 23, 42, 0.04) !important;
+    --grid-line: transparent !important;
+    background: transparent !important;
+    color: #0f172a !important;
   }
 </style>
 </head>
@@ -680,7 +756,7 @@ html[data-theme="dark"] #fg___date .calendar-panel{background:#fff;color:#202124
   <div class="hdr-left">
     <div class="meeg-logo">
       <div class="logo-orb" style="background:#ffffff;padding:2px 6px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;box-shadow:0 2px 10px rgba(0,0,0,0.1);width:auto;height:auto">
-        <img src="assets/meeg-logo.png" alt="MEEG" style="height:28px;object-fit:contain;display:block">
+        <img src="logo.jpg" alt="MEEG" style="height:28px;object-fit:contain;display:block">
       </div>
       <div class="meeg-wordmark"><div class="brand">MEEG</div><div class="sub">METI Company</div></div>
     </div>
@@ -1033,7 +1109,22 @@ function fillWelcome(){
   const l=document.getElementById('swLabel');
   if(l){l.textContent=getUserRole(email);l.style.animationDelay=(1.4+name.length*0.06)+'s';}
 }
-function toggleDark(){const html=document.documentElement;const isDark=html.getAttribute('data-theme')==='dark';const t=isDark?'light':'dark';html.setAttribute('data-theme',t);const btn=document.getElementById('darkBtn');if(btn){btn.classList.toggle('active',t==='dark');btn.innerHTML=t==='dark'?'🌙 Dark':'☀️ Light';}localStorage.setItem('meeg_theme',t);}
+function toggleDark(){
+  if (window !== window.top || location.search.includes('embedded=1')) {
+    document.documentElement.setAttribute('data-theme', 'light');
+    return;
+  }
+  const html=document.documentElement;
+  const isDark=html.getAttribute('data-theme')==='dark';
+  const t=isDark?'light':'dark';
+  html.setAttribute('data-theme',t);
+  const btn=document.getElementById('darkBtn');
+  if(btn){
+    btn.classList.toggle('active',t==='dark');
+    btn.innerHTML=t==='dark'?'🌙 Dark':'☀️ Light';
+  }
+  localStorage.setItem('meeg_theme',t);
+}
 let autoRefreshEnabled=(function(){try{const v=localStorage.getItem('meeg_autorefresh');return v===null?true:v==='1';}catch(e){return true;}})();
 function applyAutoRefreshUI(){const btn=document.getElementById('arBtn');if(!btn)return;btn.classList.toggle('active',autoRefreshEnabled);btn.innerHTML=autoRefreshEnabled?'🔄 Auto':'⏸️ Off';}
 function toggleAutoRefresh(){autoRefreshEnabled=!autoRefreshEnabled;try{localStorage.setItem('meeg_autorefresh',autoRefreshEnabled?'1':'0');}catch(e){}applyAutoRefreshUI();if(autoRefreshEnabled){if(autoRefreshTimer)clearInterval(autoRefreshTimer);autoRefreshTimer=setInterval(loadData,REFRESH_INTERVAL*1000);showToast('⏱️ Auto-refresh ON');}else{if(autoRefreshTimer)clearInterval(autoRefreshTimer);autoRefreshTimer=null;showToast('⏸️ Auto-refresh OFF');}}
@@ -2857,7 +2948,9 @@ function shootWebScrollTop(){
 function startApp(){renderUserChip(false);
   if(!document.getElementById('splash')&&window._splashTpl)document.body.insertAdjacentHTML('afterbegin',window._splashTpl);
   fillWelcome();
-  const savedTheme=localStorage.getItem('meeg_theme')||'light';document.documentElement.setAttribute('data-theme',savedTheme);const btn=document.getElementById('darkBtn');if(btn){btn.classList.toggle('active',savedTheme==='dark');btn.innerHTML=savedTheme==='dark'?'🌙 Dark':'☀️ Light';}applyAutoRefreshUI();hideSplash();loadData();startVersionPolling();fetchQualityData(true);startUsersWatch();
+  const isEmbedded = (window !== window.top || location.search.includes('embedded=1'));
+  const savedTheme = isEmbedded ? 'light' : (localStorage.getItem('meeg_theme') || 'light');
+  document.documentElement.setAttribute('data-theme', savedTheme);const btn=document.getElementById('darkBtn');if(btn){btn.classList.toggle('active',savedTheme==='dark');btn.innerHTML=savedTheme==='dark'?'🌙 Dark':'☀️ Light';}applyAutoRefreshUI();hideSplash();loadData();startVersionPolling();fetchQualityData(true);startUsersWatch();
 }
 window.addEventListener('load',()=>{
   initLoginDodge();

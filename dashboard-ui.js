@@ -265,7 +265,7 @@ function openGuideModal(){
     +'</ul>'
     +'<h4 style="margin:12px 0 6px;color:var(--text)">🚀 Work Modality & Stages</h4>'
     +'<ul style="padding-left:20px;margin:0 0 16px">'
-     +'<li><b style="color:#7258f5">Lidar FP:</b> Modality = Lidar, Pass = First Pass (FP).</li>'
+     +'<li><b style="color:#0d9488">Lidar FP:</b> Modality = Lidar, Pass = First Pass (FP).</li>'
      +'<li><b style="color:#15b8a6">Lidar QA:</b> Modality = Lidar, Pass = Quality Assurance (QA).</li>'
      +'<li><b style="color:#ed9a35">Lane Line FP:</b> Modality = Lane Line, Pass = First Pass (FP).</li>'
      +'<li><b style="color:#e9689e">Lane Line QA:</b> Modality = Lane Line, Pass = Quality Assurance (QA).</li>'
@@ -316,7 +316,7 @@ const performance=document.createElement('section');performance.id='uxPerformanc
 const dailyPage=document.createElement('section');dailyPage.id='uxDaily';dailyPage.hidden=true;document.body.appendChild(dailyPage);
 const queuesPage=document.createElement('section');queuesPage.id='uxQueues';queuesPage.hidden=true;document.body.appendChild(queuesPage);
 const qtcFloorPage=document.createElement('section');qtcFloorPage.id='uxQtcFloor';qtcFloorPage.hidden=true;document.body.appendChild(qtcFloorPage);
-const aside=document.createElement('aside');aside.className='ux-sidebar';aside.setAttribute('aria-label','Main navigation');aside.innerHTML='<div class="ux-brand"><div class="brand-logo-card"><img src="assets/meeg-logo.png" alt="MEEG - Micro Engineering Egypt" class="brand-img"></div><span class="brand-workspace-tag">PRODUCTIVITY WORKSPACE</span></div><small>WORKSPACE</small><button class="ux-nav active" data-page="dashboard">▦ &nbsp; Overview</button><button class="ux-nav" data-page="analysis">◈ &nbsp; Analysis</button><button class="ux-nav" data-page="queues">☷ &nbsp; Queues Analysis</button><button class="ux-nav" data-page="performance">▤ &nbsp; Performance per Labelers</button><button class="ux-nav" data-page="qtcfloor">🏢 &nbsp; Performance per QTC & Floor</button><button class="ux-nav" data-page="daily">▦ &nbsp; Daily Report</button><footer>Connected to your existing data<br><span style="display:block;margin-top:8px">MEEG · Internal Dashboard</span></footer>';
+const aside=document.createElement('aside');aside.className='ux-sidebar';aside.setAttribute('aria-label','Main navigation');aside.innerHTML='<div class="ux-brand"><div class="brand-logo-card"><img src="logo.jpg" alt="MEEG - Micro Engineering Egypt" class="brand-img"></div><span class="brand-workspace-tag">PRODUCTIVITY WORKSPACE</span></div><small>WORKSPACE</small><button class="ux-nav active" data-page="dashboard">▦ &nbsp; Overview</button><button class="ux-nav" data-page="analysis">◈ &nbsp; Analysis</button><button class="ux-nav" data-page="queues">☷ &nbsp; Queues Analysis</button><button class="ux-nav" data-page="performance">▤ &nbsp; Performance per Labelers</button><button class="ux-nav" data-page="qtcfloor">🏢 &nbsp; Performance per QTC & Floor</button><button class="ux-nav" data-page="daily">▦ &nbsp; Daily Report</button><footer>Connected to your existing data<br><span style="display:block;margin-top:8px">MEEG · Internal Dashboard</span></footer>';
 document.body.appendChild(aside);
 const menu=document.createElement('button');menu.className='btn ux-mobile';menu.textContent='☰ Menu';menu.setAttribute('aria-expanded','false');menu.setAttribute('aria-label','Open navigation');document.body.insertBefore(menu,root);
 const backdrop=document.createElement('button');backdrop.className='ux-backdrop';backdrop.setAttribute('aria-label','Close navigation');document.body.appendChild(backdrop);
@@ -426,7 +426,7 @@ function getCategorySummary(rows){
  const idx=name=>hdrs.findIndex(h=>String(h).trim().toLowerCase()===name);
  const ni=idx('national id'),mi=idx('modality'),pi=idx('pass'),li=idx('labeler name'),qi=idx('qtc name');
  const defs=[
-  {key:'lidarFP',label:'Lidar FP',modality:'Lidar',pass:'FP',color:'#7258f5',bg:'rgba(114,88,245,0.12)',icon:'⚡'},
+  {key:'lidarFP',label:'Lidar FP',modality:'Lidar',pass:'FP',color:'#0d9488',bg:'rgba(13,148,136,0.12)',icon:'⚡'},
   {key:'lidarQA',label:'Lidar QA',modality:'Lidar',pass:'QA',color:'#15b8a6',bg:'rgba(21,184,166,0.12)',icon:'✓'},
   {key:'laneFP',label:'Lane Line FP',modality:'Lane Line',pass:'FP',color:'#ed9a35',bg:'rgba(237,154,53,0.12)',icon:'⚡'},
   {key:'laneQA',label:'Lane Line QA',modality:'Lane Line',pass:'QA',color:'#e9689e',bg:'rgba(233,104,158,0.12)',icon:'✓'}
@@ -538,7 +538,7 @@ if(root.hidden)return;
 const rows=rowsInView(),days=daily(rows),last=days.slice(-21),max=Math.max(1,...last.map(p=>p[1]));
 const catSummary=getCategorySummary(rows);
 const metrics=[
- ['Submissions',window._firstDataReady||rawRows.length?catSummary.overall.tasks:null,'Rows matching your current filters. One row counts as one submission.','#7258f5'],
+ ['Submissions',window._firstDataReady||rawRows.length?catSummary.overall.tasks:null,'Rows matching your current filters. One row counts as one submission.','#0d9488'],
  ['Active labelers',window._firstDataReady||rawRows.length?catSummary.overall.uniqueLabelers:uniq(rows,'Labeler Name'),'Distinct labelers in the current selection.','#0a9d8c'],
  ['Avg submit / labeler',window._firstDataReady||rawRows.length?catSummary.overall.avgSubmit:null,'Average submission tasks per unique labeler.','#df8b24'],
  ['Active queues',uniq(rows,'Queue Name'),'Distinct non-empty queues in the current selection.','#df5c99']
@@ -591,10 +591,10 @@ overview.querySelectorAll('.ux-kpi').forEach((kpi, idx) => {
  }
 });
 
-const ovCatDefs = [['Lidar FP','lidarFP','#7258f5'],['Lidar QA','lidarQA','#15b8a6'],['Lane Line FP','laneFP','#ed9a35'],['Lane Line QA','laneQA','#e9689e']];
+const ovCatDefs = [['Lidar FP','lidarFP','#0d9488'],['Lidar QA','lidarQA','#15b8a6'],['Lane Line FP','laneFP','#ed9a35'],['Lane Line QA','laneQA','#e9689e']];
 overview.querySelectorAll('.an-cat-card[data-cat]').forEach(card => {
  const cat = card.dataset.cat;
- const d = ovCatDefs.find(x => x[1] === cat) || ['All Submissions', '', '#7258f5'];
+ const d = ovCatDefs.find(x => x[1] === cat) || ['All Submissions', '', '#0d9488'];
  const m = catSummary ? (cat ? catSummary[cat] : catSummary.overall) : null;
  if (m) {
   MeegTooltip.attach(card, () => ({
@@ -650,7 +650,7 @@ function floorComparisonRows(dimension='unit'){
 }
 
 function addAnalysisCharts(a){
- const defs=[['Lidar FP','lidarFP','#7258f5'],['Lidar QA','lidarQA','#15b8a6'],['Lane Line FP','laneFP','#ed9a35'],['Lane Line QA','laneQA','#e9689e']];
+ const defs=[['Lidar FP','lidarFP','#0d9488'],['Lidar QA','lidarQA','#15b8a6'],['Lane Line FP','laneFP','#ed9a35'],['Lane Line QA','laneQA','#e9689e']];
  const container=document.createElement('div');container.className='an-extra-charts';
  const floorField=hdrs.some(h=>h.trim().toLowerCase()==='floor')?'Floor':'Unit';
  [[floorField,'Floor / Unit','horizontal','unit'],['Qtc Name','QC','vertical','qtc']].forEach(([field,label,layout,key])=>{
@@ -678,7 +678,7 @@ function addAnalysisCharts(a){
    rows: [
     { label: 'Submissions', value: rows.length.toLocaleString(), color: 'var(--accent)' },
     { label: 'Total Unique QTC', value: (qtc ?? 'Unavailable').toLocaleString(), color: '#ed9a35' },
-    { label: 'Lidar FP', value: totals.lidarFP.toLocaleString(), color: '#7258f5' },
+    { label: 'Lidar FP', value: totals.lidarFP.toLocaleString(), color: '#0d9488' },
     { label: 'Lidar QA', value: totals.lidarQA.toLocaleString(), color: '#15b8a6' },
     { label: 'Lane Line FP', value: totals.laneFP.toLocaleString(), color: '#ed9a35' },
     { label: 'Lane Line QA', value: totals.laneQA.toLocaleString(), color: '#e9689e' }
@@ -771,13 +771,13 @@ function renderAnalysis(){
 if(analysis.hidden)return;
  const base=rowsInView(),a=analysisAggregate(base,analysisFilters),catSummary=getCategorySummary(a.selected),labelerMetrics=labelerSubmissionMetrics(a.selected),si=hdrs.findIndex(h=>h.toLowerCase()==='shift');
  const shifts=[...new Set(base.map(r=>si>=0?String(r[si]||'').trim():'').filter(Boolean))].sort();const top=a.points.length?[...a.points].sort((a,b)=>b[1]-a[1])[0]:null;
- const palette=['#7258f5','#15b8a6','#ed9a35','#e9689e','#459ce8','#9ca53c','#b77bdb','#7689a3'];
+ const palette=['#0d9488','#15b8a6','#ed9a35','#e9689e','#459ce8','#9ca53c','#b77bdb','#7689a3'];
  analysis.innerHTML='<div class="ux-overview"><div class="ux-heading"><div><div class="ux-eyebrow">Team output · live insights</div><h2>Analysis Overview</h2><p>Submission trends and shift contribution · one row = one submit</p></div>'+renderHeaderControlsHTML('an')+'</div><div class="ux-panel an-filters"><label>From<input id="anFrom" type="date" value="'+analysisFilters.from+'"></label><label>To<input id="anTo" type="date" value="'+analysisFilters.to+'"></label><label>Modality<select id="anMod"><option value="all">All modalities</option><option value="lane">Lane Line</option></select></label><label>Shift<select id="anShift"><option value="">All shifts</option>'+shifts.map(s=>'<option>'+esc(s)+'</option>').join('')+'</select></label><button class="btn btn-c" id="anApply">Apply filters</button><button class="btn" id="anReset">Reset</button><button class="btn" id="anDashboard">Dashboard filters ↗</button></div><p class="an-context">Uses current dashboard filters'+(activeLoc&&!activeLoc.startsWith('__')?' · '+esc(activeLoc):'')+'. These filters narrow that selection.</p>'
   +renderCategoryCardsHTML(catSummary,analysisFilters.category,'analysis')
   +'<div class="ux-panels"><section class="ux-panel"><div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:12px"><div><h3 style="margin:0 0 4px">Submit by date · Area Trend</h3><p style="margin:0">Hover for details or click a date to filter. Select stage below.</p></div><div class="an-chart-cat-tabs" id="anChartCatTabs">'
    +[
-     {key:'all',label:'All Stages (Total)',color:'#8a6ff7'},
-     {key:'lidarFP',label:'Lidar FP',color:'#7258f5'},
+     {key:'all',label:'All Stages (Total)',color:'#0d9488'},
+     {key:'lidarFP',label:'Lidar FP',color:'#0d9488'},
      {key:'lidarQA',label:'Lidar QA',color:'#15b8a6'},
      {key:'laneFP',label:'Lane Line FP',color:'#ed9a35'},
      {key:'laneQA',label:'Lane Line QA',color:'#e9689e'}
@@ -808,8 +808,8 @@ if(analysis.hidden)return;
  if(!a.points.length)$('anLine').innerHTML='<div class="ux-empty">No valid dates available.</div>';
  else{
  const chartCat=analysisFilters.chartCategory||'all';
-  const catColorMap={all:'#8a6ff7',lidarFP:'#7258f5',lidarQA:'#15b8a6',laneFP:'#ed9a35',laneQA:'#e9689e'};
-  const strokeColor=catColorMap[chartCat]||'#8a6ff7';
+  const catColorMap={all:'#0d9488',lidarFP:'#0d9488',lidarQA:'#15b8a6',laneFP:'#ed9a35',laneQA:'#e9689e'};
+  const strokeColor=catColorMap[chartCat]||'#0d9488';
   let catRows=a.selected;
   if(chartCat!=='all'){
    const mi=hdrs.findIndex(h=>h.toLowerCase()==='modality');
@@ -1546,7 +1546,7 @@ function renderQueuesAnalysis(){
       +'<th data-tip-key="shifts">Shifts</th>'
       +'<th data-tip-key="floors">Floors / Units</th>'
       +'<th data-tip-key="qtcs">QCs / QTCs</th>'
-      +'<th data-sort="lidarFP" class="'+(queuesFilters.sortCol==='lidarFP'?(queuesFilters.sortAsc?' th-sorted-asc':' th-sorted-desc'):'')+'" style="color:#7258f5">Lidar FP'+(queuesFilters.sortCol==='lidarFP'?(queuesFilters.sortAsc?' ▲':' ▼'):' ↕')+'</th>'
+      +'<th data-sort="lidarFP" class="'+(queuesFilters.sortCol==='lidarFP'?(queuesFilters.sortAsc?' th-sorted-asc':' th-sorted-desc'):'')+'" style="color:#0d9488">Lidar FP'+(queuesFilters.sortCol==='lidarFP'?(queuesFilters.sortAsc?' ▲':' ▼'):' ↕')+'</th>'
       +'<th data-sort="lidarQA" class="'+(queuesFilters.sortCol==='lidarQA'?(queuesFilters.sortAsc?' th-sorted-asc':' th-sorted-desc'):'')+'" style="color:#15b8a6">Lidar QA'+(queuesFilters.sortCol==='lidarQA'?(queuesFilters.sortAsc?' ▲':' ▼'):' ↕')+'</th>'
       +'<th data-sort="laneFP" class="'+(queuesFilters.sortCol==='laneFP'?(queuesFilters.sortAsc?' th-sorted-asc':' th-sorted-desc'):'')+'" style="color:#ed9a35">Lane Line FP'+(queuesFilters.sortCol==='laneFP'?(queuesFilters.sortAsc?' ▲':' ▼'):' ↕')+'</th>'
       +'<th data-sort="laneQA" class="'+(queuesFilters.sortCol==='laneQA'?(queuesFilters.sortAsc?' th-sorted-asc':' th-sorted-desc'):'')+'" style="color:#e9689e">Lane Line QA'+(queuesFilters.sortCol==='laneQA'?(queuesFilters.sortAsc?' ▲':' ▼'):' ↕')+'</th>'
@@ -1825,8 +1825,8 @@ function renderQueueTrendChart(containerId, rows){
   sortedDates.forEach(d=>points.push([d,dateMap.get(d)||0]));
  }
 
- const catColorMap={all:'#7258f5',lidarFP:'#7258f5',lidarQA:'#15b8a6',laneFP:'#ed9a35',laneQA:'#e9689e'};
- const strokeColor=catColorMap[queuesChartFilters.stage]||'#7258f5';
+ const catColorMap={all:'#0d9488',lidarFP:'#0d9488',lidarQA:'#15b8a6',laneFP:'#ed9a35',laneQA:'#e9689e'};
+ const strokeColor=catColorMap[queuesChartFilters.stage]||'#0d9488';
 
  const W=760,H=260,L=55,R=20,T=20,B=45;
  const max=Math.max(1,...points.map(p=>p[1]));
@@ -2194,7 +2194,7 @@ function renderQtcFloorPerformance(){
       +'<th data-qf-sort="qtc" class="'+qfSortClass('qtc')+'">QTC Name'+qfSortArrow('qtc')+'</th>'
       +'<th data-qf-sort="floor" class="'+qfSortClass('floor')+'">Floor / Unit'+qfSortArrow('floor')+'</th>'
       +'<th data-qf-tip="shifts">Shifts</th>'
-      +'<th data-qf-sort="lidarFP" class="'+qfSortClass('lidarFP')+'" style="color:#7258f5">Lidar FP'+qfSortArrow('lidarFP')+'</th>'
+      +'<th data-qf-sort="lidarFP" class="'+qfSortClass('lidarFP')+'" style="color:#0d9488">Lidar FP'+qfSortArrow('lidarFP')+'</th>'
       +'<th data-qf-sort="lidarQA" class="'+qfSortClass('lidarQA')+'" style="color:#15b8a6">Lidar QA'+qfSortArrow('lidarQA')+'</th>'
       +'<th data-qf-sort="laneFP" class="'+qfSortClass('laneFP')+'" style="color:#ed9a35">Lane Line FP'+qfSortArrow('laneFP')+'</th>'
       +'<th data-qf-sort="laneQA" class="'+qfSortClass('laneQA')+'" style="color:#e9689e">Lane Line QA'+qfSortArrow('laneQA')+'</th>'
@@ -2245,7 +2245,7 @@ function renderQtcFloorPerformance(){
       +'<th data-floor-sort="floor" class="'+floorSortClass('floor')+'">Floor / Unit / Room'+floorSortArrow('floor')+'</th>'
       +'<th data-floor-tip="shifts">Active Shifts</th>'
       +'<th data-floor-sort="uniqueQtcs" class="'+floorSortClass('uniqueQtcs')+'">Active QTCs'+floorSortArrow('uniqueQtcs')+'</th>'
-      +'<th data-floor-sort="lidarFP" class="'+floorSortClass('lidarFP')+'" style="color:#7258f5">Lidar FP'+floorSortArrow('lidarFP')+'</th>'
+      +'<th data-floor-sort="lidarFP" class="'+floorSortClass('lidarFP')+'" style="color:#0d9488">Lidar FP'+floorSortArrow('lidarFP')+'</th>'
       +'<th data-floor-sort="lidarQA" class="'+floorSortClass('lidarQA')+'" style="color:#15b8a6">Lidar QA'+floorSortArrow('lidarQA')+'</th>'
       +'<th data-floor-sort="laneFP" class="'+floorSortClass('laneFP')+'" style="color:#ed9a35">Lane Line FP'+floorSortArrow('laneFP')+'</th>'
       +'<th data-floor-sort="laneQA" class="'+floorSortClass('laneQA')+'" style="color:#e9689e">Lane Line QA'+floorSortArrow('laneQA')+'</th>'
