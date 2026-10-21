@@ -3002,7 +3002,7 @@ function startApp(){renderUserChip(false);
   document.documentElement.setAttribute('data-theme', savedTheme);const btn=document.getElementById('darkBtn');if(btn){btn.classList.toggle('active',savedTheme==='dark');btn.innerHTML=savedTheme==='dark'?'🌙 Dark':'☀️ Light';}applyAutoRefreshUI();hideSplash();loadData();startVersionPolling();fetchQualityData(true);startUsersWatch();
 }
 window.addEventListener('load',()=>{
-  initLoginDodge();
+  // No independent analytics login: the dashboard owns the sign-in flow.
   const splash=document.getElementById('splash');
   
   let user = null;
@@ -3013,19 +3013,21 @@ window.addEventListener('load',()=>{
 
   const isEmbedded = (window !== window.top || location.search.includes('embedded=1'));
   const userRole = (user && user.role ? user.role : '').toLowerCase();
-  const isAllowedRole = isEmbedded || ['admin', 'sv', 'wla', 'shift sv', 'floor sv', 'training sv', 'traning sv', 'qtc'].includes(userRole);
+  // Embedding is a presentation choice, never an authentication bypass.
+  const isAllowedRole = ['admin', 'sv', 'wla', 'shift sv', 'floor sv', 'training sv', 'traning sv', 'qtc'].includes(userRole);
+  const hasDashboardSession = Boolean(user && user.id && user.username && isAllowedRole);
 
   // Strictly enforce RBAC (allow when embedded inside dashboard or for authorized roles)
-  if (!isEmbedded && (!user || !isAllowedRole)) {
+  if (!hasDashboardSession) {
     if (splash && splash.parentNode) splash.remove();
     const ls = document.getElementById('loginScreen');
     if (ls) ls.remove();
     document.body.innerHTML = `
       <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:100vh; background:#0f172a; color:#f8fafc; font-family:system-ui, -apple-system, sans-serif; text-align:center; padding:24px;">
         <div style="font-size:3.5rem; margin-bottom:16px;">🔒</div>
-        <h2 style="font-size:1.6rem; margin-bottom:10px; font-weight:700; color:#fff;">Access Restricted (Admin Only)</h2>
+        <h2 style="font-size:1.6rem; margin-bottom:10px; font-weight:700; color:#fff;">Dashboard sign-in required</h2>
         <p style="color:#94a3b8; max-width:440px; font-size:0.95rem; line-height:1.6; margin-bottom:24px;">
-          This executive intelligence workspace contains sensitive operational analytics and is restricted exclusively to Administrator accounts.
+          Please sign in through the main MEEG dashboard. Analytics uses the same dashboard session and permissions.
         </p>
         <a href="dashboard.html" style="background:#0d9488; color:#fff; padding:12px 28px; border-radius:8px; text-decoration:none; font-weight:600; font-size:0.95rem; box-shadow:0 4px 14px rgba(13,148,136,0.35); transition:all 0.2s;">
           ⬅ Return to Dashboard
@@ -3044,7 +3046,7 @@ window.addEventListener('load',()=>{
   usersLoaded = true;
 
   const loginScreen = document.getElementById('loginScreen');
-  if (loginScreen) loginScreen.classList.add('hidden');
+  if (loginScreen) loginScreen.remove();
 
   startApp();
 });
