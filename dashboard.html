@@ -1540,7 +1540,7 @@
           + '<td><code style="font-weight:700; color:var(--primary-dark); font-size:0.85rem;">' + q.name + '</code></td>'
           + '<td>' + hlBadge + '</td>'
           + '<td style="color:var(--text-secondary); font-size:0.75rem;">' + q.created_at + '</td>'
-          + '<td style="text-align:center;"><button class="del-btn" onclick="deleteQueueFromDashboard(' + q.id + ', '' + q.name + '')">🗑️ Delete</button></td>'
+          + '<td style="text-align:center;"><button class="del-btn" onclick="deleteQueueFromDashboard(' + q.id + ')">🗑️ Delete</button></td>'
           + '</tr>';
       });
       tbody.innerHTML = html;
@@ -1589,8 +1589,10 @@
       });
     }
 
-    function deleteQueueFromDashboard(id, name) {
-      if (!confirm("Are you sure you want to delete queue: \n" + name + "?")) return;
+    function deleteQueueFromDashboard(id) {
+      var item = _adminQueuesCache.find(function(x) { return x.id == id; });
+      var name = item ? item.name : "ID #" + id;
+      if (!confirm("Are you sure you want to delete queue: " + name + "?")) return;
       tursoQuery("DELETE FROM custom_queues WHERE id = ?;", [id], function(err, res) {
         if (err) {
           alert("Failed to delete queue: " + err.message);
@@ -1659,7 +1661,7 @@
           + '<td style="font-weight:700; color:var(--primary-dark); font-size:0.88rem;">' + m.name + '</td>'
           + '<td><span style="color:var(--primary); font-weight:600;">' + (m.role || "QTC") + '</span></td>'
           + '<td style="color:var(--text-secondary); font-size:0.75rem;">' + m.created_at + '</td>'
-          + '<td style="text-align:center;"><button class="del-btn" onclick="deleteQTCFromDashboard(' + m.id + ', '' + m.name + '')">🗑️ Delete</button></td>'
+          + '<td style="text-align:center;"><button class="del-btn" onclick="deleteQTCFromDashboard(' + m.id + ')">🗑️ Delete</button></td>'
           + '</tr>';
       });
       tbody.innerHTML = html;
@@ -1701,8 +1703,10 @@
       });
     }
 
-    function deleteQTCFromDashboard(id, name) {
-      if (!confirm("Are you sure you want to delete QTC: \n" + name + "?")) return;
+    function deleteQTCFromDashboard(id) {
+      var item = _adminQTCCache.find(function(x) { return x.id == id; });
+      var name = item ? item.name : "ID #" + id;
+      if (!confirm("Are you sure you want to delete QTC: " + name + "?")) return;
       tursoQuery("DELETE FROM custom_qtc WHERE id = ?;", [id], function(err, res) {
         if (err) {
           alert("Failed to delete QTC: " + err.message);
