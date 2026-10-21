@@ -231,12 +231,41 @@ link.click();
 
 ---
 
+## 📂 Repository Structure
+
+```
+meti-task-tracker/
+│
+├── assets/
+│   └── task-tracker-architecture.svg  # Vector architectural pipeline diagram
+│
+├── .github/
+│   └── workflows/
+│       └── sync-sheets.yml            # Automated 15-minute GitHub Actions cron workflow
+│
+├── scripts/
+│   └── sync_sheets.py                 # Resilient Python ETL script for Google Sheets & Turso
+│
+├── .gitignore                         # Standard exclusion rules (OS, IDE, cache files)
+├── .nojekyll                          # Disables Jekyll processing on GitHub Pages
+├── dashboard.html                     # Operational analytics & admin management dashboard
+├── index.html                         # Annotator submission terminal with regex URL parser
+├── logo.jpg                           # Official MEEG / METI corporate identity asset
+├── LICENSE                            # Open-source MIT License
+└── README.md                          # Executive-grade bilingual project documentation
+```
+
+---
+
 ## 👨‍💻 Author & Credits
 
 **Islam Yasser**  
 *Workforce Management & Autonomous Driving Operations Analytics*  
-- **GitHub:** [@islamyasser424-design](https://github.com/islamyasser424-design)  
-- **Project Link:** [https://github.com/islamyasser424-design/meti-task-tracker](https://github.com/islamyasser424-design/meti-task-tracker)
+*Micro Engineering Egypt (MEEG) — A METI Company*  
+
+- **GitHub Profile:** [@islamyasser424-design](https://github.com/islamyasser424-design)  
+- **LinkedIn Profile:** [Islam Yasser](https://www.linkedin.com/in/islam-yasser-55048b378/)  
+- **Project Link:** [https://github.com/islamyasser424-design/meti-task-tracker](https://github.com/islamyasser424-design/meti-task-tracker)  
 
 ---
 
