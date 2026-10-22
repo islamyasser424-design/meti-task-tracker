@@ -1910,3 +1910,94 @@ html[data-theme="dark"] #meegGlobalTooltip .tip-chip {
   padding: 14px 18px;
   font-size: 13px;
 }
+
+
+/* ============================================================
+   3-SHIFT SEPARATION STYLES FOR GM REPORT
+   ============================================================ */
+.gm-shift-overview-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg, 14px);
+  padding: 18px 22px;
+  margin-bottom: 22px;
+  box-shadow: var(--shadow);
+}
+
+.gm-shift-nav-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border);
+}
+
+.gm-shift-jump-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.gm-shift-jump-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  background: var(--bg-3);
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-decoration: none;
+}
+
+.gm-shift-jump-btn:hover {
+  border-color: var(--primary);
+  transform: translateY(-1px);
+}
+
+.gm-shift-jump-btn .jump-count {
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--bg-2);
+  color: var(--text-soft);
+}
+
+.shift-card-on {
+  border-top: 4px solid #8b5cf6 !important;
+}
+
+.shift-card-morning {
+  border-top: 4px solid #0d9488 !important;
+}
+
+.shift-card-night {
+  border-top: 4px solid #ed9a35 !important;
+}
+
+.shift-badge-on {
+  background: rgba(139, 92, 246, 0.16);
+  color: #a78bfa;
+  border: 1px solid rgba(139, 92, 246, 0.35);
+}
+
+.shift-badge-morning {
+  background: rgba(13, 148, 136, 0.16);
+  color: #2dd4bf;
+  border: 1px solid rgba(13, 148, 136, 0.35);
+}
+
+.shift-badge-night {
+  background: rgba(237, 154, 53, 0.16);
+  color: #fbbf24;
+  border: 1px solid rgba(237, 154, 53, 0.35);
+}

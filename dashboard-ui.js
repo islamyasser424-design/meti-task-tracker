@@ -3769,6 +3769,50 @@ function renderQueueTrendChart(containerId, rows){
 // PAGE: GM REPORT (Queue Operations Table matching user sheet)
 // ============================================================
 
+
+function parseTaskHour(ts) {
+  if (!ts) return -1;
+  const s = String(ts).trim();
+  // 12-hour AM/PM: e.g. '10/21/2026, 11:06:49 AM'
+  const ampm = s.match(/(\d{1,2}):\d{2}(?::\d{2})?\s*(AM|PM)/i);
+  if (ampm) {
+    let h = parseInt(ampm[1], 10);
+    const isPM = ampm[2].toUpperCase() === 'PM';
+    if (isPM && h < 12) h += 12;
+    if (!isPM && h === 12) h = 0;
+    return h;
+  }
+  // 24-hour: e.g. '2026-10-21 14:41:37' or '2026-10-21 1:41:37'
+  const m24 = s.match(/(?:\s+|T)(\d{1,2}):(\d{2})/);
+  if (m24) {
+    return parseInt(m24[1], 10);
+  }
+  return -1;
+}
+
+function getTaskShiftCategory(r) {
+  const tsIdx = hdrs ? hdrs.findIndex(h => ['timestamp', 'created at', 'date'].includes(h.toLowerCase())) : -1;
+  const si = hdrs ? hdrs.findIndex(h => h.toLowerCase() === 'shift') : -1;
+
+  const ts = tsIdx >= 0 ? r[tsIdx] : '';
+  const h = parseTaskHour(ts);
+  if (h >= 0) {
+    // 12:00 AM to 8:00 AM (00:00 to 07:59:59)
+    if (h < 8) return 'on';
+    // 8:00 AM to 4:00 PM (08:00 to 15:59:59)
+    if (h < 16) return 'morning';
+    // 4:00 PM to 12:00 AM (16:00 to 23:59:59)
+    return 'night';
+  }
+
+  // Fallback to Shift text if timestamp has no hour
+  const shStr = si >= 0 ? String(r[si] || '').toLowerCase() : '';
+  if (shStr.includes('on') || shStr.includes('over')) return 'on';
+  if (shStr.includes('morn')) return 'morning';
+  if (shStr.includes('night')) return 'night';
+  return 'morning';
+}
+
 function gmQueueReport(rows, universe = rows) {
   const idx = name => hdrs ? hdrs.findIndex(h => h.trim().toLowerCase() === name.toLowerCase()) : -1;
   const qi = idx('Queue Name');
@@ -3857,176 +3901,309 @@ function renderGmReport(){
 
   const baseRows = rowsInView();
   const sourceUniverse = (typeof rawRows !== 'undefined' && rawRows.length) ? rawRows : baseRows;
-  const report = gmQueueReport(baseRows, sourceUniverse);
 
-  // Filter groups
-  let visibleGroups = report.groups;
-
-  // Zero-submissions toggle (hidden by default matching reference image)
-  if (gmReportFilters.hideZero !== false) {
-    visibleGroups = visibleGroups.filter(g => g.fp > 0 || g.qa > 0);
-  }
-
-  // Modality filter
-  if (gmReportFilters.modality && gmReportFilters.modality !== 'all') {
-    if (gmReportFilters.modality === 'relabel') {
-      visibleGroups = visibleGroups.filter(g => g.isRelabel);
-    } else if (gmReportFilters.modality === 'lidar') {
-      visibleGroups = visibleGroups.filter(g => g.mod === 'Lidar' && !g.isRelabel);
-    } else if (gmReportFilters.modality === 'laneline') {
-      visibleGroups = visibleGroups.filter(g => g.mod === 'Lane Line' && !g.isRelabel);
+  // Shift Definitions covering full 24 hours:
+  const SHIFTS_META = [
+    {
+      key: 'on',
+      name: 'ON Report',
+      fullTitle: '1. ON Report — Over Night Shift',
+      timeWindow: '12:00 AM to 8:00 AM (00:00 – 08:00)',
+      icon: '🌙',
+      tone: '#8b5cf6',
+      cardClass: 'shift-card-on',
+      badgeClass: 'shift-badge-on'
+    },
+    {
+      key: 'morning',
+      name: 'Morning Report',
+      fullTitle: '2. Morning Report — Morning Shift',
+      timeWindow: '8:00 AM to 4:00 PM (08:00 – 16:00)',
+      icon: '☀️',
+      tone: '#0d9488',
+      cardClass: 'shift-card-morning',
+      badgeClass: 'shift-badge-morning'
+    },
+    {
+      key: 'night',
+      name: 'Night Report',
+      fullTitle: '3. Night Report — Night Shift',
+      timeWindow: '4:00 PM to 12:00 AM (16:00 – 00:00)',
+      icon: '🌆',
+      tone: '#ed9a35',
+      cardClass: 'shift-card-night',
+      badgeClass: 'shift-badge-night'
     }
-  }
+  ];
 
-  // Search query
+  // Partition rows into 3 non-overlapping shift buckets
+  const shiftRowsMap = { on: [], morning: [], night: [] };
+  baseRows.forEach(r => {
+    const sCat = getTaskShiftCategory(r);
+    if (shiftRowsMap[sCat]) {
+      shiftRowsMap[sCat].push(r);
+    } else {
+      shiftRowsMap.morning.push(r);
+    }
+  });
+
+  // Calculate aggregates for each shift
   const qSearch = (gmReportFilters.query || '').toLowerCase().trim();
-  if (qSearch) {
-    visibleGroups = visibleGroups.filter(g => g.name.toLowerCase().includes(qSearch));
-  }
+  const modFilter = gmReportFilters.modality || 'all';
 
-  // Sort
-  const sortCol = gmReportFilters.sortCol || 'name';
-  const sortAsc = gmReportFilters.sortAsc !== undefined ? gmReportFilters.sortAsc : (sortCol === 'name');
-  visibleGroups.sort((a, b) => {
-    let va = (sortCol === 'name') ? a.name : (sortCol === 'fpLabelers') ? a.fpIds.size : (sortCol === 'fp') ? a.fp : (sortCol === 'qaLabelers') ? a.qaIds.size : a.qa;
-    let vb = (sortCol === 'name') ? b.name : (sortCol === 'fpLabelers') ? b.fpIds.size : (sortCol === 'fp') ? b.fp : (sortCol === 'qaLabelers') ? b.qaIds.size : b.qa;
-    if (typeof va === 'string') return sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
-    va = Number(va) || 0; vb = Number(vb) || 0;
-    return sortAsc ? (va - vb) : (vb - va);
+  const shiftReports = SHIFTS_META.map(meta => {
+    const sRows = shiftRowsMap[meta.key] || [];
+    const rep = gmQueueReport(sRows, sourceUniverse);
+    let groups = rep.groups;
+
+    // Filter zero activity queues (default true)
+    if (gmReportFilters.hideZero !== false) {
+      groups = groups.filter(g => g.fp > 0 || g.qa > 0);
+    }
+
+    // Modality filter
+    if (modFilter !== 'all') {
+      if (modFilter === 'relabel') {
+        groups = groups.filter(g => g.isRelabel);
+      } else if (modFilter === 'lidar') {
+        groups = groups.filter(g => g.mod === 'Lidar' && !g.isRelabel);
+      } else if (modFilter === 'laneline') {
+        groups = groups.filter(g => g.mod === 'Lane Line' && !g.isRelabel);
+      }
+    }
+
+    // Search query filter
+    if (qSearch) {
+      groups = groups.filter(g => g.name.toLowerCase().includes(qSearch));
+    }
+
+    // Sorting
+    const sortCol = gmReportFilters.sortCol || 'name';
+    const sortAsc = gmReportFilters.sortAsc !== undefined ? gmReportFilters.sortAsc : (sortCol === 'name');
+    groups.sort((a, b) => {
+      let va = (sortCol === 'name') ? a.name : (sortCol === 'fpLabelers') ? a.fpIds.size : (sortCol === 'fp') ? a.fp : (sortCol === 'qaLabelers') ? a.qaIds.size : a.qa;
+      let vb = (sortCol === 'name') ? b.name : (sortCol === 'fpLabelers') ? b.fpIds.size : (sortCol === 'fp') ? b.fp : (sortCol === 'qaLabelers') ? b.qaIds.size : b.qa;
+      if (typeof va === 'string') return sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
+      va = Number(va) || 0; vb = Number(vb) || 0;
+      return sortAsc ? (va - vb) : (vb - va);
+    });
+
+    let totalFp = 0, totalQa = 0, missing = 0;
+    const fpIds = new Set(), qaIds = new Set();
+    groups.forEach(g => {
+      totalFp += g.fp;
+      totalQa += g.qa;
+      g.fpIds.forEach(id => fpIds.add(id));
+      g.qaIds.forEach(id => qaIds.add(id));
+      missing += g.missing;
+    });
+
+    return {
+      meta,
+      rowsCount: sRows.length,
+      groups,
+      totalFp,
+      totalQa,
+      totalSubmits: totalFp + totalQa,
+      uniqueFp: fpIds.size,
+      uniqueQa: qaIds.size,
+      missing
+    };
   });
 
-  // Calculate grand totals across visible queues
-  let grandTotalFp = 0;
-  let grandTotalQa = 0;
-  const grandFpIds = new Set();
-  const grandQaIds = new Set();
-  let totalMissing = 0;
-
-  visibleGroups.forEach(g => {
-    grandTotalFp += g.fp;
-    grandTotalQa += g.qa;
-    g.fpIds.forEach(id => grandFpIds.add(id));
-    g.qaIds.forEach(id => grandQaIds.add(id));
-    totalMissing += g.missing;
-  });
-
+  // Grand totals across all 24 hours
+  const grand24hSubmits = baseRows.length;
   const activeDateDisplay = globalUnifiedFilters.date 
-    ? globalUnifiedFilters.date 
+    ? ('📅 يوم: ' + globalUnifiedFilters.date)
     : (globalUnifiedFilters.from && globalUnifiedFilters.to)
-      ? (globalUnifiedFilters.from + ' → ' + globalUnifiedFilters.to)
-      : (cairoToday() + ' (All Dates)');
+      ? ('📅 فترة: ' + globalUnifiedFilters.from + ' → ' + globalUnifiedFilters.to)
+      : ('📅 كافة الأيام المتاحة (All-time: ' + cairoToday() + ')');
 
   page.innerHTML = `
     <div class="ux-overview">
       <div class="ux-heading">
         <div>
-          <div class="ux-eyebrow">Queue activity · FP / QA</div>
-          <h2>📊 GM Report — Daily Queue Activity</h2>
-          <p>${esc(activeDateDisplay)}</p>
+          <div class="ux-eyebrow">24-Hour Operational Diagnostics · 3 Sequential Shift Reports</div>
+          <h2>📊 GM Report — 3 Shift Daily Activity</h2>
+          <p>${esc(activeDateDisplay)} · مقسمة زمنياً بنظام 24 ساعة (ON · Morning · Night)</p>
         </div>
         <div class="ux-tools">
           ${renderHeaderControlsHTML('gm')}
-          <button class="btn btn-c" id="gmExportCsvBtn" title="Export GM Report to CSV">↓ Export CSV</button>
+          <button class="btn btn-c" id="gmExportAllCsvBtn" title="Export complete 24H 3-shift data to CSV">↓ Export 24H GM CSV</button>
         </div>
       </div>
 
       ${renderUniversalFilterBar('gm_report')}
 
-      <!-- Main Queue Daily Summary Card (Matching Reference UI) -->
-      <section class="daily-queue-card">
-        <div class="daily-queue-card-head">
+      <!-- 24H Consolidated Summary & Quick Shift Jump Bar -->
+      <div class="gm-shift-overview-card">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:14px; margin-bottom:12px;">
           <div>
-            <h3>Queue daily summary</h3>
-            <p>Unique Labelers use valid National Id, once per Queue + Modality + Pass. Queues with zero FP and QA submissions are hidden.</p>
+            <h3 style="margin:0 0 4px; font-size:16px; font-weight:700; color:var(--text); display:flex; align-items:center; gap:8px;">
+              <span>⏱️</span> 24-Hour Operational Summary (إجمالي اليوم بالكامل)
+            </h3>
+            <p style="margin:0; font-size:12px; color:var(--text-soft);">
+              إجمالي تسليمات اليوم: <b style="color:var(--primary); font-size:14px;">${grand24hSubmits.toLocaleString()}</b> مهمة مسجلة موزعة على الـ 3 شيفتات بالتساوي (8 ساعات لكل شيفت).
+            </p>
           </div>
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <label style="font-size: 12px; color: var(--text-soft); display: flex; align-items: center; gap: 6px; cursor: pointer;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <label style="font-size:12px; color:var(--text-soft); display:flex; align-items:center; gap:6px; cursor:pointer;">
               <input type="checkbox" id="gmHideZeroToggle" ${gmReportFilters.hideZero !== false ? 'checked' : ''}>
-              إخفاء الكيوهات الصفرية (Hide zero activity)
+              إخفاء الكيوهات الصفرية في الجداول
             </label>
           </div>
         </div>
 
-        <!-- Filter Toolbar -->
-        <div class="daily-toolbar-row">
+        <!-- 3 Shifts Metric Distribution Pills -->
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(230px, 1fr)); gap:12px; margin-top:14px;">
+          ${shiftReports.map(rep => {
+            const share = grand24hSubmits > 0 ? ((rep.totalSubmits / grand24hSubmits) * 100).toFixed(1) : 0;
+            return `
+              <div class="ux-panel" style="padding:12px 16px; border-left:4px solid ${rep.meta.tone}; background:var(--bg-2);">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                  <span style="font-size:13px; font-weight:700; color:${rep.meta.tone};">${rep.meta.icon} ${rep.meta.name}</span>
+                  <span class="q-badge" style="background:${rep.meta.tone}22; color:${rep.meta.tone}; font-weight:700;">${share}% share</span>
+                </div>
+                <div style="font-size:20px; font-weight:800; color:var(--text); margin-bottom:4px;">
+                  ${rep.totalSubmits.toLocaleString()} <span style="font-size:11px; font-weight:500; color:var(--text-soft);">tasks</span>
+                </div>
+                <div style="font-size:11px; color:var(--text-soft); display:flex; justify-content:space-between;">
+                  <span>FP: <b>${rep.totalFp.toLocaleString()}</b></span>
+                  <span>QA: <b>${rep.totalQa.toLocaleString()}</b></span>
+                  <span>Queues: <b>${rep.groups.length}</b></span>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+
+        <!-- Toolbar for Real-time Searching & Modality Filter across all 3 tables -->
+        <div class="daily-toolbar-row" style="margin-top:16px;">
           <div class="daily-search-box">
-            <input type="text" id="gmSearchInput" class="daily-search-input" placeholder="🔍 Search queue name..." value="${esc(gmReportFilters.query || '')}">
+            <input type="text" id="gmSearchInput" class="daily-search-input" placeholder="🔍 Search queue name across all 3 reports..." value="${esc(gmReportFilters.query || '')}">
           </div>
           <div class="daily-mod-pills">
-            <button type="button" class="daily-pill-btn ${(!gmReportFilters.modality || gmReportFilters.modality === 'all') ? 'active' : ''}" data-gm-mod="all">All Queues (${visibleGroups.length})</button>
+            <button type="button" class="daily-pill-btn ${(!gmReportFilters.modality || gmReportFilters.modality === 'all') ? 'active' : ''}" data-gm-mod="all">All Modalities</button>
             <button type="button" class="daily-pill-btn ${gmReportFilters.modality === 'lidar' ? 'active' : ''}" data-gm-mod="lidar">📡 Lidar</button>
             <button type="button" class="daily-pill-btn ${gmReportFilters.modality === 'laneline' ? 'active' : ''}" data-gm-mod="laneline">🛣️ Lane Line</button>
             <button type="button" class="daily-pill-btn ${gmReportFilters.modality === 'relabel' ? 'active' : ''}" data-gm-mod="relabel">🔄 Relabeling</button>
           </div>
         </div>
 
-        <!-- Table matching screenshot exactly -->
-        <div class="daily-table-wrap">
-          <table class="daily-queue-table">
-            <thead>
-              <tr>
-                <th class="sortable" data-sort="name">QUEUE ${sortCol==='name'?(sortAsc?'▲':'▼'):''}</th>
-                <th class="sortable" data-sort="fpLabelers">UNIQUE LABELERS (FP) ${sortCol==='fpLabelers'?(sortAsc?'▲':'▼'):''}</th>
-                <th class="sortable" data-sort="fp">TOTAL SUBMIT (FP) ${sortCol==='fp'?(sortAsc?'▲':'▼'):''}</th>
-                <th class="sortable" data-sort="qaLabelers">UNIQUE LABELERS (QA) ${sortCol==='qaLabelers'?(sortAsc?'▲':'▼'):''}</th>
-                <th class="sortable" data-sort="qa">TOTAL SUBMIT (QA) ${sortCol==='qa'?(sortAsc?'▲':'▼'):''}</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${visibleGroups.map(g => {
-                let badges = '';
-                if (g.isRelabel) {
-                  badges += '<span class="daily-mod daily-relabel">(Relabeling)</span> ';
-                }
-                if (g.mod === 'Lidar') {
-                  badges += '<span class="daily-mod daily-lidar">(Lidar)</span>';
-                } else if (g.mod === 'Lane Line') {
-                  badges += '<span class="daily-mod daily-lane">(Lane Line)</span>';
-                } else if (g.mod && g.mod !== 'Unspecified') {
-                  badges += '<span class="daily-mod daily-lidar">(' + esc(g.mod) + ')</span>';
-                }
-
-                return `
-                  <tr class="daily-queue-row">
-                    <td class="daily-queue-cell">
-                      <span class="daily-queue-name">${esc(g.name)}</span>
-                      ${badges}
-                    </td>
-                    <td class="daily-num-cell">${g.fpIds.size.toLocaleString()}</td>
-                    <td class="daily-num-cell highlight-fp">${g.fp.toLocaleString()}</td>
-                    <td class="daily-num-cell">${g.qaIds.size.toLocaleString()}</td>
-                    <td class="daily-num-cell highlight-qa">${g.qa.toLocaleString()}</td>
-                  </tr>
-                `;
-              }).join('')}
-              ${!visibleGroups.length ? '<tr><td colspan="5" class="ux-empty" style="text-align:center; padding:36px;">No queue submissions match the current filters.</td></tr>' : ''}
-            </tbody>
-            <tfoot>
-              <tr class="daily-total-row">
-                <td style="padding:14px 18px; font-weight:800; color:var(--text);">
-                  TOTAL (${visibleGroups.length} queues):
-                </td>
-                <td class="daily-num-cell"><b>${grandFpIds.size.toLocaleString()}</b></td>
-                <td class="daily-num-cell highlight-fp"><b>${grandTotalFp.toLocaleString()}</b></td>
-                <td class="daily-num-cell"><b>${grandQaIds.size.toLocaleString()}</b></td>
-                <td class="daily-num-cell highlight-qa"><b>${grandTotalQa.toLocaleString()}</b></td>
-              </tr>
-            </tfoot>
-          </table>
+        <!-- Quick Jump Navigation -->
+        <div class="gm-shift-nav-bar">
+          <span style="font-size:11.5px; font-weight:700; color:var(--muted);">الانتقال المباشر للتقرير:</span>
+          <div class="gm-shift-jump-group">
+            ${shiftReports.map(rep => `
+              <a href="#gmShiftSec_${rep.meta.key}" class="gm-shift-jump-btn">
+                <span>${rep.meta.icon} ${rep.meta.name}</span>
+                <span class="jump-count">${rep.totalSubmits.toLocaleString()}</span>
+              </a>
+            `).join('')}
+          </div>
         </div>
+      </div>
 
-        <p class="an-context" style="margin-top:14px; font-size:11px; color:var(--muted);">
-          ${totalMissing > 0 ? (totalMissing + ' FP/QA entries have missing or non-standard National ID; included in submit totals, de-duplicated by name. ') : ''}
-          Unique Labelers use valid National Id, once per Queue + Modality + Pass. Queues with zero FP and QA submissions are hidden.
-        </p>
-      </section>
+      <!-- ============================================================ -->
+      <!-- 3 INDEPENDENT SHIFT REPORTS (STACKED VERTICALLY) -->
+      <!-- ============================================================ -->
+      ${shiftReports.map(rep => {
+        const sortCol = gmReportFilters.sortCol || 'name';
+        const sortAsc = gmReportFilters.sortAsc !== undefined ? gmReportFilters.sortAsc : (sortCol === 'name');
+
+        return `
+          <section class="daily-queue-card ${rep.meta.cardClass}" id="gmShiftSec_${rep.meta.key}" style="margin-bottom:28px;">
+            <div class="daily-queue-card-head">
+              <div>
+                <h3>
+                  <span>${rep.meta.icon}</span>
+                  <span style="color:${rep.meta.tone};">${rep.meta.fullTitle}</span>
+                  <span class="daily-mod ${rep.meta.badgeClass}">${rep.meta.timeWindow}</span>
+                </h3>
+                <p>
+                  تقرير تفصيلي لإنتاجية الكيوهات الخاصة بفترة الشيفت (${rep.meta.timeWindow}). الكيوهات بدون تسليمات خلال هذه الفترة يتم استبعادها تلقائياً.
+                </p>
+              </div>
+              <div style="display:flex; align-items:center; gap:8px;">
+                <button class="btn btn-sm btn-c" data-export-shift="${rep.meta.key}">↓ Export ${rep.meta.name} CSV</button>
+              </div>
+            </div>
+
+            <!-- Table Matching Reference Screenshot Exactly -->
+            <div class="daily-table-wrap">
+              <table class="daily-queue-table">
+                <thead>
+                  <tr>
+                    <th class="sortable" data-sort="name">QUEUE ${sortCol==='name'?(sortAsc?'▲':'▼'):''}</th>
+                    <th class="sortable" data-sort="fpLabelers">UNIQUE LABELERS (FP) ${sortCol==='fpLabelers'?(sortAsc?'▲':'▼'):''}</th>
+                    <th class="sortable" data-sort="fp">TOTAL SUBMIT (FP) ${sortCol==='fp'?(sortAsc?'▲':'▼'):''}</th>
+                    <th class="sortable" data-sort="qaLabelers">UNIQUE LABELERS (QA) ${sortCol==='qaLabelers'?(sortAsc?'▲':'▼'):''}</th>
+                    <th class="sortable" data-sort="qa">TOTAL SUBMIT (QA) ${sortCol==='qa'?(sortAsc?'▲':'▼'):''}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${rep.groups.map(g => {
+                    let badges = '';
+                    if (g.isRelabel) {
+                      badges += '<span class="daily-mod daily-relabel">(Relabeling)</span> ';
+                    }
+                    if (g.mod === 'Lidar') {
+                      badges += '<span class="daily-mod daily-lidar">(Lidar)</span>';
+                    } else if (g.mod === 'Lane Line') {
+                      badges += '<span class="daily-mod daily-lane">(Lane Line)</span>';
+                    } else if (g.mod && g.mod !== 'Unspecified') {
+                      badges += '<span class="daily-mod daily-lidar">(' + esc(g.mod) + ')</span>';
+                    }
+
+                    return `
+                      <tr class="daily-queue-row">
+                        <td class="daily-queue-cell">
+                          <span class="daily-queue-name">${esc(g.name)}</span>
+                          ${badges}
+                        </td>
+                        <td class="daily-num-cell">${g.fpIds.size.toLocaleString()}</td>
+                        <td class="daily-num-cell highlight-fp">${g.fp.toLocaleString()}</td>
+                        <td class="daily-num-cell">${g.qaIds.size.toLocaleString()}</td>
+                        <td class="daily-num-cell highlight-qa">${g.qa.toLocaleString()}</td>
+                      </tr>
+                    `;
+                  }).join('')}
+                  ${!rep.groups.length ? `
+                    <tr>
+                      <td colspan="5" class="ux-empty" style="text-align:center; padding:32px; color:var(--muted);">
+                        لا توجد تسليمات مسجلة في هذا الكيو خلال فترة ${rep.meta.name} (${rep.meta.timeWindow}).
+                      </td>
+                    </tr>
+                  ` : ''}
+                </tbody>
+                <tfoot>
+                  <tr class="daily-total-row">
+                    <td style="padding:14px 18px; font-weight:800; color:var(--text);">
+                      TOTAL ${rep.meta.name} (${rep.groups.length} active queues):
+                    </td>
+                    <td class="daily-num-cell"><b>${rep.uniqueFp.toLocaleString()}</b></td>
+                    <td class="daily-num-cell highlight-fp"><b>${rep.totalFp.toLocaleString()}</b></td>
+                    <td class="daily-num-cell"><b>${rep.uniqueQa.toLocaleString()}</b></td>
+                    <td class="daily-num-cell highlight-qa"><b>${rep.totalQa.toLocaleString()}</b></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+
+            <p class="an-context" style="margin-top:12px; font-size:11px; color:var(--muted);">
+              ${rep.missing > 0 ? (rep.missing + ' FP/QA entries de-duplicated by name. ') : ''}
+              Unique Labelers use valid National Id, once per Queue + Modality + Pass. Period: ${rep.meta.timeWindow}.
+            </p>
+          </section>
+        `;
+      }).join('')}
     </div>
   `;
 
   bindHeaderControls(page, 'gm');
   bindUniversalFilterBar(page, 'gm_report');
 
-  // Search input binding
+  // Search input binding across reports
   const searchInput = page.querySelector('#gmSearchInput');
   if (searchInput) {
     searchInput.oninput = (e) => {
@@ -4071,20 +4248,22 @@ function renderGmReport(){
     };
   });
 
-  // Export CSV binding
-  const exportBtn = page.querySelector('#gmExportCsvBtn');
-  if (exportBtn) {
-    exportBtn.onclick = () => {
-      if (!visibleGroups.length) {
-        showToast('No queue rows to export');
+  // Export Individual Shift CSV
+  page.querySelectorAll('[data-export-shift]').forEach(btn => {
+    btn.onclick = () => {
+      const sKey = btn.dataset.exportShift;
+      const rep = shiftReports.find(r => r.meta.key === sKey);
+      if (!rep || !rep.groups.length) {
+        showToast('No queue rows to export for ' + sKey);
         return;
       }
       const cell = v => '"' + String(v ?? '').replace(/^[=+@\-\t\r]/, "'$&").replace(/"/g, '""') + '"';
-      const csvHeaders = ['Queue Name', 'Modality', 'Is Relabeling', 'Unique Labelers (FP)', 'Total Submit (FP)', 'Unique Labelers (QA)', 'Total Submit (QA)', 'Total Submissions'];
-      const csvRows = visibleGroups.map(g => [
+      const csvHeaders = ['Queue Name', 'Modality', 'Is Relabeling', 'Shift Window', 'Unique Labelers (FP)', 'Total Submit (FP)', 'Unique Labelers (QA)', 'Total Submit (QA)', 'Total Submissions'];
+      const csvRows = rep.groups.map(g => [
         g.name,
         g.mod,
         g.isRelabel ? 'Yes' : 'No',
+        rep.meta.timeWindow,
         g.fpIds.size,
         g.fp,
         g.qaIds.size,
@@ -4092,8 +4271,41 @@ function renderGmReport(){
         g.fp + g.qa
       ]);
       const csvContent = [csvHeaders, ...csvRows].map(r => r.map(cell).join(',')).join('\r\n');
-      downloadBlob(new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8' }), 'MEEG_GM_Queue_Report_' + cairoToday() + '.csv');
-      showToast('✓ GM Report exported to CSV');
+      downloadBlob(new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8' }), 'MEEG_GM_' + rep.meta.name.replace(/\s+/g, '_') + '_' + cairoToday() + '.csv');
+      showToast('✓ ' + rep.meta.name + ' exported to CSV');
+    };
+  });
+
+  // Export Full 24H GM CSV
+  const exportAllBtn = page.querySelector('#gmExportAllCsvBtn');
+  if (exportAllBtn) {
+    exportAllBtn.onclick = () => {
+      const cell = v => '"' + String(v ?? '').replace(/^[=+@\-\t\r]/, "'$&").replace(/"/g, '""') + '"';
+      const csvHeaders = ['Shift Report', 'Time Window', 'Queue Name', 'Modality', 'Is Relabeling', 'Unique Labelers (FP)', 'Total Submit (FP)', 'Unique Labelers (QA)', 'Total Submit (QA)', 'Total Submissions'];
+      const allRows = [];
+      shiftReports.forEach(rep => {
+        rep.groups.forEach(g => {
+          allRows.push([
+            rep.meta.name,
+            rep.meta.timeWindow,
+            g.name,
+            g.mod,
+            g.isRelabel ? 'Yes' : 'No',
+            g.fpIds.size,
+            g.fp,
+            g.qaIds.size,
+            g.qa,
+            g.fp + g.qa
+          ]);
+        });
+      });
+      if (!allRows.length) {
+        showToast('No queue rows to export');
+        return;
+      }
+      const csvContent = [csvHeaders, ...allRows].map(r => r.map(cell).join(',')).join('\r\n');
+      downloadBlob(new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8' }), 'MEEG_GM_24H_3Shifts_Report_' + cairoToday() + '.csv');
+      showToast('✓ Full 24-Hour 3-Shift GM Report exported to CSV');
     };
   }
 }
