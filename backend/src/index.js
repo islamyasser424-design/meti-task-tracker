@@ -799,12 +799,57 @@ export default {
       }
 
       // ------------------------------------------------------------
-      // ANALYTICS DATASET (Masked by default, Admin gets full National IDs)
+      // ANALYTICS DATASET & SERVER-SIDE OVERVIEW (Turso Backed)
       // ------------------------------------------------------------
+      if (pathname === "/api/analytics/overview" && request.method === "GET") {
+        const stats = await db(
+          env,
+          `SELECT 
+             COUNT(*) AS total_tasks,
+             COUNT(DISTINCT labeler_name) AS total_labelers,
+             COUNT(DISTINCT qtc_name) AS total_qtc,
+             COUNT(DISTINCT queue_name) AS total_queues,
+             COUNT(DISTINCT unit) AS total_units,
+             SUM(CASE WHEN LOWER(pass) = 'fp' OR LOWER(pass) = 'pass' THEN 1 ELSE 0 END) AS total_fp,
+             SUM(CASE WHEN LOWER(pass) = 'qa' THEN 1 ELSE 0 END) AS total_qa,
+             SUM(CASE WHEN LOWER(modality) = 'lidar' THEN 1 ELSE 0 END) AS total_lidar,
+             SUM(CASE WHEN LOWER(modality) LIKE '%lane%' THEN 1 ELSE 0 END) AS total_lane,
+             SUM(object_count) AS total_objects,
+             AVG(object_count) AS avg_objects
+           FROM task_submissions`
+        );
+        const row = stats[0] || {};
+        const total = parseInt(row.total_tasks || 0, 10);
+        const fpCnt = parseInt(row.total_fp || 0, 10);
+        const qaCnt = parseInt(row.total_qa || 0, 10);
+        const passRate = total > 0 ? (((fpCnt + qaCnt) / total) * 100).toFixed(1) : "100.0";
+
+        return json({
+          ok: true,
+          overview: {
+            total_tasks: total,
+            total_labelers: parseInt(row.total_labelers || 0, 10),
+            total_qtc: parseInt(row.total_qtc || 0, 10),
+            total_queues: parseInt(row.total_queues || 0, 10),
+            total_units: parseInt(row.total_units || 0, 10),
+            total_fp: fpCnt,
+            total_qa: qaCnt,
+            pass_count: fpCnt,
+            fail_count: 0,
+            pass_rate: parseFloat(passRate),
+            total_lidar: parseInt(row.total_lidar || 0, 10),
+            total_lane: parseInt(row.total_lane || 0, 10),
+            total_objects: parseInt(row.total_objects || 0, 10),
+            avg_objects: parseFloat(row.avg_objects || 0).toFixed(1)
+          }
+        }, 200, corsHeaders);
+      }
+
       if (pathname === "/api/analytics/dataset" && request.method === "GET") {
         const maybeUser = await verifySession(request, env);
         const role = maybeUser ? maybeUser.role : "qt";
-        const limit = Math.min(25000, parseInt(url.searchParams.get("limit") || "10000", 10));
+        const limitParam = parseInt(url.searchParams.get("limit") || "60000", 10);
+        const limit = Math.min(100000, Math.max(1, isNaN(limitParam) ? 60000 : limitParam));
         const rawRows = await db(
           env,
           `SELECT id, timestamp, shift, unit, pc_no, labeler_name, national_id, qtc_shift, yubikey_email, qtc_name, stage, task_link, pass, modality, queue_name, object_count, created_at 
@@ -1088,41 +1133,7 @@ export default {
         return json({ ok: true, message: "QTC member deleted" }, 200, corsHeaders);
       }
 
-      // ------------------------------------------------------------
-      // 13. ANALYTICS: AGGREGATED METRICS & DATASET
-      // ------------------------------------------------------------
-      if (pathname === "/api/analytics/overview" && request.method === "GET") {
-        const stats = await db(
-          env,
-          `SELECT 
-             COUNT(*) AS total_tasks,
-             COUNT(DISTINCT labeler_name) AS total_labelers,
-             COUNT(DISTINCT qtc_name) AS total_qtc,
-             SUM(CASE WHEN LOWER(pass) = 'pass' THEN 1 ELSE 0 END) AS pass_count,
-             SUM(CASE WHEN LOWER(pass) = 'fail' THEN 1 ELSE 0 END) AS fail_count,
-             SUM(object_count) AS total_objects,
-             AVG(object_count) AS avg_objects
-           FROM task_submissions`
-        );
-        const row = stats[0] || {};
-        const total = parseInt(row.total_tasks || 0, 10);
-        const passCnt = parseInt(row.pass_count || 0, 10);
-        const passRate = total > 0 ? ((passCnt / total) * 100).toFixed(1) : "0.0";
 
-        return json({
-          ok: true,
-          overview: {
-            total_tasks: total,
-            total_labelers: parseInt(row.total_labelers || 0, 10),
-            total_qtc: parseInt(row.total_qtc || 0, 10),
-            pass_count: passCnt,
-            fail_count: parseInt(row.fail_count || 0, 10),
-            pass_rate: parseFloat(passRate),
-            total_objects: parseInt(row.total_objects || 0, 10),
-            avg_objects: parseFloat(row.avg_objects || 0).toFixed(1)
-          }
-        }, 200, corsHeaders);
-      }
 
 
 

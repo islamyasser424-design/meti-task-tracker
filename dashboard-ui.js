@@ -348,13 +348,33 @@ function maskEmployeeId(rawId, pcOrName) {
   return 'EMP-—';
 }
 
+function normalizeShift(sh) {
+  const s = String(sh || '').trim().toLowerCase();
+  if (s.includes('morning') || s === 'over shift (m)' || s === 'm') return 'Morning';
+  if ((s.includes('night') && (s.includes('over') || s.includes('on'))) || s.includes('12 h') || s === 'over shift (on)') return 'Over Night';
+  if (s.includes('night') || s === 'over shift (n)' || s === 'n') return 'Night';
+  return String(sh || '').trim() || 'Other';
+}
+
 function isModPass(r, targetMod, targetPass) {
   const mi = hdrs.findIndex(h => h.toLowerCase() === 'modality');
   const pi = hdrs.findIndex(h => h.toLowerCase() === 'pass');
   const mod = mi < 0 ? '' : String(r[mi] || '').toLowerCase().replace(/[\s_-]+/g, '');
   const pass = pi < 0 ? '' : String(r[pi] || '').trim().toUpperCase();
   const normalizedMod = (mod === 'lidar') ? 'lidar' : (mod === 'laneline' || mod === 'lane') ? 'laneline' : mod;
-  return normalizedMod === targetMod.toLowerCase() && pass === targetPass.toUpperCase();
+
+  const tMod = String(targetMod || '').toLowerCase().trim();
+  const tPass = String(targetPass || '').toUpperCase().trim();
+
+  const modMatch = !tMod || tMod === 'any' || tMod === 'all' || tMod === '*' ||
+    normalizedMod === tMod.replace(/[\s_-]+/g, '') ||
+    (tMod.includes('lane') && normalizedMod === 'laneline');
+
+  const passMatch = !tPass || tPass === 'any' || tPass === 'all' || tPass === '*' ||
+    pass === tPass ||
+    (tPass === 'FP' && (pass === 'FP' || pass === 'PASS'));
+
+  return modMatch && passMatch;
 }
 
 function getQualityStore() {
@@ -1106,12 +1126,14 @@ function getCategorySummary(rows){
 function renderCategoryCardsHTML(summary,activeCategory='',scope='overview'){
  const defs=summary.defs;
  const isOverview=scope==='overview';
+ const overallTasks=summary.overall.tasks || 1;
  return '<section class="an-cat-section" aria-label="Workstream metrics">'
   +'<div class="an-cat-grid">'
   +defs.map(d=>{
    const cat=summary.categories[d.key];
    const isSel=activeCategory===d.key;
    const titleAction=isOverview?'Click to view '+d.label+' in Analysis':'Click to filter by '+d.label+(isSel?' (active)':'');
+   const sharePct=((cat.tasks / overallTasks) * 100).toFixed(1);
    return '<article class="an-cat-card '+(isSel?'selected':'')+'" style="--cat-color:'+d.color+';--cat-bg:'+d.bg+'" data-cat="'+d.key+'" role="button" tabindex="0" aria-label="'+d.label+': '+cat.tasks.toLocaleString()+' tasks, '+cat.uniqueLabelers.toLocaleString()+' unique labelers, '+cat.avgSubmit+' avg submit, '+cat.uniqueQtc.toLocaleString()+' unique QTC" title="'+titleAction+'">'
     +'<div class="an-cat-header">'
      +'<div class="an-cat-title"><span aria-hidden="true">'+d.icon+'</span> <span>'+d.label+'</span></div>'
@@ -1127,12 +1149,16 @@ function renderCategoryCardsHTML(summary,activeCategory='',scope='overview'){
       +'<strong class="an-cat-stat-val">'+cat.uniqueLabelers.toLocaleString()+'</strong>'
      +'</div>'
      +'<div class="an-cat-stat">'
-      +'<span class="an-cat-stat-lbl">Avg Submit / Labeler</span>'
+      +'<span class="an-cat-stat-lbl">Avg / Labeler</span>'
       +'<strong class="an-cat-stat-val highlight">'+cat.avgSubmit+'</strong>'
      +'</div>'
      +'<div class="an-cat-stat">'
       +'<span class="an-cat-stat-lbl">Total Unique QTC</span>'
       +'<strong class="an-cat-stat-val">'+cat.uniqueQtc.toLocaleString()+'</strong>'
+     +'</div>'
+     +'<div class="an-cat-stat" style="grid-column:span 2;">'
+      +'<span class="an-cat-stat-lbl">Contribution Share</span>'
+      +'<strong class="an-cat-stat-val" style="color:var(--text);">'+sharePct+'% of total</strong>'
      +'</div>'
     +'</div>'
    +'</article>';
@@ -1150,6 +1176,10 @@ function renderOverview(){
   const activeQueues = uniq(rows, 'Queue Name') || 0;
   const totalSubmissions = rows.length;
   const avgSubmit = activeLabelers ? (totalSubmissions / activeLabelers).toFixed(1) : '0';
+
+  const oi = hdrs.findIndex(h => ['object count', 'object_count', 'objects'].includes(h.toLowerCase()));
+  const totalObjects = rows.reduce((acc, r) => acc + (parseFloat(oi >= 0 ? r[oi] : 0) || 0), 0);
+  const avgObjects = totalSubmissions > 0 ? (totalObjects / totalSubmissions).toFixed(1) : '0';
 
   const lidarFP = rows.filter(r => isModPass(r, 'lidar', 'FP')).length;
   const lidarQA = rows.filter(r => isModPass(r, 'lidar', 'QA')).length;
@@ -1212,7 +1242,7 @@ function renderOverview(){
   const topQtcs = [...qtcMap.entries()].sort((a,b) => b[1] - a[1]).slice(0, 10);
   const topLabelers = [...labMap.entries()].sort((a,b) => b[1] - a[1]).slice(0, 10);
 
-  // Shift & Floor distribution
+  // Shift & Floor distribution (Floor = Unit)
   const si = hdrs.findIndex(h => h.toLowerCase() === 'shift');
   const fi = hdrs.findIndex(h => ['floor', 'unit'].includes(h.toLowerCase()));
   const shiftMap = new Map();
@@ -1243,9 +1273,30 @@ function renderOverview(){
   const last21 = sortedDates.slice(-21).map(d => [d, dateMap.get(d) || 0]);
   const maxDay = Math.max(1, ...last21.map(p => p[1]));
 
-  // 12 KPI Cards Definitions
+  // Operational Highlights calculations (Part 3.6)
+  const workstreamRank = [
+    { label: 'Lidar FP', cnt: lidarFP, tone: '#0d9488' },
+    { label: 'Lidar QA', cnt: lidarQA, tone: '#14b8a6' },
+    { label: 'Lane Line FP', cnt: laneFP, tone: '#ed9a35' },
+    { label: 'Lane Line QA', cnt: laneQA, tone: '#ec4899' }
+  ].sort((a,b) => b.cnt - a.cnt);
+  const topWorkstream = workstreamRank[0] || { label: '—', cnt: 0, tone: '#0d9488' };
+  const topShift = [...shiftMap.entries()].sort((a,b) => b[1] - a[1])[0] || ['—', 0];
+  const topUnit = [...floorMap.entries()].sort((a,b) => b[1] - a[1])[0] || ['—', 0];
+  const avgDaily = activeDays > 0 ? Math.round(totalSubmissions / activeDays) : 0;
+
+  // Largest increase/decrease between consecutive days
+  let maxInc = 0, maxIncDate = '—', maxDec = 0, maxDecDate = '—';
+  for (let i = 1; i < sortedDates.length; i++) {
+    const diff = (dateMap.get(sortedDates[i]) || 0) - (dateMap.get(sortedDates[i-1]) || 0);
+    if (diff > maxInc) { maxInc = diff; maxIncDate = sortedDates[i]; }
+    if (diff < maxDec) { maxDec = diff; maxDecDate = sortedDates[i]; }
+  }
+
+  // 13 Main KPI Cards Definitions (Including Total Objects)
   const kpiDefs = [
     { title: 'Total Submissions', val: totalSubmissions.toLocaleString(), sub: 'Selected period output', tone: '#0d9488' },
+    { title: 'Total Objects', val: totalObjects.toLocaleString(), sub: 'Cumulative objects (' + avgObjects + ' avg/task)', tone: '#0284c7' },
     { title: 'Active Labelers', val: activeLabelers.toLocaleString(), sub: 'Unique contributors', tone: '#0a9d8c' },
     { title: 'Active QTCs', val: activeQtcs.toLocaleString(), sub: 'Distinct QA reviewers', tone: '#df8b24' },
     { title: 'Active Queues', val: activeQueues.toLocaleString(), sub: 'Operational queues', tone: '#df5c99' },
@@ -1288,8 +1339,8 @@ function renderOverview(){
     + '</div>'
   + '</div>'
 
-  // 12 KPI Grid
-  + '<div class="ux-grid-12">'
+  // 13 Main KPI Cards Grid
+  + '<div class="ux-grid-12" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(210px, 1fr)); gap:12px;">'
     + kpiDefs.map(k => '<div class="kpi-mini-card" style="--tone:' + k.tone + '">'
       + '<div class="kpi-title"><span>' + esc(k.title) + '</span><span style="color:' + k.tone + '">●</span></div>'
       + (k.isGrowth
@@ -1299,15 +1350,45 @@ function renderOverview(){
     + '</div>').join('')
   + '</div>'
 
-  // Modality & Category Breakdown Cards
+  // 4 Workstream Performance Cards
   + renderCategoryCardsHTML(catSummary, '', 'overview')
+
+  // Operational Highlights Panel (Part 3.6)
+  + '<div class="ux-panel" style="margin-top:20px; padding:18px 22px; background:var(--bg-2); border-radius:12px; border:1px solid var(--border);">'
+    + '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:8px;">'
+      + '<h3 style="margin:0; font-size:15px; display:flex; align-items:center; gap:8px;">💡 Operational Highlights &amp; Key Insights</h3>'
+      + '<span class="ux-note">Computed from real database activity</span>'
+    + '</div>'
+    + '<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:12px;">'
+      + '<div style="background:var(--bg-3); padding:12px 14px; border-radius:8px; border-left:3px solid ' + topWorkstream.tone + ';">'
+        + '<span class="ux-note">Highest-Volume Workstream</span>'
+        + '<div style="font-weight:700; font-size:14px; color:var(--text); margin-top:3px;">' + topWorkstream.label + ' (' + topWorkstream.cnt.toLocaleString() + ' tasks)</div>'
+      + '</div>'
+      + '<div style="background:var(--bg-3); padding:12px 14px; border-radius:8px; border-left:3px solid #3b82f6;">'
+        + '<span class="ux-note">Highest-Volume Shift</span>'
+        + '<div style="font-weight:700; font-size:14px; color:var(--text); margin-top:3px;">' + esc(topShift[0]) + ' (' + topShift[1].toLocaleString() + ' tasks)</div>'
+      + '</div>'
+      + '<div style="background:var(--bg-3); padding:12px 14px; border-radius:8px; border-left:3px solid #ed9a35;">'
+        + '<span class="ux-note">Highest-Volume Floor / Unit</span>'
+        + '<div style="font-weight:700; font-size:14px; color:var(--text); margin-top:3px;">Unit ' + esc(topUnit[0]) + ' (' + topUnit[1].toLocaleString() + ' tasks)</div>'
+      + '</div>'
+      + '<div style="background:var(--bg-3); padding:12px 14px; border-radius:8px; border-left:3px solid #8b5cf6;">'
+        + '<span class="ux-note">Average Daily Submissions</span>'
+        + '<div style="font-weight:700; font-size:14px; color:var(--text); margin-top:3px;">' + avgDaily.toLocaleString() + ' tasks / day (' + activeDays + ' active days)</div>'
+      + '</div>'
+      + (maxInc > 0 ? ('<div style="background:var(--bg-3); padding:12px 14px; border-radius:8px; border-left:3px solid #10b981;">'
+        + '<span class="ux-note">Largest Daily Increase</span>'
+        + '<div style="font-weight:700; font-size:14px; color:var(--success); margin-top:3px;">+' + maxInc.toLocaleString() + ' on ' + maxIncDate + '</div>'
+      + '</div>') : '')
+    + '</div>'
+  + '</div>'
 
   // Top Charts Grid: Daily Trend & Hourly Production
   + '<div class="ux-panels" style="margin-top:20px;">'
-    // Chart 1: Daily Submission Trend Line
+    // Chart 1: Daily Submission Trend Line (Last 21 active dates)
     + '<section class="ux-panel" style="flex:1.6;">'
       + '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">'
-        + '<div><h3 style="margin:0 0 4px;">📈 Daily Submission Trend</h3><p style="margin:0;">Recent 21 active dates. Select a bar/point to filter.</p></div>'
+        + '<div><h3 style="margin:0 0 4px;">📈 Daily Submission Activity (Last 21 Dates)</h3><p style="margin:0;">Recent 21 active dates with task count. Select a bar to filter dashboard.</p></div>'
         + '<span class="ux-note">' + last21.length + ' active days</span>'
       + '</div>'
       + '<div class="ux-bars">'
@@ -1335,11 +1416,11 @@ function renderOverview(){
     + '</section>'
   + '</div>'
 
-  // Mid Charts Grid: Modality Donut, Pass Donut, Shift & Floor comparison
+  // Mid Charts Grid: Workstream Donut, Shift & Floor comparison
   + '<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:16px; margin-top:20px;">'
     // Chart 3 & 4: Modality & Pass Visual Distribution
     + '<div class="ux-panel">'
-      + '<h3>📦 Modality & Pass Share</h3>'
+      + '<h3>📦 Workstream & Pass Share</h3>'
       + '<p>Distribution across work types and validation stages.</p>'
       + '<div style="display:flex; flex-direction:column; gap:12px; margin-top:14px;">'
         + '<div>'
@@ -1385,17 +1466,17 @@ function renderOverview(){
       + '</div>'
     + '</div>'
 
-    // Chart 6: Floor Productivity (Floor 01, Floor 02, Floor 03, Floor 04)
+    // Chart 6: Floor Productivity (Floor = Unit)
     + '<div class="ux-panel">'
-      + '<h3>🏢 Floor Productivity Comparison</h3>'
-      + '<p>Throughput by floor based on operational room mapping.</p>'
+      + '<h3>🏢 Floor / Unit Productivity Comparison</h3>'
+      + '<p>Throughput by floor based on operational Unit mapping.</p>'
       + '<div style="display:flex; flex-direction:column; gap:8px; margin-top:12px;">'
         + (([...floorMap.keys()].sort().map(fl => {
           const cnt = floorMap.get(fl) || 0;
           const maxF = Math.max(1, ...floorMap.values());
           const pct = totalSubmissions ? ((cnt / totalSubmissions) * 100).toFixed(1) : 0;
           return '<div>'
-            + '<div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:3px;"><span>' + esc(fl) + '</span><b>' + cnt.toLocaleString() + ' (' + pct + '%)</b></div>'
+            + '<div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:3px;"><span>Unit ' + esc(fl) + '</span><b>' + cnt.toLocaleString() + ' (' + pct + '%)</b></div>'
             + '<div style="height:8px; border-radius:4px; background:var(--border); overflow:hidden;">'
               + '<div style="height:100%; width:' + ((cnt/maxF)*100) + '%; background:#df8b24;"></div>'
             + '</div>'
@@ -1418,69 +1499,71 @@ function renderOverview(){
           const maxQ = topQueues[0][1] || 1;
           return '<div style="padding:4px 0; border-bottom:1px solid var(--border-light);">'
             + '<div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:2px;">'
-              + '<span style="font-weight:600; text-overflow:ellipsis; overflow:hidden; white-space:nowrap; max-width:200px;">' + (idx+1) + '. ' + esc(q) + '</span>'
-              + '<b style="color:var(--primary);">' + cnt.toLocaleString() + '</b>'
+              + '<span><b style="color:var(--text-soft); font-size:10px; margin-right:4px;">#' + (idx+1) + '</b> ' + esc(q) + '</span>'
+              + '<b>' + cnt.toLocaleString() + '</b>'
             + '</div>'
-            + '<div style="height:5px; border-radius:3px; background:var(--border); overflow:hidden;">'
-              + '<div style="height:100%; width:' + ((cnt/maxQ)*100) + '%; background:var(--primary);"></div>'
+            + '<div style="height:4px; border-radius:2px; background:var(--border); overflow:hidden;">'
+              + '<div style="height:100%; width:' + ((cnt/maxQ)*100) + '%; background:var(--accent);"></div>'
             + '</div>'
           + '</div>';
-        }).join('') || '<div class="ux-empty">No queue data.</div>')
+        }).join('') || '<div class="ux-empty">No queue data available.</div>')
       + '</div>'
     + '</div>'
 
     // Chart 8: Top 10 QTCs
     + '<div class="ux-panel">'
       + '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">'
-        + '<h3 style="margin:0;">👥 Top 10 QTC Teams</h3>'
-        + '<span class="ux-note">By Team Output</span>'
+        + '<h3 style="margin:0;">👥 Top 10 QTC Supervisors</h3>'
+        + '<span class="ux-note">By Team Volume</span>'
       + '</div>'
       + '<div style="display:flex; flex-direction:column; gap:6px;">'
         + (topQtcs.map(([qc, cnt], idx) => {
-          const maxQC = topQtcs[0][1] || 1;
+          const maxQc = topQtcs[0][1] || 1;
           return '<div style="padding:4px 0; border-bottom:1px solid var(--border-light);">'
             + '<div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:2px;">'
-              + '<span style="font-weight:600; text-overflow:ellipsis; overflow:hidden; white-space:nowrap; max-width:200px;">' + (idx+1) + '. ' + esc(qc) + '</span>'
-              + '<b style="color:#df8b24;">' + cnt.toLocaleString() + '</b>'
+              + '<span><b style="color:var(--text-soft); font-size:10px; margin-right:4px;">#' + (idx+1) + '</b> ' + esc(qc) + '</span>'
+              + '<b>' + cnt.toLocaleString() + '</b>'
             + '</div>'
-            + '<div style="height:5px; border-radius:3px; background:var(--border); overflow:hidden;">'
-              + '<div style="height:100%; width:' + ((cnt/maxQC)*100) + '%; background:#df8b24;"></div>'
+            + '<div style="height:4px; border-radius:2px; background:var(--border); overflow:hidden;">'
+              + '<div style="height:100%; width:' + ((cnt/maxQc)*100) + '%; background:#df8b24;"></div>'
             + '</div>'
           + '</div>';
-        }).join('') || '<div class="ux-empty">No QTC data.</div>')
+        }).join('') || '<div class="ux-empty">No QTC data available.</div>')
       + '</div>'
     + '</div>'
 
     // Chart 9: Top 10 Labelers
     + '<div class="ux-panel">'
       + '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">'
-        + '<h3 style="margin:0;">🏆 Top 10 Labelers</h3>'
-        + '<span class="ux-note">By Total Submits</span>'
+        + '<h3 style="margin:0;">👤 Top 10 Labelers</h3>'
+        + '<span class="ux-note">By Submissions</span>'
       + '</div>'
       + '<div style="display:flex; flex-direction:column; gap:6px;">'
-        + (topLabelers.map(([lab, cnt], idx) => {
+        + (topLabelers.map(([lbl, cnt], idx) => {
           const maxL = topLabelers[0][1] || 1;
           return '<div style="padding:4px 0; border-bottom:1px solid var(--border-light);">'
             + '<div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:2px;">'
-              + '<span style="font-weight:600; text-overflow:ellipsis; overflow:hidden; white-space:nowrap; max-width:200px;">' + (idx < 3 ? ['🥇','🥈','🥉'][idx] + ' ' : (idx+1) + '. ') + esc(lab) + '</span>'
-              + '<b style="color:#0a9d8c;">' + cnt.toLocaleString() + '</b>'
+              + '<span><b style="color:var(--text-soft); font-size:10px; margin-right:4px;">#' + (idx+1) + '</b> ' + esc(lbl) + '</span>'
+              + '<b>' + cnt.toLocaleString() + '</b>'
             + '</div>'
-            + '<div style="height:5px; border-radius:3px; background:var(--border); overflow:hidden;">'
-              + '<div style="height:100%; width:' + ((cnt/maxL)*100) + '%; background:#0a9d8c;"></div>'
+            + '<div style="height:4px; border-radius:2px; background:var(--border); overflow:hidden;">'
+              + '<div style="height:100%; width:' + ((cnt/maxL)*100) + '%; background:#10b981;"></div>'
             + '</div>'
           + '</div>';
-        }).join('') || '<div class="ux-empty">No labeler data.</div>')
+        }).join('') || '<div class="ux-empty">No labeler data available.</div>')
       + '</div>'
     + '</div>'
   + '</div>'
 
-  // Personal Target Progress Box
+  // Personal Target Tracking Feature (Part 3.4)
   + '<div class="ux-panel" style="margin-top:20px;">'
-    + '<h3>🎯 Personal Submission Target</h3>'
-    + '<p>Set a custom target for the current selection, saved on your local browser.</p>'
+    + '<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">'
+      + '<div><h3 style="margin:0;">🎯 Personal Submission Target</h3><p style="margin:2px 0 0;">Track progress toward operational shift and daily goals.</p></div>'
+      + '<span class="ux-note">Saved locally</span>'
+    + '</div>'
     + '<div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin-top:12px;">'
-      + '<label class="ux-note" style="display:flex; align-items:center; gap:8px;">Target Rows:<input class="ux-target" id="uxTarget" type="number" min="1" step="1" placeholder="e.g. 500" value="' + (target || '') + '" style="padding:6px 12px; border-radius:8px; border:1px solid var(--border); width:140px;"></label>'
-      + '<div id="uxProgress" style="flex:1; min-width:200px;"></div>'
+      + '<label class="ux-note" style="display:flex; align-items:center; gap:8px;">Target Tasks:<input class="ux-target" id="uxTarget" type="number" min="1" step="1" placeholder="e.g. 500" value="' + (target || '') + '" style="padding:6px 12px; border-radius:8px; border:1px solid var(--border); width:140px;"></label>'
+      + '<div id="uxProgress" style="flex:1; min-width:240px;"></div>'
     + '</div>'
   + '</div>';
 
@@ -1517,7 +1600,11 @@ function renderOverview(){
 
   overview.querySelectorAll('.an-cat-card[data-cat]').forEach(card => {
     const cat = card.dataset.cat;
-    card.onclick = () => { analysisFilters.category = cat; location.hash = 'analysis-overview'; };
+    card.onclick = () => {
+      analysisFilters.category = cat;
+      if (typeof switchTab === 'function') switchTab('analysis');
+      else location.hash = 'analysis-overview';
+    };
   });
 
   overview.querySelectorAll('.ux-bar').forEach(b => {
@@ -1549,7 +1636,26 @@ function renderOverview(){
   applyView();
   bindUniversalFilterBar(overview, 'overview');
 }
-function progress(count){const pct=target?count/target*100:0;$('uxProgress').innerHTML=target?'<div class="ux-track" role="progressbar" aria-label="Submission target" aria-valuenow="'+Math.min(100,Math.round(pct))+'" aria-valuemin="0" aria-valuemax="100"><div class="ux-fill" style="width:'+Math.min(100,pct)+'%"></div></div><b>'+Math.round(pct)+'%</b><p>'+count.toLocaleString()+' of '+target.toLocaleString()+' submissions</p>':'<p style="margin-top:18px">Set a target to see your progress.</p>';}
+function progress(count){
+  const t = Number(target) || 0;
+  const pct = t > 0 ? ((count / t) * 100).toFixed(1) : '0';
+  const remaining = Math.max(0, t - count);
+  const el = $('uxProgress');
+  if (!el) return;
+  if (!t) {
+    el.innerHTML = '<span class="ux-note" style="display:block; margin-top:6px;">Set an operational target above to view achievement and remaining tasks.</span>';
+    return;
+  }
+  el.innerHTML = '<div style="display:flex; flex-direction:column; gap:4px; margin-top:2px;">'
+    + '<div style="display:flex; justify-content:space-between; font-size:12px; align-items:center;">'
+      + '<span><b>' + count.toLocaleString() + '</b> / ' + t.toLocaleString() + ' actual tasks</span>'
+      + '<span style="font-weight:700; color:' + (Number(pct) >= 100 ? 'var(--success)' : 'var(--primary)') + ';">' + pct + '% achieved (' + remaining.toLocaleString() + ' remaining)</span>'
+    + '</div>'
+    + '<div class="ux-track" role="progressbar" aria-valuenow="' + Math.min(100, Math.round(Number(pct))) + '" aria-valuemin="0" aria-valuemax="100" style="height:10px; border-radius:5px; background:var(--border); overflow:hidden;">'
+      + '<div class="ux-fill" style="width:' + Math.min(100, Number(pct)) + '%; height:100%; background:' + (Number(pct) >= 100 ? 'var(--success)' : 'var(--primary)') + '; transition:width 0.3s;"></div>'
+    + '</div>'
+  + '</div>';
+}
 function exportCSV(){const rows=rowsInView();if(!rows.length){showToast('No matching rows to export.');return;}const cell=v=>'"'+String(v??'').replace(/^[=+@\-\t\r]/,"'$&").replace(/"/g,'""')+'"';const csv=[hdrs,...rows].map(r=>r.map(cell).join(',')).join('\r\n');downloadBlob(new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'}),'MEEG_filtered_'+cairoToday()+'.csv');}
 function labelerSubmissionMetrics(rows){
  const idx=name=>hdrs.findIndex(h=>String(h).trim().toLowerCase()===name);
@@ -1769,6 +1875,47 @@ function renderAnalysis(){
     if (qcI >= 0 && r[qcI]) laneQtcMap.set(r[qcI], (laneQtcMap.get(r[qcI]) || 0) + 1);
   });
 
+  // Compare All Floors / Units Matrix (Section 4.4 - Evaluated across base for full comparison)
+  const allFloors = [...new Set(base.map(r => fi >= 0 ? deriveFloor(r[fi]) : '').filter(Boolean))].sort();
+  const floorUnitData = allFloors.map(fl => {
+    const fRows = base.filter(r => fi >= 0 && deriveFloor(r[fi]) === fl);
+    const tot = fRows.length;
+    const lFP = fRows.filter(r => isModPass(r, 'lidar', 'FP')).length;
+    const lQA = fRows.filter(r => isModPass(r, 'lidar', 'QA')).length;
+    const lnFP = fRows.filter(r => isModPass(r, 'laneline', 'FP')).length;
+    const lnQA = fRows.filter(r => isModPass(r, 'laneline', 'QA')).length;
+    const labCnt = uniq(fRows, 'Labeler Name') || 0;
+    const qtcCnt = uniq(fRows, 'QTC Name') || 0;
+    const avg = labCnt > 0 ? (tot / labCnt).toFixed(1) : '0';
+    const share = base.length > 0 ? ((tot / base.length) * 100).toFixed(1) : '0';
+    return { floor: fl, total: tot, lFP, lQA, lnFP, lnQA, labelers: labCnt, qtcs: qtcCnt, avg, share };
+  }).sort((a,b) => b.total - a.total);
+
+  // QTC Supervisory Analysis (Section 4.5)
+  const qtcMapAnalysis = new Map();
+  a.selected.forEach(r => {
+    const qtc = qcI >= 0 ? String(r[qcI] || '').normalize('NFC').trim().replace(/\s+/gu, ' ') : '';
+    if (!qtc) return;
+    if (!qtcMapAnalysis.has(qtc)) {
+      qtcMapAnalysis.set(qtc, { qtc, total: 0, lFP: 0, lQA: 0, lnFP: 0, lnQA: 0, labSet: new Set() });
+    }
+    const item = qtcMapAnalysis.get(qtc);
+    item.total++;
+    if (isModPass(r, 'lidar', 'FP')) item.lFP++;
+    if (isModPass(r, 'lidar', 'QA')) item.lQA++;
+    if (isModPass(r, 'laneline', 'FP')) item.lnFP++;
+    if (isModPass(r, 'laneline', 'QA')) item.lnQA++;
+    const lab = li >= 0 ? String(r[li] || '').trim() : '';
+    if (lab) item.labSet.add(lab);
+  });
+  const allQtcsSorted = [...qtcMapAnalysis.values()].map(item => ({
+    ...item,
+    uniqueLabelers: item.labSet.size,
+    avgSubmit: item.labSet.size > 0 ? (item.total / item.labSet.size).toFixed(1) : '0'
+  })).sort((a,b) => b.total - a.total);
+  const top15Qtcs = allQtcsSorted.slice(0, 15);
+  const bottom15Qtcs = allQtcsSorted.length > 15 ? allQtcsSorted.slice(-15) : allQtcsSorted;
+
   // Verified Quality Analysis Data from qualityStore
   const qs = getQualityStore();
   const qsEntries = Object.entries(qs);
@@ -1789,7 +1936,7 @@ function renderAnalysis(){
   const avgTva = qAssessments ? (qSumTva / qAssessments) : null;
   const avgArt = qAssessments ? (qSumArt / qAssessments).toFixed(1) : '—';
 
-  // 8 KPI Cards
+  // 8 Main KPI Cards
   const kpiCards = [
     { title: 'Total Lidar Submissions', val: totalLidar.toLocaleString(), sub: 'FP + QA Lidar Tasks', tone: '#0d9488' },
     { title: 'Total Lane Line Submissions', val: totalLane.toLocaleString(), sub: 'FP + QA Lane Line Tasks', tone: '#ed9a35' },
@@ -1804,9 +1951,9 @@ function renderAnalysis(){
   analysis.innerHTML = '<div class="ux-overview">'
     + '<div class="ux-heading">'
       + '<div>'
-        + '<div class="ux-eyebrow">Modality & Attribute Operations</div>'
-        + '<h2>Modality & Attribute Analysis</h2>'
-        + '<p>Deep operational distribution across Lidar, Lane Line, and verified quality assessments.</p>'
+        + '<div class="ux-eyebrow">Modality &amp; Attribute Operations</div>'
+        + '<h2>Modality &amp; Attribute Analysis</h2>'
+        + '<p>Deep operational distribution across Lidar, Lane Line, Facility Units, and supervised quality.</p>'
       + '</div>'
       + renderHeaderControlsHTML('an')
     + '</div>'
@@ -1822,7 +1969,7 @@ function renderAnalysis(){
       + '</div>').join('')
     + '</div>'
 
-    // Category cards row
+    // Category cards row (4 Workstream Deep-Dive Cards)
     + renderCategoryCardsHTML(catSummary, analysisFilters.category, 'analysis')
 
     // SECTION 1 & 2: Lidar Deep Dive & Lane Line Deep Dive
@@ -1874,7 +2021,7 @@ function renderAnalysis(){
     + '<div class="ux-panel" style="margin-top:20px;">'
       + '<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:14px;">'
         + '<div>'
-          + '<h3 style="margin:0;">⭐ Attribute & Verified Quality Analysis</h3>'
+          + '<h3 style="margin:0;">⭐ Attribute &amp; Verified Quality Analysis</h3>'
           + '<p style="margin:2px 0 0;">Quality accuracy metrics derived strictly from verified assessment records in the Export tab.</p>'
         + '</div>'
         + '<div class="q-badge" style="background:rgba(16,185,129,0.12); color:var(--success); border:1px solid rgba(16,185,129,0.3); font-size:11px; padding:4px 10px;">'
@@ -1892,11 +2039,107 @@ function renderAnalysis(){
       + '</div>'
     + '</div>'
 
+    // SECTION 4: Compare All Floors / Units Matrix (Section 4.4)
+    + '<div class="ux-panel" style="margin-top:20px;">'
+      + '<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:14px;">'
+        + '<div>'
+          + '<h3 style="margin:0;">🏢 Compare All Floors / Units Matrix</h3>'
+          + '<p style="margin:2px 0 0;">Facility-wide performance comparison across all operational units (Floor = Unit).</p>'
+        + '</div>'
+        + '<span class="q-badge" style="background:var(--primary); color:#fff; font-weight:700;">' + floorUnitData.length + ' Units Compared</span>'
+      + '</div>'
+      + '<div style="overflow-x:auto;">'
+        + '<table style="width:100%; border-collapse:collapse; font-size:12px; text-align:left;">'
+          + '<thead>'
+            + '<tr style="background:var(--bg-2); border-bottom:1px solid var(--border);">'
+              + '<th style="padding:10px 14px;">Floor / Unit</th>'
+              + '<th style="padding:10px 12px; text-align:center; color:#0d9488;">Lidar FP</th>'
+              + '<th style="padding:10px 12px; text-align:center; color:#14b8a6;">Lidar QA</th>'
+              + '<th style="padding:10px 12px; text-align:center; color:#ed9a35;">Lane Line FP</th>'
+              + '<th style="padding:10px 12px; text-align:center; color:#ec4899;">Lane Line QA</th>'
+              + '<th style="padding:10px 12px; text-align:center; font-weight:700;">Total Submits</th>'
+              + '<th style="padding:10px 12px; text-align:center;">Unique Labelers</th>'
+              + '<th style="padding:10px 12px; text-align:center;">Unique QTCs</th>'
+              + '<th style="padding:10px 12px; text-align:center;">Avg / Labeler</th>'
+              + '<th style="padding:10px 14px; text-align:center;">Unit Share %</th>'
+            + '</tr>'
+          + '</thead>'
+          + '<tbody>'
+            + floorUnitData.map(item => `
+              <tr style="border-bottom:1px solid var(--border);" onmouseover="this.style.background='var(--accent-light)'" onmouseout="this.style.background='transparent'">
+                <td style="padding:10px 14px; font-weight:700; color:var(--accent);">🏢 Unit ${esc(item.floor)}</td>
+                <td style="padding:10px 12px; text-align:center; color:#0d9488; font-weight:600;">${item.lFP.toLocaleString()}</td>
+                <td style="padding:10px 12px; text-align:center; color:#14b8a6; font-weight:600;">${item.lQA.toLocaleString()}</td>
+                <td style="padding:10px 12px; text-align:center; color:#ed9a35; font-weight:600;">${item.lnFP.toLocaleString()}</td>
+                <td style="padding:10px 12px; text-align:center; color:#ec4899; font-weight:600;">${item.lnQA.toLocaleString()}</td>
+                <td style="padding:10px 12px; text-align:center; font-weight:800; color:var(--text); font-size:13px;">${item.total.toLocaleString()}</td>
+                <td style="padding:10px 12px; text-align:center;">${item.labelers.toLocaleString()}</td>
+                <td style="padding:10px 12px; text-align:center;">${item.qtcs.toLocaleString()}</td>
+                <td style="padding:10px 12px; text-align:center; font-weight:600; color:var(--primary);">${item.avg}</td>
+                <td style="padding:10px 14px; text-align:center;">
+                  <div style="display:flex; align-items:center; justify-content:center; gap:6px;">
+                    <div style="width:50px; height:6px; border-radius:3px; background:var(--border); overflow:hidden;">
+                      <div style="width:${item.share}%; height:100%; background:var(--primary);"></div>
+                    </div>
+                    <b>${item.share}%</b>
+                  </div>
+                </td>
+              </tr>
+            `).join('')
+          + '</tbody>'
+        + '</table>'
+      + '</div>'
+    + '</div>'
+
+    // SECTION 5: QTC Supervisory Analysis (Section 4.5)
+    + '<div class="ux-panel" style="margin-top:20px;">'
+      + '<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:14px;">'
+        + '<div>'
+          + '<h3 style="margin:0;">👥 QTC Supervisory Analysis (Top 15 &amp; Bottom 15)</h3>'
+          + '<p style="margin:2px 0 0;">Supervisory volume, team size, and workstream distribution for highest and lowest active QTCs.</p>'
+        + '</div>'
+        + '<div style="display:flex; gap:6px;">'
+          + '<button class="btn btn-c" id="anQtcTopBtn" style="font-size:11px; padding:5px 12px;">Top 15 QTCs</button>'
+          + '<button class="btn" id="anQtcBotBtn" style="font-size:11px; padding:5px 12px;">Bottom 15 QTCs</button>'
+        + '</div>'
+      + '</div>'
+      + '<div style="overflow-x:auto;">'
+        + '<table style="width:100%; border-collapse:collapse; font-size:12px; text-align:left;">'
+          + '<thead>'
+            + '<tr style="background:var(--bg-2); border-bottom:1px solid var(--border);">'
+              + '<th style="padding:10px 14px;">QTC Supervisor</th>'
+              + '<th style="padding:10px 12px; text-align:center; font-weight:700;">Total Tasks</th>'
+              + '<th style="padding:10px 12px; text-align:center;">Unique Labelers</th>'
+              + '<th style="padding:10px 12px; text-align:center; color:#0d9488;">Lidar FP</th>'
+              + '<th style="padding:10px 12px; text-align:center; color:#14b8a6;">Lidar QA</th>'
+              + '<th style="padding:10px 12px; text-align:center; color:#ed9a35;">Lane Line FP</th>'
+              + '<th style="padding:10px 12px; text-align:center; color:#ec4899;">Lane Line QA</th>'
+              + '<th style="padding:10px 12px; text-align:center;">Avg / Labeler</th>'
+            + '</tr>'
+          + '</thead>'
+          + '<tbody id="anQtcTableBody">'
+            + top15Qtcs.map(item => `
+              <tr style="border-bottom:1px solid var(--border);" onmouseover="this.style.background='var(--accent-light)'" onmouseout="this.style.background='transparent'">
+                <td style="padding:9px 14px; font-weight:700; color:var(--primary);">👤 ${esc(item.qtc)}</td>
+                <td style="padding:9px 12px; text-align:center; font-weight:800; color:var(--text);">${item.total.toLocaleString()}</td>
+                <td style="padding:9px 12px; text-align:center; font-weight:600;">${item.uniqueLabelers.toLocaleString()}</td>
+                <td style="padding:9px 12px; text-align:center; color:#0d9488;">${item.lFP.toLocaleString()}</td>
+                <td style="padding:9px 12px; text-align:center; color:#14b8a6;">${item.lQA.toLocaleString()}</td>
+                <td style="padding:9px 12px; text-align:center; color:#ed9a35;">${item.lnFP.toLocaleString()}</td>
+                <td style="padding:9px 12px; text-align:center; color:#ec4899;">${item.lnQA.toLocaleString()}</td>
+                <td style="padding:9px 12px; text-align:center; font-weight:600; color:var(--accent);">${item.avgSubmit}</td>
+              </tr>
+            `).join('')
+          + '</tbody>'
+        + '</table>'
+      + '</div>'
+    + '</div>'
+
     // Charts: Modality Trends & Shift Share
     + '<div class="ux-panels" style="margin-top:20px;">'
       + '<section class="ux-panel">'
         + '<div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:12px;">'
-          + '<div><h3>Daily Submission Area Trend</h3><p>Select category tab below to filter trend.</p></div>'
+          + '<div><h3>Daily Submission Area Trend</h3><p>Select category tab below to filter trend. Includes 7-day moving average.</p></div>'
           + '<div class="an-chart-cat-tabs" id="anChartCatTabs">'
             + [
               {key:'all',label:'All Stages (Total)',color:'#0d9488'},
@@ -1908,6 +2151,10 @@ function renderAnalysis(){
           + '</div>'
         + '</div>'
         + '<div id="anLine" class="an-line"></div>'
+        + '<div style="display:flex; justify-content:flex-end; gap:16px; font-size:11px; color:var(--text-soft); margin-top:8px;">'
+          + '<span><span style="display:inline-block; width:12px; height:12px; background:var(--primary); border-radius:2px; vertical-align:middle; margin-right:4px;"></span> Daily Submissions</span>'
+          + '<span><span style="display:inline-block; width:14px; height:0; border-top:2px dashed #ef4444; vertical-align:middle; margin-right:4px;"></span> 7-Day Moving Avg</span>'
+        + '</div>'
       + '</section>'
       + '<section class="ux-panel">'
         + '<h3>Shift Submission Distribution</h3>'
@@ -1921,6 +2168,36 @@ function renderAnalysis(){
   bindHeaderControls(analysis, 'an'); bindUniversalFilterBar(analysis, 'analysis');
   const slicerContainer = analysis.querySelector('#anSlicers');
   if (slicerContainer) slicerContainer.appendChild(createListSlicers());
+
+  // QTC Top/Bottom toggle buttons
+  const topBtn = $('anQtcTopBtn');
+  const botBtn = $('anQtcBotBtn');
+  const qtcTableBody = $('anQtcTableBody');
+  const renderQtcList = (list) => {
+    if (!qtcTableBody) return;
+    qtcTableBody.innerHTML = list.map(item => `
+      <tr style="border-bottom:1px solid var(--border);" onmouseover="this.style.background='var(--accent-light)'" onmouseout="this.style.background='transparent'">
+        <td style="padding:9px 14px; font-weight:700; color:var(--primary);">👤 ${esc(item.qtc)}</td>
+        <td style="padding:9px 12px; text-align:center; font-weight:800; color:var(--text);">${item.total.toLocaleString()}</td>
+        <td style="padding:9px 12px; text-align:center; font-weight:600;">${item.uniqueLabelers.toLocaleString()}</td>
+        <td style="padding:9px 12px; text-align:center; color:#0d9488;">${item.lFP.toLocaleString()}</td>
+        <td style="padding:9px 12px; text-align:center; color:#14b8a6;">${item.lQA.toLocaleString()}</td>
+        <td style="padding:9px 12px; text-align:center; color:#ed9a35;">${item.lnFP.toLocaleString()}</td>
+        <td style="padding:9px 12px; text-align:center; color:#ec4899;">${item.lnQA.toLocaleString()}</td>
+        <td style="padding:9px 12px; text-align:center; font-weight:600; color:var(--accent);">${item.avgSubmit}</td>
+      </tr>
+    `).join('');
+  };
+  if (topBtn && botBtn) {
+    topBtn.onclick = () => {
+      topBtn.classList.add('btn-c'); botBtn.classList.remove('btn-c');
+      renderQtcList(top15Qtcs);
+    };
+    botBtn.onclick = () => {
+      botBtn.classList.add('btn-c'); topBtn.classList.remove('btn-c');
+      renderQtcList(bottom15Qtcs);
+    };
+  }
 
   // Category card filter click
   analysis.querySelectorAll('.an-cat-card[data-cat]').forEach(card => {
@@ -1939,7 +2216,7 @@ function renderAnalysis(){
     };
   });
 
-  // Render SVG Area Line chart
+  // Render SVG Area Line chart with 7-Day Moving Average
   const palette = ['#0d9488', '#15b8a6', '#ed9a35', '#e9689e', '#459ce8', '#9ca53c', '#b77bdb', '#7689a3'];
   if (!a.selected.length) {
     $('anLine').innerHTML = '<div class="ux-empty">No submissions match these filters.</div>';
@@ -1966,6 +2243,14 @@ function renderAnalysis(){
   catRows.forEach(r => { const d = rDate(r); if (d) catDates.set(d, (catDates.get(d) || 0) + 1); });
   const chartPoints = a.points.map(([d]) => [d, catDates.get(d) || 0]);
 
+  // Compute 7-day moving average
+  const movingAvg = chartPoints.map((p, i) => {
+    const start = Math.max(0, i - 6);
+    const slice = chartPoints.slice(start, i + 1);
+    const sum = slice.reduce((acc, pt) => acc + pt[1], 0);
+    return [p[0], Math.round(sum / slice.length)];
+  });
+
   const W = 760, H = 260, L = 55, R = 20, T = 20, B = 45;
   const max = Math.max(1, ...chartPoints.map(p => p[1]));
   const x = i => L + (chartPoints.length === 1 ? (W - L - R) / 2 : (i / (chartPoints.length - 1)) * (W - L - R));
@@ -1982,8 +2267,12 @@ function renderAnalysis(){
     svg += '<polygon fill="url(#anAreaGrad)" points="' + polyPoints + '"/>';
   }
   svg += '<polyline fill="none" stroke="' + strokeColor + '" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" points="' + chartPoints.map((p, i) => x(i) + ',' + y(p[1])).join(' ') + '"/>';
+  // 7-day moving average dashed overlay
+  if (chartPoints.length > 1) {
+    svg += '<polyline fill="none" stroke="#ef4444" stroke-width="2" stroke-dasharray="5 4" stroke-linecap="round" points="' + movingAvg.map((p, i) => x(i) + ',' + y(p[1])).join(' ') + '"/>';
+  }
   chartPoints.forEach(([d, c], i) => {
-    svg += '<circle tabindex="0" role="img" cx="' + x(i) + '" cy="' + y(c) + '" r="4.5" fill="' + strokeColor + '" stroke="var(--bg-3)" stroke-width="1.5"><title>' + d + ' (' + chartCat + '): ' + c.toLocaleString() + ' submissions</title></circle>';
+    svg += '<circle tabindex="0" role="img" cx="' + x(i) + '" cy="' + y(c) + '" r="4.5" fill="' + strokeColor + '" stroke="var(--bg-3)" stroke-width="1.5"><title>' + d + ' (' + chartCat + '): ' + c.toLocaleString() + ' submissions (7d avg: ' + movingAvg[i][1] + ')</title></circle>';
     if (i === 0 || i === chartPoints.length - 1 || (chartPoints.length > 3 && i === Math.floor(chartPoints.length / 2))) {
       svg += '<text x="' + x(i) + '" y="' + (H - 12) + '" text-anchor="' + (i === 0 ? 'start' : i === chartPoints.length - 1 ? 'end' : 'middle') + '">' + d + '</text>';
     }
@@ -2078,8 +2367,11 @@ function renderPerformance(){
   const mi = hdrs.findIndex(h => h.toLowerCase() === 'modality');
   const pi = hdrs.findIndex(h => h.toLowerCase() === 'pass');
   const ti = hdrs.findIndex(h => ['task id', 'id'].includes(h.toLowerCase()));
+  const oi = hdrs.findIndex(h => ['object count', 'object_count', 'objects'].includes(h.toLowerCase()));
+  const qi = hdrs.findIndex(h => h.toLowerCase() === 'queue name');
+  const tlIdx = hdrs.findIndex(h => ['task link', 'task_link', 'link'].includes(h.toLowerCase()));
 
-  // Aggregate people
+  // Aggregate people with complete object counts
   const peopleMap = new Map();
   rows.forEach(r => {
     const rawName = li >= 0 ? String(r[li] || '').trim() : '';
@@ -2097,11 +2389,13 @@ function renderPerformance(){
         maskedId: maskEmployeeId(rawId, pc || rawName),
         shifts: new Set(),
         units: new Set(),
-        floors: new Set(),
         qtcs: new Set(),
+        queues: new Set(),
         dates: new Set(),
         tasks: [],
         total: 0,
+        totalObjects: 0,
+        largestTask: 0,
         lidarFP: 0,
         lidarQA: 0,
         laneFP: 0,
@@ -2111,72 +2405,61 @@ function renderPerformance(){
 
     const p = peopleMap.get(key);
     p.total++;
+
+    const objCount = parseFloat(oi >= 0 ? r[oi] : 0) || 0;
+    p.totalObjects += objCount;
+    if (objCount > p.largestTask) p.largestTask = objCount;
+
     if (si >= 0 && r[si]) p.shifts.add(r[si]);
-    if (fi >= 0 && r[fi]) { p.units.add(r[fi]); p.floors.add(deriveFloor(r[fi])); }
+    if (fi >= 0 && r[fi]) p.units.add(deriveFloor(r[fi]));
     if (qcI >= 0 && r[qcI]) p.qtcs.add(r[qcI]);
+    if (qi >= 0 && r[qi]) p.queues.add(r[qi]);
+
     const d = rDate(r);
     if (d) p.dates.add(d);
 
-    const mod = mi < 0 ? '' : String(r[mi] || '').toLowerCase().replace(/[\s_-]+/g, '');
-    const pass = pi < 0 ? '' : String(r[pi] || '').trim().toUpperCase();
-    const prefix = mod === 'lidar' ? 'lidar' : (mod === 'laneline' || mod === 'lane') ? 'lane' : '';
-    if (prefix && (pass === 'FP' || pass === 'QA')) {
-      const cat = prefix + pass;
-      if (cat === 'lidarFP') p.lidarFP++;
-      else if (cat === 'lidarQA') p.lidarQA++;
-      else if (cat === 'laneFP') p.laneFP++;
-      else if (cat === 'laneQA') p.laneQA++;
-    }
+    if (isModPass(r, 'lidar', 'FP')) p.lidarFP++;
+    if (isModPass(r, 'lidar', 'QA')) p.lidarQA++;
+    if (isModPass(r, 'laneline', 'FP')) p.laneFP++;
+    if (isModPass(r, 'laneline', 'QA')) p.laneQA++;
 
     p.tasks.push({
       id: ti >= 0 ? r[ti] : '—',
       date: d || 'Unknown',
       shift: si >= 0 ? r[si] : '—',
-      unit: fi >= 0 ? r[fi] : '—',
+      unit: fi >= 0 ? deriveFloor(r[fi]) : '—',
+      queue: qi >= 0 ? r[qi] : '—',
       qtc: qcI >= 0 ? r[qcI] : '—',
-      mod: r[mi] || '—',
-      pass: r[pi] || '—'
+      mod: mi >= 0 ? r[mi] : '—',
+      pass: pi >= 0 ? r[pi] : '—',
+      objects: objCount,
+      link: tlIdx >= 0 ? r[tlIdx] : ''
     });
   });
 
   const people = [...peopleMap.values()].map(p => {
     const activeDays = Math.max(1, p.dates.size);
     const avgPerDay = (p.total / activeDays).toFixed(1);
-    const avgPerHour = (p.total / (activeDays * 8)).toFixed(1);
-    const qData = getLabelerQuality(p.name, '');
-    const verifiedScore = qData && qData.totalAccuracy !== null ? qData.totalAccuracy : null;
-    const targetAch = targetSimState.dailyTarget > 0 ? Math.round((Number(avgPerDay) / targetSimState.dailyTarget) * 100) : null;
-
+    const avgObjectsPerTask = p.total > 0 ? (p.totalObjects / p.total).toFixed(1) : '0';
     return {
       ...p,
       activeDays,
       avgPerDay: Number(avgPerDay) || 0,
       avgPerDayStr: avgPerDay,
-      avgPerHour: Number(avgPerHour) || 0,
-      avgPerHourStr: avgPerHour,
-      verifiedScore,
-      verifiedScoreStr: verifiedScore !== null ? (typeof window.qFmt === 'function' ? window.qFmt(verifiedScore) : (verifiedScore*100).toFixed(1)+'%') : '—',
-      targetAch,
-      targetAchStr: targetAch !== null ? targetAch + '%' : '—'
+      avgObjectsPerTask: Number(avgObjectsPerTask) || 0,
+      avgObjectsPerTaskStr: avgObjectsPerTask
     };
   });
 
-  // Calculate 10 KPI Cards
+  // Calculate 8 Main KPI Cards (Section 6.1)
   const totalPeople = people.length;
   const totalSubmits = rows.length;
+  const totalObjectsAll = people.reduce((s, p) => s + p.totalObjects, 0);
   const avgSubmit = totalPeople ? (totalSubmits / totalPeople).toFixed(1) : '0';
+  const overallAvgObjects = totalSubmits > 0 ? (totalObjectsAll / totalSubmits).toFixed(1) : '0';
+  const overallLargestTask = people.reduce((m, p) => Math.max(m, p.largestTask), 0);
 
-  const counts = people.map(p => p.total).sort((a,b) => a - b);
-  const medianSubmit = counts.length ? (counts.length % 2 === 0 ? Math.round((counts[counts.length/2 - 1] + counts[counts.length/2]) / 2) : counts[Math.floor(counts.length/2)]) : 0;
-  const maxSubmit = counts.length ? counts[counts.length - 1] : 0;
-  const minSubmit = counts.length ? counts[0] : 0;
-
-  const lidarFPTot = people.reduce((s, p) => s + p.lidarFP, 0);
-  const lidarQATot = people.reduce((s, p) => s + p.lidarQA, 0);
-  const laneFPTot = people.reduce((s, p) => s + p.laneFP, 0);
-  const laneQATot = people.reduce((s, p) => s + p.laneQA, 0);
-
-  // Filter people by query
+  // Filter people by query & category
   const qFilter = (perfFilters.query || '').toLowerCase().trim();
   let filteredPeople = people.filter(p => {
     if (perfFilters.category) {
@@ -2190,13 +2473,14 @@ function renderPerformance(){
       const mId = p.maskedId.toLowerCase().includes(qFilter);
       const mShift = [...p.shifts].some(s => s.toLowerCase().includes(qFilter));
       const mQtc = [...p.qtcs].some(q => q.toLowerCase().includes(qFilter));
-      if (!mName && !mId && !mShift && !mQtc) return false;
+      const mUnit = [...p.units].some(u => u.toLowerCase().includes(qFilter));
+      if (!mName && !mId && !mShift && !mQtc && !mUnit) return false;
     }
     return true;
   });
 
-  // Sort people
-  const sortCol = perfFilters.sortCol || 'total';
+  // Default Sort ranking: Total Objects (Section 6.2)
+  const sortCol = perfFilters.sortCol || 'totalObjects';
   const sortAsc = !!perfFilters.sortAsc;
   filteredPeople.sort((a, b) => {
     let va = a[sortCol], vb = b[sortCol];
@@ -2205,149 +2489,129 @@ function renderPerformance(){
     return sortAsc ? (va - vb) : (vb - va);
   });
 
-  // Pagination
+  // Top rankings for Insights (Section 6.5)
+  const topByObjects = [...people].sort((a,b) => b.totalObjects - a.totalObjects).slice(0, 5);
+  const topByTasks = [...people].sort((a,b) => b.total - a.total).slice(0, 5);
+
+  // Pagination (Section 6.2 - No 100 limit, full pagination)
   const pageSize = 25;
   const totalPages = Math.max(1, Math.ceil(filteredPeople.length / pageSize));
   perfFilters.page = Math.min(perfFilters.page || 0, totalPages - 1);
   const visiblePeople = filteredPeople.slice(perfFilters.page * pageSize, (perfFilters.page + 1) * pageSize);
 
-  // Target Simulator Calculations
-  targetSimState.workforceSize = targetSimState.workforceSize || Math.max(1, totalPeople);
-  const simExpected = targetSimState.workforceSize * targetSimState.dailyTarget;
-  const simActual = totalSubmits;
-  const simAchPct = simExpected > 0 ? ((simActual / simExpected) * 100).toFixed(1) : 0;
-  const simRequired = Math.max(0, simExpected - simActual);
-  const simProjected = Math.round((simActual / Math.max(1, 4)) * targetSimState.workHours);
-  const simWorkforceReq = targetSimState.dailyTarget > 0 ? Math.ceil(simRequired / targetSimState.dailyTarget) : 0;
+  // Expose people list globally for drill-down modal lookup
+  window._allPeoplePerfMap = peopleMap;
 
-  // 10 KPI Cards
-  const kpi10 = [
-    { title: 'Total Active Labelers', val: totalPeople.toLocaleString(), sub: 'Distinct contributors', tone: '#0a9d8c' },
-    { title: 'Total Submissions', val: totalSubmits.toLocaleString(), sub: 'Total task volume', tone: '#0d9488' },
-    { title: 'Average / Labeler', val: avgSubmit, sub: 'Mean throughput', tone: '#3b82f6' },
-    { title: 'Median Submissions', val: medianSubmit.toLocaleString(), sub: 'Median throughput', tone: '#8b5cf6' },
-    { title: 'Highest Count', val: maxSubmit.toLocaleString(), sub: 'Top individual submit', tone: '#10b981' },
-    { title: 'Lowest Count', val: minSubmit.toLocaleString(), sub: 'Minimum individual submit', tone: '#f59e0b' },
-    { title: 'Lidar FP Total', val: lidarFPTot.toLocaleString(), sub: 'Lidar first pass volume', tone: '#0d9488' },
-    { title: 'Lidar QA Total', val: lidarQATot.toLocaleString(), sub: 'Lidar QA volume', tone: '#14b8a6' },
-    { title: 'Lane Line FP Total', val: laneFPTot.toLocaleString(), sub: 'Lane Line first pass', tone: '#ed9a35' },
-    { title: 'Lane Line QA Total', val: laneQATot.toLocaleString(), sub: 'Lane Line QA volume', tone: '#ec4899' }
+  // KPI Definitions
+  const kpiDefs = [
+    { title: 'Total Annotated Objects', val: totalObjectsAll.toLocaleString(), sub: 'Across all verified submissions', tone: '#0284c7' },
+    { title: 'Total Unique Labelers', val: totalPeople.toLocaleString(), sub: 'Active contributors in view', tone: '#0a9d8c' },
+    { title: 'Total Task Submissions', val: totalSubmits.toLocaleString(), sub: 'Cumulative task entries', tone: '#0d9488' },
+    { title: 'Largest Task Objects', val: overallLargestTask.toLocaleString(), sub: 'Max object count single task', tone: '#f59e0b' },
+    { title: 'Avg Objects / Task', val: overallAvgObjects, sub: 'Mean object complexity', tone: '#8b5cf6' },
+    { title: 'Avg Submissions / Labeler', val: avgSubmit, sub: 'Average output per person', tone: '#3b82f6' }
   ];
 
   page.innerHTML = '<div class="ux-overview">'
     + '<div class="ux-heading">'
       + '<div>'
-        + '<div class="ux-eyebrow">Workforce Performance · Capacity & Ranking</div>'
+        + '<div class="ux-eyebrow">Workforce Performance Intelligence</div>'
         + '<h2>Performance per Labelers</h2>'
-        + '<p>Comprehensive individual metrics, target achievement, capacity forecasting, and fair evaluation.</p>'
+        + '<p>Task volume, annotated object counts, and productivity analytics per individual contributor.</p>'
       + '</div>'
       + renderHeaderControlsHTML('perf')
     + '</div>'
 
     + renderUniversalFilterBar('performance')
 
-    // Controls
-    + '<div class="ux-panel perf-controls" style="margin-top:14px;">'
-      + '<label>Search Labeler / ID / Shift / QTC<input id="perfQuery" placeholder="Type labeler name, masked ID, QTC…" value="' + esc(perfFilters.query || '') + '"></label>'
-      + '<label>Category Filter<select id="perfCategory"><option value="">All Categories</option><option value="lidarFP" ' + (perfFilters.category==='lidarFP'?'selected':'') + '>Lidar FP</option><option value="lidarQA" ' + (perfFilters.category==='lidarQA'?'selected':'') + '>Lidar QA</option><option value="laneFP" ' + (perfFilters.category==='laneFP'?'selected':'') + '>Lane Line FP</option><option value="laneQA" ' + (perfFilters.category==='laneQA'?'selected':'') + '>Lane Line QA</option></select></label>'
-      + '<div style="margin-left:auto; display:flex; gap:8px; align-items:flex-end;">'
-        + '<button class="btn btn-c" id="perfExportCSV">↓ Export CSV (Masked IDs)</button>'
-        + '<button class="btn" id="perfReset">Reset Filters</button>'
-      + '</div>'
-    + '</div>'
-
-    // 10 KPI Grid
-    + '<div class="ux-grid-10" style="margin-top:16px;">'
-      + kpi10.map(k => '<div class="kpi-mini-card" style="--tone:' + k.tone + '">'
+    // Main KPI Cards Grid
+    + '<div class="ux-grid-8" style="grid-template-columns:repeat(auto-fit, minmax(210px, 1fr));">'
+      + kpiDefs.map(k => '<div class="kpi-mini-card" style="--tone:' + k.tone + '">'
         + '<div class="kpi-title"><span>' + esc(k.title) + '</span><span style="color:' + k.tone + '">●</span></div>'
         + '<div class="kpi-val">' + k.val + '</div>'
         + '<div class="kpi-sub">' + esc(k.sub) + '</div>'
       + '</div>').join('')
     + '</div>'
 
-    // TARGET SIMULATOR & CAPACITY FORECASTER
-    + '<div class="target-sim-box">'
-      + '<div class="sim-header">'
-        + '<div>'
-          + '<h3 style="margin:0; font-size:16px; font-weight:700;">🎯 Target Simulator & Capacity Forecaster</h3>'
-          + '<p style="margin:3px 0 0; font-size:12px; color:var(--text-soft);">Model scenario targets and estimate workforce requirements. Forecast calculations are clearly distinguished from actual observations.</p>'
+    // Employee Productivity Insights Panel (Section 6.5)
+    + '<div class="ux-panel" style="margin-top:16px; padding:16px 20px; background:var(--bg-2); border-radius:12px; border:1px solid var(--border);">'
+      + '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">'
+        + '<h3 style="margin:0; font-size:14px; display:flex; align-items:center; gap:8px;">🏆 Top Labeler Highlights (By Objects &amp; By Tasks)</h3>'
+        + '<span class="ux-note">Default ranking is ordered by Total Objects</span>'
+      + '</div>'
+      + '<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:14px;">'
+        + '<div style="background:var(--bg-3); padding:12px 14px; border-radius:8px; border-left:3px solid #0284c7;">'
+          + '<div style="font-weight:700; font-size:12px; margin-bottom:6px; color:#0284c7;">Top 5 Labelers by Total Objects:</div>'
+          + '<div style="display:flex; flex-direction:column; gap:4px; font-size:11px;">'
+            + topByObjects.map((p, i) => '<div style="display:flex; justify-content:space-between;"><span><b>#' + (i+1) + '</b> ' + esc(p.name) + '</span><strong style="color:#0284c7;">' + p.totalObjects.toLocaleString() + ' obj</strong></div>').join('')
+          + '</div>'
         + '</div>'
-        + '<span class="sim-forecast-badge">MODEL SIMULATION · FORECAST ONLY</span>'
-      + '</div>'
-      + '<div class="sim-inputs-grid">'
-        + '<label>Daily Target (tasks/person)<input type="number" id="simDaily" value="' + targetSimState.dailyTarget + '" min="1" step="5"></label>'
-        + '<label>Shift Target (tasks/shift)<input type="number" id="simShift" value="' + targetSimState.shiftTarget + '" min="1" step="5"></label>'
-        + '<label>Modality Focus<select id="simMod"><option value="all">All Modalities</option><option value="lidar">Lidar</option><option value="lane">Lane Line</option></select></label>'
-        + '<label>Working Hours<input type="number" id="simHours" value="' + targetSimState.workHours + '" min="1" max="24" step="1"></label>'
-        + '<label>Expected Workforce Size<input type="number" id="simWorkforce" value="' + targetSimState.workforceSize + '" min="1" step="5"></label>'
-      + '</div>'
-      + '<div class="sim-results-grid">'
-        + '<div class="sim-res-card"><span>Expected Submissions</span><strong>' + simExpected.toLocaleString() + '</strong></div>'
-        + '<div class="sim-res-card"><span>Current Achievement</span><strong style="color:' + (simAchPct >= 100 ? 'var(--success)' : '#df8b24') + ';">' + simAchPct + '%</strong></div>'
-        + '<div class="sim-res-card"><span>Required Submissions</span><strong style="color:var(--danger);">' + simRequired.toLocaleString() + '</strong></div>'
-        + '<div class="sim-res-card"><span>Projected End-of-Shift</span><strong style="color:var(--accent);">' + simProjected.toLocaleString() + '</strong></div>'
-        + '<div class="sim-res-card"><span>Addl. Workforce Needed</span><strong>' + simWorkforceReq.toLocaleString() + ' people</strong></div>'
+        + '<div style="background:var(--bg-3); padding:12px 14px; border-radius:8px; border-left:3px solid #0d9488;">'
+          + '<div style="font-weight:700; font-size:12px; margin-bottom:6px; color:#0d9488;">Top 5 Labelers by Total Tasks:</div>'
+          + '<div style="display:flex; flex-direction:column; gap:4px; font-size:11px;">'
+            + topByTasks.map((p, i) => '<div style="display:flex; justify-content:space-between;"><span><b>#' + (i+1) + '</b> ' + esc(p.name) + '</span><strong style="color:var(--primary);">' + p.total.toLocaleString() + ' tasks</strong></div>').join('')
+          + '</div>'
+        + '</div>'
       + '</div>'
     + '</div>'
 
-    // Fair Ranking Notice
-    + '<div class="ux-panel" style="margin-top:20px; padding:12px 18px; border-left:4px solid #f59e0b; background:rgba(245,158,11,0.06); font-size:12px; line-height:1.6; color:var(--text);">'
-      + '<b>⚖️ Fair Assessment & Compliance Notice:</b> Do not use raw submission counts alone for punitive employee rankings; account for task difficulty, verified quality, shift length, and data completeness. National IDs are permanently masked (<code>EMP-***XXXX</code>) across all tables and exports.'
+    // Controls & Filter Bar
+    + '<div class="queues-controls" style="margin-top:16px;">'
+      + '<label>Search Labeler / ID / Shift / Unit / QTC<input id="perfSearch" placeholder="Type name, masked ID, unit, QTC…" value="' + esc(perfFilters.query || '') + '"></label>'
+      + '<label>Category Filter<select id="perfCategory"><option value="">All Categories</option><option value="lidarFP" ' + (perfFilters.category==='lidarFP'?'selected':'') + '>Lidar FP</option><option value="lidarQA" ' + (perfFilters.category==='lidarQA'?'selected':'') + '>Lidar QA</option><option value="laneFP" ' + (perfFilters.category==='laneFP'?'selected':'') + '>Lane Line FP</option><option value="laneQA" ' + (perfFilters.category==='laneQA'?'selected':'') + '>Lane Line QA</option></select></label>'
+      + '<div style="margin-left:auto; display:flex; gap:8px; align-items:flex-end;">'
+        + '<button class="btn btn-c" id="perfExportCSV">↓ Export CSV</button>'
+        + '<button class="btn" id="perfReset">Reset filters</button>'
+      + '</div>'
     + '</div>'
 
-    // MAIN LABELER TABLE
+    // RANKING TABLE
     + '<section class="ux-panel" style="margin-top:20px;">'
       + '<div class="ux-heading" style="margin-bottom:12px;">'
-        + '<div><h3>Labeler Performance Rankings (' + filteredPeople.length.toLocaleString() + ' labelers)</h3><p>Click any column header with ↕ to sort. Click labeler name to view detailed profile.</p></div>'
+        + '<div><h3>Labeler Ranking Table (' + filteredPeople.length.toLocaleString() + ' contributors)</h3><p>Default sorted by Total Objects. Click headers with ↕ to reorder. Click any employee to open detail drill-down.</p></div>'
         + '<span class="ux-note">Showing ' + (visiblePeople.length ? (perfFilters.page*pageSize+1) : 0) + ' – ' + Math.min((perfFilters.page+1)*pageSize, filteredPeople.length) + ' of ' + filteredPeople.length + ' labelers</span>'
       + '</div>'
       + '<div class="perf-table">'
         + '<table>'
           + '<thead><tr>'
-            + '<th style="width:40px;">Rank</th>'
+            + '<th>#</th>'
             + '<th data-sort="name">Labeler Name ↕</th>'
-            + '<th>Employee ID</th>'
-            + '<th>Shift(s)</th>'
-            + '<th>Floor</th>'
-            + '<th>QTC / Supervisor</th>'
-            + '<th data-sort="total" style="color:var(--primary);">Total Submit ↕</th>'
-            + '<th data-sort="lidarFP" style="color:#0d9488;">Lidar FP ↕</th>'
-            + '<th data-sort="lidarQA" style="color:#14b8a6;">Lidar QA ↕</th>'
-            + '<th data-sort="laneFP" style="color:#ed9a35;">Lane Line FP ↕</th>'
-            + '<th data-sort="laneQA" style="color:#ec4899;">Lane Line QA ↕</th>'
+            + '<th>Masked ID</th>'
+            + '<th data-sort="totalObjects" style="color:#0284c7; font-weight:800;">Total Objects ↕</th>'
+            + '<th data-sort="total" style="color:var(--primary);">Total Tasks ↕</th>'
+            + '<th data-sort="avgObjectsPerTask">Avg Obj / Task ↕</th>'
+            + '<th data-sort="largestTask">Largest Task ↕</th>'
             + '<th data-sort="activeDays">Active Days ↕</th>'
             + '<th data-sort="avgPerDay">Avg / Day ↕</th>'
-            + '<th data-sort="avgPerHour">Avg / Hour ↕</th>'
-            + '<th>Verified Quality</th>'
-            + '<th>Target Ach. %</th>'
+            + '<th style="color:#0d9488;">Lidar FP</th>'
+            + '<th style="color:#14b8a6;">Lidar QA</th>'
+            + '<th style="color:#ed9a35;">Lane FP</th>'
+            + '<th style="color:#ec4899;">Lane QA</th>'
+            + '<th>Action</th>'
           + '</tr></thead>'
           + '<tbody>'
             + visiblePeople.map((p, idx) => {
-              const rank = perfFilters.page * pageSize + idx + 1;
-              const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : ('#' + rank);
-              const tierClass = p.verifiedScore !== null ? (p.verifiedScore >= 0.95 ? 'tier-high' : p.verifiedScore >= 0.85 ? 'tier-mid' : 'tier-low') : '';
-              return '<tr>'
-                + '<td style="font-weight:700; color:var(--text-soft);">' + medal + '</td>'
-                + '<td><button class="perf-person" data-person-key="' + esc(p.key) + '" style="background:none; border:none; color:var(--primary); font-weight:700; cursor:pointer; text-decoration:underline;">' + esc(p.name) + '</button></td>'
-                + '<td><span class="q-badge" style="background:var(--bg-3); border:1px solid var(--border); font-family:var(--mono);">' + esc(p.maskedId) + '</span></td>'
-                + '<td>' + ([...p.shifts].slice(0,2).map(s=>'<span class="q-badge q-shift">' + esc(s) + '</span>').join('') || '—') + '</td>'
-                + '<td>' + ([...p.floors].map(esc).join(', ') || '—') + '</td>'
-                + '<td>' + ([...p.qtcs].slice(0,2).join(', ') || '—') + '</td>'
-                + '<td><strong style="color:var(--primary); font-size:14px;">' + p.total.toLocaleString() + '</strong></td>'
-                + '<td>' + p.lidarFP.toLocaleString() + '</td>'
-                + '<td>' + p.lidarQA.toLocaleString() + '</td>'
-                + '<td>' + p.laneFP.toLocaleString() + '</td>'
-                + '<td>' + p.laneQA.toLocaleString() + '</td>'
-                + '<td><b>' + p.activeDays + '</b></td>'
-                + '<td>' + p.avgPerDayStr + '</td>'
-                + '<td>' + p.avgPerHourStr + '</td>'
-                + '<td>' + (p.verifiedScore !== null ? '<span class="tier-badge ' + tierClass + '">' + p.verifiedScoreStr + '</span>' : '<span class="ux-note">—</span>') + '</td>'
-                + '<td><b style="color:' + (p.targetAch >= 100 ? 'var(--success)' : 'var(--text)') + ';">' + p.targetAchStr + '</b></td>'
+              const rank = (perfFilters.page * pageSize) + idx + 1;
+              return '<tr class="labeler-row-item" data-person-key="' + esc(p.key) + '" style="cursor:pointer;" title="Click to view detailed employee task history">'
+                + '<td><b style="color:var(--text-soft); font-size:11px;">' + rank + '</b></td>'
+                + '<td><strong style="color:var(--primary);">' + esc(p.name) + '</strong></td>'
+                + '<td><span class="ux-note" style="font-family:monospace; font-size:11px;">' + esc(p.maskedId) + '</span></td>'
+                + '<td><strong style="color:#0284c7; font-size:13px;">' + p.totalObjects.toLocaleString() + '</strong></td>'
+                + '<td><strong style="color:var(--text);">' + p.total.toLocaleString() + '</strong></td>'
+                + '<td><span>' + p.avgObjectsPerTaskStr + '</span></td>'
+                + '<td><span>' + p.largestTask.toLocaleString() + '</span></td>'
+                + '<td><span>' + p.activeDays + '</span></td>'
+                + '<td><b>' + p.avgPerDayStr + '</b></td>'
+                + '<td><span style="color:#0d9488;">' + p.lidarFP.toLocaleString() + '</span></td>'
+                + '<td><span style="color:#14b8a6;">' + p.lidarQA.toLocaleString() + '</span></td>'
+                + '<td><span style="color:#ed9a35;">' + p.laneFP.toLocaleString() + '</span></td>'
+                + '<td><span style="color:#ec4899;">' + p.laneQA.toLocaleString() + '</span></td>'
+                + '<td><button class="btn btn-c lab-drill-btn" data-person-key="' + esc(p.key) + '" style="font-size:10px; padding:3px 8px;">🔍 Detail</button></td>'
               + '</tr>';
             }).join('')
           + '</tbody>'
         + '</table>'
-        + (!filteredPeople.length ? '<div class="ux-empty">No labelers match your filters.</div>' : '')
+        + (!filteredPeople.length ? '<div class="ux-empty">No labelers match your current filters.</div>' : '')
       + '</div>'
       + '<div class="perf-pagination" style="display:flex; justify-content:space-between; align-items:center; margin-top:14px;">'
         + '<button class="btn" id="perfPrev" ' + (perfFilters.page === 0 ? 'disabled' : '') + '>Previous</button>'
@@ -2357,109 +2621,51 @@ function renderPerformance(){
     + '</section>'
   + '</div>';
 
-  bindHeaderControls(page, 'perf'); bindUniversalFilterBar(page, 'performance');
-  const slicersEl = page.querySelector('#perfSlicers');
-  if (slicersEl) slicersEl.appendChild(createListSlicers());
+  bindHeaderControls(page, 'perf');
+  bindUniversalFilterBar(page, 'performance');
 
   // Search input
-  const qInput = page.querySelector('#perfQuery');
-  if (qInput) {
-    qInput.oninput = (e) => {
-      perfFilters.query = e.target.value;
-      perfFilters.page = 0;
+  const sInput = $('perfSearch');
+  if(sInput){
+    sInput.oninput = e => { perfFilters.query = e.target.value; perfFilters.page = 0; renderPerformance(); };
+  }
+  const cSelect = $('perfCategory');
+  if(cSelect){
+    cSelect.onchange = e => { perfFilters.category = e.target.value; perfFilters.page = 0; renderPerformance(); };
+  }
+  const rBtn = $('perfReset');
+  if(rBtn){
+    rBtn.onclick = () => {
+      Object.assign(perfFilters, { query: '', category: '', sortCol: 'totalObjects', sortAsc: false, page: 0 });
       renderPerformance();
     };
   }
 
-  // Category select
-  const catSel = page.querySelector('#perfCategory');
-  if (catSel) {
-    catSel.onchange = (e) => {
-      perfFilters.category = e.target.value;
-      perfFilters.page = 0;
-      renderPerformance();
-    };
-  }
-
-  // Sorter clicks
+  // Sorting
   page.querySelectorAll('th[data-sort]').forEach(th => {
     th.style.cursor = 'pointer';
     th.onclick = () => {
-      const col = th.dataset.sort;
-      if (perfFilters.sortCol === col) perfFilters.sortAsc = !perfFilters.sortAsc;
-      else { perfFilters.sortCol = col; perfFilters.sortAsc = false; }
+      const s = th.dataset.sort;
+      if(perfFilters.sortCol === s) { perfFilters.sortAsc = !perfFilters.sortAsc; }
+      else { perfFilters.sortCol = s; perfFilters.sortAsc = false; }
       renderPerformance();
     };
   });
 
-  // Simulator live bindings
-  const updateSim = () => {
-    targetSimState.dailyTarget = Number($('simDaily').value) || 50;
-    targetSimState.shiftTarget = Number($('simShift').value) || 25;
-    targetSimState.workHours = Number($('simHours').value) || 8;
-    targetSimState.workforceSize = Number($('simWorkforce').value) || totalPeople;
-    renderPerformance();
-  };
-  $('simDaily').onchange = updateSim;
-  $('simShift').onchange = updateSim;
-  $('simHours').onchange = updateSim;
-  $('simWorkforce').onchange = updateSim;
+  // Pagination
+  const pPrev = $('perfPrev'); if(pPrev) pPrev.onclick = () => { if(perfFilters.page > 0){ perfFilters.page--; renderPerformance(); } };
+  const pNext = $('perfNext'); if(pNext) pNext.onclick = () => { if(perfFilters.page < totalPages - 1){ perfFilters.page++; renderPerformance(); } };
 
-  // Pagination buttons
-  $('perfPrev').onclick = () => { if (perfFilters.page > 0) { perfFilters.page--; renderPerformance(); } };
-  $('perfNext').onclick = () => { if (perfFilters.page < totalPages - 1) { perfFilters.page++; renderPerformance(); } };
-  $('perfReset').onclick = () => { perfFilters.query = ''; perfFilters.category = ''; perfFilters.page = 0; renderPerformance(); };
+  // Export CSV
+  const pExp = $('perfExportCSV');
+  if(pExp) pExp.onclick = () => exportPerformanceCSV(filteredPeople);
 
-  // Export CSV with masked IDs
-  $('perfExportCSV').onclick = () => {
-    const headers = ['Rank', 'Labeler Name', 'Employee ID (Masked)', 'Shifts', 'Floors', 'QTCs', 'Total Submits', 'Lidar FP', 'Lidar QA', 'Lane Line FP', 'Lane Line QA', 'Active Days', 'Avg / Day', 'Avg / Hour', 'Verified Quality', 'Target Ach %'];
-    const csvRows = filteredPeople.map((p, i) => [
-      i + 1,
-      p.name,
-      p.maskedId,
-      [...p.shifts].join('; '),
-      [...p.floors].join('; '),
-      [...p.qtcs].join('; '),
-      p.total,
-      p.lidarFP,
-      p.lidarQA,
-      p.laneFP,
-      p.laneQA,
-      p.activeDays,
-      p.avgPerDayStr,
-      p.avgPerHourStr,
-      p.verifiedScoreStr,
-      p.targetAchStr
-    ]);
-    const cell = v => '"' + String(v ?? '').replace(/^[=+@\-\t\r]/, "'$&").replace(/"/g, '""') + '"';
-    const csv = [headers, ...csvRows].map(r => r.map(cell).join(',')).join('\r\n');
-    downloadBlob(new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' }), 'MEEG_labelers_performance_' + cairoToday() + '.csv');
-    showToast('✓ Exported labelers performance with masked IDs');
-  };
-
-  // Labeler Profile Modal click
-  page.querySelectorAll('[data-person-key]').forEach(btn => {
-    btn.onclick = () => {
-      const k = btn.dataset.personKey;
-      const p = peopleMap.get(k);
-      if (!p) return;
-      const qData = getLabelerQuality(p.name, '');
-      const taskRows = p.tasks.map(t => [
-        t.id,
-        t.date,
-        t.shift,
-        t.unit,
-        t.qtc,
-        t.mod,
-        t.pass
-      ]);
-      openDrilldownModal({
-        title: p.name + ' · Detailed Profile',
-        subtitle: p.maskedId + ' · ' + p.total.toLocaleString() + ' total submissions across ' + p.activeDays + ' active days',
-        badge: qData ? 'Verified Quality: ' + (qData.totalAccuracy*100).toFixed(1)+'%' : 'Standard Contributor',
-        columns: ['Task ID', 'Date', 'Shift', 'Unit', 'QTC', 'Modality', 'Pass'],
-        rows: taskRows
-      });
+  // Drilldown modal bindings
+  page.querySelectorAll('.labeler-row-item, .lab-drill-btn').forEach(el => {
+    el.onclick = (e) => {
+      e.stopPropagation();
+      const pKey = el.dataset.personKey;
+      if(pKey && typeof openLabelerDetailModal === 'function') openLabelerDetailModal(pKey);
     };
   });
 }
@@ -3129,7 +3335,7 @@ loadData=function(){
     try{
       const token = (typeof getAuthToken === "function" ? getAuthToken() : (sessionStorage.getItem("meeg_auth_token") || ""));
       const apiBase = window.MEEG_API_URL || localStorage.getItem("meeg_api_url") || "https://meeg-secure-api.islamyasser424.workers.dev";
-      const res = await (typeof apiFetch === "function" ? apiFetch("/api/analytics/dataset?limit=25000") : fetch(apiBase + "/api/analytics/dataset?limit=25000", {
+      const res = await (typeof apiFetch === "function" ? apiFetch("/api/analytics/dataset?limit=100000") : fetch(apiBase + "/api/analytics/dataset?limit=100000", {
         headers: token ? { "Authorization": "Bearer " + token } : {},
         credentials: "include"
       }));
@@ -3161,24 +3367,9 @@ loadData=function(){
       }
       onCsvTable(table);
       setTrafficLight('green');
-      return;;
+      return;
    }catch(e){
       failure = e;
-      // Fallback directly to Google Sheets CSV export if API drops
-      try {
-        const sheetRes = await fetch("https://docs.google.com/spreadsheets/d/1g9mPKQMactJKC-BP0Ik3Cw72PLUXCb4VTKFbHYLjc5I/export?format=csv&gid=0");
-        if (sheetRes.ok) {
-          const csvText = await sheetRes.text();
-          const table = await parseCSVAsync(csvText);
-          if (table && table.length) {
-            onCsvTable(table);
-            setTrafficLight('green');
-            return;
-          }
-        }
-      } catch(sheetErr) {
-        failure = sheetErr;
-      }
    }
 
    if(!rawRows.length){
@@ -3260,87 +3451,101 @@ const oldRender=renderAllSections;
 /* queuesFilters declared at top */
 
 function queuesAggregateData(rows){
- const idx=name=>hdrs.findIndex(h=>String(h).trim().toLowerCase()===name);
- const qi=idx('queue name'),si=idx('shift'),fi=hdrs.findIndex(h=>['floor','unit'].includes(String(h).trim().toLowerCase()));
- const qci=idx('qtc name'),mi=idx('modality'),pi=idx('pass'),ni=idx('national id'),li=idx('labeler name');
+  const idx = name => hdrs.findIndex(h => h.trim().toLowerCase() === name.toLowerCase());
+  const qi = idx('queue name'), si = idx('shift'), fi = hdrs.findIndex(h => ['floor','unit'].includes(h.trim().toLowerCase()));
+  const qci = idx('qtc name'), mi = idx('modality'), pi = idx('pass'), ni = idx('national id'), li = idx('labeler name');
+  const oi = idx('object count');
 
- const queueMap=new Map();
+  const queueMap = new Map();
 
- rows.forEach(r=>{
-  const qName=qi>=0?String(r[qi]||'').trim():'';
-  if(!qName)return;
+  rows.forEach(r => {
+    const qName = qi >= 0 ? String(r[qi] || '').trim() : '';
+    if (!qName) return;
 
-  if(!queueMap.has(qName)){
-   queueMap.set(qName,{
-    name:qName,
-    shifts:new Set(),
-    floors:new Set(),
-    qtcs:new Set(),
-    labelers:new Set(),
-    totalSubmit:0,
-    lidarFP:0,
-    lidarQA:0,
-    laneFP:0,
-    laneQA:0
-   });
-  }
+    if (!queueMap.has(qName)) {
+      queueMap.set(qName, {
+        name: qName,
+        shifts: new Set(),
+        floors: new Set(),
+        qtcs: new Set(),
+        labelers: new Set(),
+        totalSubmit: 0,
+        totalObjects: 0,
+        lidarFP: 0,
+        lidarQA: 0,
+        laneFP: 0,
+        laneQA: 0,
+        dates: new Map(),
+        latestTimestamp: ''
+      });
+    }
 
-  const item=queueMap.get(qName);
+    const item = queueMap.get(qName);
 
-  const shift=si>=0?String(r[si]||'').trim():'';
-  if(shift)item.shifts.add(shift);
+    const shift = si >= 0 ? String(r[si] || '').trim() : '';
+    if (shift) item.shifts.add(shift);
 
-  const floor=fi>=0?String(r[fi]||'').trim():'';
-  if(floor)item.floors.add(floor);
+    const floor = fi >= 0 ? deriveFloor(r[fi]) : '';
+    if (floor) item.floors.add(floor);
 
-  const qtc=qci>=0?String(r[qci]||'').normalize('NFC').trim().replace(/\s+/gu,' '):'';
-  if(qtc)item.qtcs.add(qtc);
+    const qtc = qci >= 0 ? String(r[qci] || '').normalize('NFC').trim().replace(/\s+/gu, ' ') : '';
+    if (qtc) item.qtcs.add(qtc);
 
-  let lid='';
-  if(ni>=0){
-   const rawNi=String(r[ni]??'').trim()
-    .replace(/[٠-٩]/g,c=>String(c.charCodeAt(0)-1632))
-    .replace(/[۰-۹]/g,c=>String(c.charCodeAt(0)-1776))
-    .replace(/\.0+$/,'').replace(/[\s-]/g,'');
-   if(/^\d{14}$/.test(rawNi))lid=rawNi;
-  }
-  if(!lid&&li>=0){
-   const name=String(r[li]??'').trim().toLowerCase();
-   if(name)lid='name:'+name;
-  }
-  if(lid)item.labelers.add(lid);
+    let lid = '';
+    if (ni >= 0) {
+      const rawNi = String(r[ni] ?? '').trim()
+        .replace(/[٠-٩]/g, c => String(c.charCodeAt(0) - 1632))
+        .replace(/[۰-۹]/g, c => String(c.charCodeAt(0) - 1776))
+        .replace(/\.0+$/, '').replace(/[\s-]/g, '');
+      if (/^\d{14}$/.test(rawNi)) lid = rawNi;
+    }
+    if (!lid && li >= 0) {
+      const name = String(r[li] ?? '').trim().toLowerCase();
+      if (name) lid = 'name:' + name;
+    }
+    if (lid) item.labelers.add(lid);
 
-  item.totalSubmit++;
+    item.totalSubmit++;
+    const objCnt = parseFloat(oi >= 0 ? r[oi] : 0) || 0;
+    item.totalObjects += objCnt;
 
-  const mod=mi<0?'':String(r[mi]??'').trim().toLowerCase().replace(/[\s_-]+/g,'');
-  const pass=pi<0?'':String(r[pi]??'').trim().toUpperCase();
-  const prefix=mod==='lidar'?'lidar':(mod==='laneline'||mod==='lane')?'lane':'';
-  if(prefix&&(pass==='FP'||pass==='QA')){
-   const key=prefix+pass;
-   if(item[key]!==undefined)item[key]++;
-  }
- });
+    const d = rDate(r);
+    if (d) {
+      item.dates.set(d, (item.dates.get(d) || 0) + 1);
+      if (!item.latestTimestamp || d > item.latestTimestamp) item.latestTimestamp = d;
+    }
 
- return [...queueMap.values()].map(q=>{
-  const uniqueLabelers=q.labelers.size;
-  const avgSubmit=uniqueLabelers>0?(q.totalSubmit/uniqueLabelers).toFixed(1):'0';
-  return {
-   name:q.name,
-   shifts:[...q.shifts].sort(),
-   floors:[...q.floors].sort(),
-   qtcs:[...q.qtcs].sort(),
-   labelerSet:q.labelers,
-   totalSubmit:q.totalSubmit,
-   lidarFP:q.lidarFP,
-   lidarQA:q.lidarQA,
-   laneFP:q.laneFP,
-   laneQA:q.laneQA,
-   uniqueLabelers,
-   avgSubmit:Number(avgSubmit),
-   avgSubmitStr:avgSubmit,
-   uniqueQtc:q.qtcs.size
-  };
- });
+    if (isModPass(r, 'lidar', 'FP')) item.lidarFP++;
+    if (isModPass(r, 'lidar', 'QA')) item.lidarQA++;
+    if (isModPass(r, 'laneline', 'FP')) item.laneFP++;
+    if (isModPass(r, 'laneline', 'QA')) item.laneQA++;
+  });
+
+  return [...queueMap.values()].map(q => {
+    const uniqueLabelers = q.labelers.size;
+    const avgSubmit = uniqueLabelers > 0 ? (q.totalSubmit / uniqueLabelers).toFixed(1) : '0';
+    const avgObjects = q.totalSubmit > 0 ? (q.totalObjects / q.totalSubmit).toFixed(1) : '0';
+    return {
+      name: q.name,
+      shifts: [...q.shifts].sort(),
+      floors: [...q.floors].sort(),
+      qtcs: [...q.qtcs].sort(),
+      labelerSet: q.labelers,
+      totalSubmit: q.totalSubmit,
+      totalObjects: q.totalObjects,
+      avgObjects,
+      lidarFP: q.lidarFP,
+      lidarQA: q.lidarQA,
+      laneFP: q.laneFP,
+      laneQA: q.laneQA,
+      uniqueLabelers,
+      avgSubmit: Number(avgSubmit),
+      avgSubmitStr: avgSubmit,
+      uniqueQtc: q.qtcs.size,
+      dates: q.dates,
+      latestTimestamp: q.latestTimestamp
+    };
+  });
 }
 
 function exportQueuesCSV(queues){
@@ -3372,7 +3577,7 @@ function renderQueuesAnalysis(){
 
   if(!window._firstDataReady && !hdrs.length){
     const error = $('mainContent')?.querySelector('.errbox');
-    page.innerHTML = '<div class="ux-overview"><div class="ux-heading"><div><div class="ux-eyebrow">Queue breakdown · Shifts & Floors & QTCs</div><h2>Queues Analysis</h2><p>Submission volume, shifts, floors, and QTC distribution per queue</p></div>' + renderHeaderControlsHTML('queues') + '</div><div class="ux-panel"><h3>' + (error ? 'Data could not be loaded' : 'Waiting for source data') + '</h3><p>' + esc(error ? error.textContent.replace('↻ Retry','').trim() : 'Queues analysis will appear once dashboard data is loaded.') + '</p><button class="btn btn-c" id="qRetry" style="margin-top:16px">↻ Retry data load</button></div></div>';
+    page.innerHTML = '<div class="ux-overview"><div class="ux-heading"><div><div class="ux-eyebrow">Queue breakdown · Shifts &amp; Floors &amp; QTCs</div><h2>Queues Analysis</h2><p>Submission volume, shifts, floors, and QTC distribution per queue</p></div>' + renderHeaderControlsHTML('queues') + '</div><div class="ux-panel"><h3>' + (error ? 'Data could not be loaded' : 'Waiting for source data') + '</h3><p>' + esc(error ? error.textContent.replace('↻ Retry','').trim() : 'Queues analysis will appear once dashboard data is loaded.') + '</p><button class="btn btn-c" id="qRetry" style="margin-top:16px">↻ Retry data load</button></div></div>';
     bindHeaderControls(page, 'queues'); bindUniversalFilterBar(page, 'queues');
     $('qRetry')?.addEventListener('click', () => loadData());
     return;
@@ -3419,6 +3624,7 @@ function renderQueuesAnalysis(){
 
   // Selection summary stats
   const totalTasks = filtered.reduce((n,q) => n + q.totalSubmit, 0);
+  const totalObjectsAll = filtered.reduce((n,q) => n + q.totalObjects, 0);
   const totalLidarFP = filtered.reduce((n,q) => n + q.lidarFP, 0);
   const totalLidarQA = filtered.reduce((n,q) => n + q.lidarQA, 0);
   const totalLaneFP = filtered.reduce((n,q) => n + q.laneFP, 0);
@@ -3427,11 +3633,16 @@ function renderQueuesAnalysis(){
   const totalUniqueQtcs = new Set(filtered.flatMap(q => q.qtcs)).size;
   const totalUniqueLabelers = new Set(filtered.flatMap(q => [...(q.labelerSet || [])])).size;
   const avgSubmit = totalUniqueLabelers > 0 ? (totalTasks / totalUniqueLabelers).toFixed(1) : '0';
+  const avgObjectsPerTask = totalTasks > 0 ? (totalObjectsAll / totalTasks).toFixed(1) : '0';
 
   const sortedByVol = [...filtered].sort((a,b) => b.totalSubmit - a.totalSubmit);
   const topQueue = sortedByVol.length ? sortedByVol[0] : null;
   const lowestQueue = sortedByVol.length ? sortedByVol[sortedByVol.length - 1] : null;
   const decliningQueues = filtered.filter(q => q.totalSubmit <= 5);
+
+  // Workload concentration: Top 3 queues share
+  const top3Vol = sortedByVol.slice(0, 3).reduce((n, q) => n + q.totalSubmit, 0);
+  const top3Share = totalTasks > 0 ? ((top3Vol / totalTasks) * 100).toFixed(1) : '0';
 
   // Pagination
   const pageSize = queuesFilters.pageSize || 25;
@@ -3439,22 +3650,22 @@ function renderQueuesAnalysis(){
   queuesFilters.page = Math.min(queuesFilters.page || 0, totalPages - 1);
   const visible = filtered.slice(queuesFilters.page * pageSize, (queuesFilters.page + 1) * pageSize);
 
-  // 8 KPI Cards
+  // 8 Main KPI Cards (Including Total Objects)
   const kpi8 = [
     { title: 'Total Active Queues', val: filtered.length.toLocaleString(), sub: 'Receiving submissions', tone: '#df5c99' },
     { title: 'Queue Submissions', val: totalTasks.toLocaleString(), sub: 'Total task entries', tone: '#0d9488' },
+    { title: 'Total Objects', val: totalObjectsAll.toLocaleString(), sub: 'Cumulative objects (' + avgObjectsPerTask + ' avg/task)', tone: '#0284c7' },
     { title: 'Unique Labelers', val: totalUniqueLabelers.toLocaleString(), sub: 'Active contributors', tone: '#0a9d8c' },
     { title: 'Unique QTCs', val: totalUniqueQtcs.toLocaleString(), sub: 'Distinct QA reviewers', tone: '#df8b24' },
     { title: 'Avg Submissions / Labeler', val: avgSubmit, sub: 'Average productivity', tone: '#3b82f6' },
     { title: 'Highest Performing Queue', val: (topQueue ? topQueue.name : '—'), sub: (topQueue ? topQueue.totalSubmit.toLocaleString() + ' tasks' : '—'), tone: '#10b981' },
-    { title: 'Lowest Volume Queue', val: (lowestQueue ? lowestQueue.name : '—'), sub: (lowestQueue ? lowestQueue.totalSubmit.toLocaleString() + ' tasks' : '—'), tone: '#f59e0b' },
-    { title: 'Declining Activity Queues', val: decliningQueues.length.toLocaleString(), sub: 'Volume <= 5 submissions', tone: '#ef4444' }
+    { title: 'Workload Concentration', val: (top3Share + '%'), sub: 'Top 3 queues share of total output', tone: '#8b5cf6' }
   ];
 
   page.innerHTML = '<div class="ux-overview">'
     + '<div class="ux-heading">'
       + '<div>'
-        + '<div class="ux-eyebrow">Queue Operations · Velocity & Workload</div>'
+        + '<div class="ux-eyebrow">Queue Operations · Velocity &amp; Workload</div>'
         + '<h2>Queues Analysis</h2>'
         + '<p>Monitor queue productivity, operational balance, modality distribution, and team throughput.</p>'
       + '</div>'
@@ -3474,6 +3685,32 @@ function renderQueuesAnalysis(){
 
     + renderCategoryCardsHTML(catSummary, queuesFilters.category, 'queues')
 
+    // Smart Queue Insights Panel (Section 5.5)
+    + '<div class="ux-panel" style="margin-top:16px; padding:16px 20px; background:var(--bg-2); border-radius:12px; border:1px solid var(--border);">'
+      + '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">'
+        + '<h3 style="margin:0; font-size:14px; display:flex; align-items:center; gap:8px;">📊 Smart Queue Insights &amp; Workload Health</h3>'
+        + '<span class="ux-note">Live analytics from Turso database</span>'
+      + '</div>'
+      + '<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:12px;">'
+        + '<div style="background:var(--bg-3); padding:10px 14px; border-radius:8px; border-left:3px solid #10b981;">'
+          + '<span class="ux-note">Top Queue by Volume</span>'
+          + '<div style="font-weight:700; font-size:13px; color:var(--text); margin-top:2px;">' + (topQueue ? esc(topQueue.name) + ' (' + topQueue.totalSubmit.toLocaleString() + ' tasks)' : '—') + '</div>'
+        + '</div>'
+        + '<div style="background:var(--bg-3); padding:10px 14px; border-radius:8px; border-left:3px solid #8b5cf6;">'
+          + '<span class="ux-note">Workload Concentration (Top 3 Queues)</span>'
+          + '<div style="font-weight:700; font-size:13px; color:var(--text); margin-top:2px;">' + top3Share + '% of all submissions</div>'
+        + '</div>'
+        + '<div style="background:var(--bg-3); padding:10px 14px; border-radius:8px; border-left:3px solid #f59e0b;">'
+          + '<span class="ux-note">Lowest Volume Queue</span>'
+          + '<div style="font-weight:700; font-size:13px; color:var(--text); margin-top:2px;">' + (lowestQueue ? esc(lowestQueue.name) + ' (' + lowestQueue.totalSubmit.toLocaleString() + ' tasks)' : '—') + '</div>'
+        + '</div>'
+        + '<div style="background:var(--bg-3); padding:10px 14px; border-radius:8px; border-left:3px solid #ef4444;">'
+          + '<span class="ux-note">Declining / Low Activity Queues</span>'
+          + '<div style="font-weight:700; font-size:13px; color:var(--text); margin-top:2px;">' + decliningQueues.length + ' queues (<= 5 submissions)</div>'
+        + '</div>'
+      + '</div>'
+    + '</div>'
+
     // Filter Controls Bar
     + '<div class="queues-controls" style="margin-top:16px;">'
       + '<label>Search Queue / Shift / Floor / QTC<input id="qSearch" placeholder="Type to filter queues, shifts, floors, QTCs…" value="' + esc(queuesFilters.query || '') + '"></label>'
@@ -3486,54 +3723,49 @@ function renderQueuesAnalysis(){
       + '</div>'
     + '</div>'
 
-    // Operational Notice Banner
-    + '<div class="ux-panel" style="margin-top:16px; padding:12px 18px; border-left:4px solid #3b82f6; background:rgba(59,130,246,0.06); font-size:12px; color:var(--text);">'
-      + '<b>ℹ️ Operational Queue Notice:</b> Queues with low submission volume are flagged as <i>Declining Activity</i>. Do not label low submission volume as a backlog unless task assignment, pending-task status, or queue inventory data confirms it.'
-    + '</div>'
-
-    // MAIN 13-COLUMN QUEUE TABLE
+    // MAIN QUEUE TABLE WITH OBJECTS AND CONTRIBUTION %
     + '<section class="ux-panel" style="margin-top:20px;">'
       + '<div class="ux-heading" style="margin-bottom:12px;">'
-        + '<div><h3>Queues Breakdown Table (' + filtered.length.toLocaleString() + ' queues)</h3><p>Click any column header with ↕ to sort. Click any queue row to inspect full drill-down records.</p></div>'
+        + '<div><h3>Queues Breakdown Table (' + filtered.length.toLocaleString() + ' queues)</h3><p>Click any column header with ↕ to sort. Click any queue row to open interactive drill-down modal.</p></div>'
         + '<span class="ux-note">Showing ' + (visible.length ? (queuesFilters.page*pageSize+1) : 0) + ' – ' + Math.min((queuesFilters.page+1)*pageSize, filtered.length) + ' of ' + filtered.length + ' queues</span>'
       + '</div>'
       + '<div class="perf-table">'
         + '<table>'
           + '<thead><tr>'
             + '<th data-sort="name">Queue Name ↕</th>'
-            + '<th>Modality</th>'
-            + '<th>Stage</th>'
+            + '<th>Shifts</th>'
+            + '<th>Floors / Units</th>'
             + '<th data-sort="lidarFP" style="color:#0d9488;">Lidar FP ↕</th>'
             + '<th data-sort="lidarQA" style="color:#14b8a6;">Lidar QA ↕</th>'
             + '<th data-sort="laneFP" style="color:#ed9a35;">Lane Line FP ↕</th>'
             + '<th data-sort="laneQA" style="color:#ec4899;">Lane Line QA ↕</th>'
             + '<th data-sort="totalSubmit" style="color:var(--primary);">Total Submit ↕</th>'
+            + '<th data-sort="totalObjects" style="color:#0284c7;">Total Objects ↕</th>'
             + '<th data-sort="uniqueLabelers">Unique Labelers ↕</th>'
             + '<th data-sort="uniqueQtc">Unique QTCs ↕</th>'
             + '<th data-sort="avgSubmit">Avg / Labeler ↕</th>'
-            + '<th>Production Share %</th>'
-            + '<th>Latest Activity</th>'
+            + '<th>Share %</th>'
+            + '<th>Action</th>'
           + '</tr></thead>'
           + '<tbody>'
             + visible.map(q => {
               const isDeclining = q.totalSubmit <= 5;
               const sharePct = totalTasks ? ((q.totalSubmit / totalTasks) * 100).toFixed(1) + '%' : '0%';
-              const modBadge = q.lidarFP || q.lidarQA ? (q.laneFP || q.laneQA ? 'Mixed' : 'Lidar') : 'Lane Line';
-              const stageBadge = (q.lidarFP || q.laneFP) && (q.lidarQA || q.laneQA) ? 'FP / QA' : (q.lidarQA || q.laneQA ? 'QA' : 'FP');
               return '<tr class="queue-row-item" data-queue-name="' + esc(q.name) + '" style="cursor:pointer;" title="Click to view detailed queue drill-down">'
-                + '<td><b>' + esc(q.name) + '</b>' + (isDeclining ? ' <span class="q-badge" style="background:rgba(239,68,68,0.12); color:var(--danger); border:1px solid rgba(239,68,68,0.3); font-size:9px;">📉 Declining Activity</span>' : '') + '</td>'
-                + '<td><span class="q-badge" style="background:var(--bg-3);">' + modBadge + '</span></td>'
-                + '<td><span class="q-badge" style="background:var(--bg-3);">' + stageBadge + '</span></td>'
+                + '<td><b>' + esc(q.name) + '</b>' + (isDeclining ? ' <span class="q-badge" style="background:rgba(239,68,68,0.12); color:var(--danger); border:1px solid rgba(239,68,68,0.3); font-size:9px;">📉 Declining</span>' : '') + '</td>'
+                + '<td><span class="ux-note" style="font-size:11px;">' + (q.shifts.slice(0, 2).map(esc).join(', ') + (q.shifts.length > 2 ? '...' : '')) + '</span></td>'
+                + '<td><span class="ux-note" style="font-size:11px;">' + (q.floors.slice(0, 2).map(f => 'Unit ' + esc(f)).join(', ') + (q.floors.length > 2 ? '...' : '')) + '</span></td>'
                 + '<td><b style="color:#0d9488;">' + q.lidarFP.toLocaleString() + '</b></td>'
                 + '<td><b style="color:#14b8a6;">' + q.lidarQA.toLocaleString() + '</b></td>'
                 + '<td><b style="color:#ed9a35;">' + q.laneFP.toLocaleString() + '</b></td>'
                 + '<td><b style="color:#ec4899;">' + q.laneQA.toLocaleString() + '</b></td>'
                 + '<td><strong style="color:var(--primary); font-size:14px;">' + q.totalSubmit.toLocaleString() + '</strong></td>'
+                + '<td><strong style="color:#0284c7;">' + q.totalObjects.toLocaleString() + '</strong></td>'
                 + '<td><b>' + q.uniqueLabelers.toLocaleString() + '</b></td>'
                 + '<td><b>' + q.uniqueQtc.toLocaleString() + '</b></td>'
                 + '<td><span class="q-val-avg">' + q.avgSubmitStr + '</span></td>'
                 + '<td><b>' + sharePct + '</b></td>'
-                + '<td><span class="ux-note">' + (q.latestTimestamp || 'Recent') + '</span></td>'
+                + '<td><button class="btn btn-c q-drilldown-btn" data-queue-name="' + esc(q.name) + '" style="font-size:10px; padding:3px 8px;">🔍 Drill-down</button></td>'
               + '</tr>';
             }).join('')
           + '</tbody>'
@@ -3573,111 +3805,73 @@ function renderQueuesAnalysis(){
   + '</div>';
 
   bindHeaderControls(page, 'queues');
+  bindUniversalFilterBar(page, 'queues');
 
-  // Search input
-  const qSearch = page.querySelector('#qSearch');
-  if(qSearch){
-    qSearch.oninput = (e) => {
-      queuesFilters.query = e.target.value;
-      queuesFilters.page = 0;
+  // Search, filter, sorting events
+  const qSearchInput = $('qSearch');
+  if(qSearchInput){
+    qSearchInput.oninput = e => { queuesFilters.query = e.target.value; queuesFilters.page = 0; renderQueuesAnalysis(); };
+  }
+  const qShiftSel = $('qShift');
+  if(qShiftSel){
+    qShiftSel.onchange = e => { queuesFilters.shift = e.target.value; queuesFilters.page = 0; renderQueuesAnalysis(); };
+  }
+  const qFloorSel = $('qFloor');
+  if(qFloorSel){
+    qFloorSel.onchange = e => { queuesFilters.floor = e.target.value; queuesFilters.page = 0; renderQueuesAnalysis(); };
+  }
+  const qCatSel = $('qCategory');
+  if(qCatSel){
+    qCatSel.onchange = e => { queuesFilters.category = e.target.value; queuesFilters.page = 0; renderQueuesAnalysis(); };
+  }
+  const qResetBtn = $('qReset');
+  if(qResetBtn){
+    qResetBtn.onclick = () => {
+      Object.assign(queuesFilters, { query: '', shift: '', floor: '', category: '', sortCol: 'totalSubmit', sortAsc: false, page: 0 });
       renderQueuesAnalysis();
     };
   }
-
-  // Filter dropdowns
-  $('qShift').onchange = (e) => { queuesFilters.shift = e.target.value; queuesFilters.page = 0; renderQueuesAnalysis(); };
-  $('qFloor').onchange = (e) => { queuesFilters.floor = e.target.value; queuesFilters.page = 0; renderQueuesAnalysis(); };
-  $('qCategory').onchange = (e) => { queuesFilters.category = e.target.value; queuesFilters.page = 0; renderQueuesAnalysis(); };
-  $('qReset').onclick = () => { queuesFilters.query = ''; queuesFilters.shift = ''; queuesFilters.floor = ''; queuesFilters.category = ''; queuesFilters.page = 0; renderQueuesAnalysis(); };
 
   // Sorting
   page.querySelectorAll('th[data-sort]').forEach(th => {
     th.style.cursor = 'pointer';
     th.onclick = () => {
-      const col = th.dataset.sort;
-      if (queuesFilters.sortCol === col) queuesFilters.sortAsc = !queuesFilters.sortAsc;
-      else { queuesFilters.sortCol = col; queuesFilters.sortAsc = false; }
+      const s = th.dataset.sort;
+      if(queuesFilters.sortCol === s) { queuesFilters.sortAsc = !queuesFilters.sortAsc; }
+      else { queuesFilters.sortCol = s; queuesFilters.sortAsc = false; }
       renderQueuesAnalysis();
     };
   });
 
   // Pagination
-  $('qPrev').onclick = () => { if(queuesFilters.page > 0){ queuesFilters.page--; renderQueuesAnalysis(); } };
-  $('qNext').onclick = () => { if(queuesFilters.page < totalPages - 1){ queuesFilters.page++; renderQueuesAnalysis(); } };
+  const qPrev = $('qPrev'); if(qPrev) qPrev.onclick = () => { if(queuesFilters.page > 0){ queuesFilters.page--; renderQueuesAnalysis(); } };
+  const qNext = $('qNext'); if(qNext) qNext.onclick = () => { if(queuesFilters.page < totalPages - 1){ queuesFilters.page++; renderQueuesAnalysis(); } };
 
   // Export CSV
-  $('qExportCSV').onclick = () => {
-    const headers = ['Queue Name', 'Modality', 'Stage', 'Lidar FP', 'Lidar QA', 'Lane Line FP', 'Lane Line QA', 'Total Submits', 'Unique Labelers', 'Unique QTCs', 'Avg Submit / Labeler', 'Production Share %', 'Latest Timestamp'];
-    const csvRows = filtered.map(q => [
-      q.name,
-      q.lidarFP || q.lidarQA ? (q.laneFP || q.laneQA ? 'Mixed' : 'Lidar') : 'Lane Line',
-      (q.lidarFP || q.laneFP) && (q.lidarQA || q.laneQA) ? 'FP / QA' : (q.lidarQA || q.laneQA ? 'QA' : 'FP'),
-      q.lidarFP,
-      q.lidarQA,
-      q.laneFP,
-      q.laneQA,
-      q.totalSubmit,
-      q.uniqueLabelers,
-      q.uniqueQtc,
-      q.avgSubmitStr,
-      totalTasks ? ((q.totalSubmit / totalTasks) * 100).toFixed(1) + '%' : '0%',
-      q.latestTimestamp || 'Recent'
-    ]);
-    const cell = v => '"' + String(v ?? '').replace(/^[=+@\-\t\r]/, "'$&").replace(/"/g, '""') + '"';
-    const csv = [headers, ...csvRows].map(r => r.map(cell).join(',')).join('\r\n');
-    downloadBlob(new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' }), 'MEEG_queues_analysis_' + cairoToday() + '.csv');
-    showToast('✓ Queues analysis CSV exported');
-  };
+  const qExp = $('qExportCSV');
+  if(qExp) qExp.onclick = () => exportQueuesCSV(filtered);
 
-  // Row-click drilldown modal
-  page.querySelectorAll('.queue-row-item').forEach(tr => {
-    tr.onclick = () => {
-      const qName = tr.dataset.queueName;
-      const qRows = base.filter(r => {
-        const qi = hdrs.findIndex(h => h.toLowerCase() === 'queue name');
-        return qi >= 0 && r[qi] === qName;
-      });
-      const ti = hdrs.findIndex(h => ['task id', 'id'].includes(h.toLowerCase()));
-      const li = hdrs.findIndex(h => h.toLowerCase() === 'labeler name');
-      const ni = hdrs.findIndex(h => h.toLowerCase() === 'national id');
-      const si = hdrs.findIndex(h => h.toLowerCase() === 'shift');
-      const fi = hdrs.findIndex(h => ['floor', 'unit'].includes(h.toLowerCase()));
-      const qcI = hdrs.findIndex(h => h.toLowerCase() === 'qtc name');
-      const mi = hdrs.findIndex(h => h.toLowerCase() === 'modality');
-      const pi = hdrs.findIndex(h => h.toLowerCase() === 'pass');
-
-      const drillRows = qRows.map(r => [
-        ti >= 0 ? esc(r[ti]) : '—',
-        rDate(r) || '—',
-        li >= 0 ? esc(r[li]) : '—',
-        maskEmployeeId(ni >= 0 ? r[ni] : '', r[li]),
-        si >= 0 ? esc(r[si]) : '—',
-        fi >= 0 ? esc(r[fi]) : '—',
-        qcI >= 0 ? esc(r[qcI]) : '—',
-        esc(r[mi] || ''),
-        esc(r[pi] || '')
-      ]);
-
-      openDrilldownModal({
-        title: qName + ' · Queue Drill-Down',
-        subtitle: qRows.length.toLocaleString() + ' total submissions on this queue',
-        badge: 'Queue Records',
-        columns: ['Task ID', 'Date', 'Labeler Name', 'Employee ID', 'Shift', 'Unit', 'QTC', 'Modality', 'Pass'],
-        rows: drillRows
-      });
+  // Queue Drilldown Modal Bindings
+  page.querySelectorAll('.queue-row-item, .q-drilldown-btn').forEach(el => {
+    el.onclick = (e) => {
+      e.stopPropagation();
+      const qName = el.dataset.queueName;
+      if(qName && typeof openQueueDetailModal === 'function') openQueueDetailModal(qName);
     };
   });
 
-  // Render trend chart
+  // Trend controls
   renderQueueTrendChart('qTrendChart', base);
 }
 
-function renderQueueTrendChart(containerId, rows){
- const qi=hdrs.findIndex(h=>h.trim().toLowerCase()==='queue name');
+function renderQueueTrendChart(containerId, rows) {
+  if (Array.isArray(containerId)) { rows = containerId; containerId = 'qTrendChart'; }
+  if (!containerId) containerId = 'qTrendChart';
+  let chartRows = rows || [];
+  const qi=hdrs.findIndex(h=>h.trim().toLowerCase()==='queue name');
  const mi=hdrs.findIndex(h=>h.trim().toLowerCase()==='modality');
  const pi=hdrs.findIndex(h=>h.trim().toLowerCase()==='pass');
 
- let chartRows=rows;
  if(queuesChartFilters.queue!=='all'&&qi>=0){
   chartRows=chartRows.filter(r=>String(r[qi]||'').trim()===queuesChartFilters.queue);
  }
@@ -4413,7 +4607,12 @@ function renderShiftComparison(){
   const page = $('uxShiftComparison');
   if(!page || page.hidden) return;
 
-  const baseRows = rowsInView();
+  // Use base dataset from rawRows/fcache, overriding globalUnifiedFilters.shift so all 3 shifts always appear
+  const allData = (typeof rawRows !== 'undefined' && rawRows && rawRows.length) ? rawRows : ((window.rawRows && window.rawRows.length) ? window.rawRows : ((typeof fcache !== 'undefined' && fcache) ? fcache : []));
+  let baseRows = activeLoc && !activeLoc.startsWith('__') && locColIdx >= 0
+    ? allData.filter(r => String(r[locColIdx]||'').trim() === activeLoc)
+    : allData;
+
   const idx = name => hdrs.findIndex(h => h.trim().toLowerCase() === name.toLowerCase());
   const si = idx('shift');
   const fi = hdrs.findIndex(h => ['floor', 'unit'].includes(h.trim().toLowerCase()));
@@ -4421,51 +4620,90 @@ function renderShiftComparison(){
   const li = idx('labeler name');
   const ni = idx('national id');
   const mi = idx('modality');
+  const pi = idx('pass');
+  const oi = idx('object count');
+  const qni = idx('queue name');
 
-  // Filter base rows
+  // Employee & QTC identity helpers
+  const getEmpKey = r => {
+    let lid = '';
+    if (ni >= 0) {
+      const rawNi = String(r[ni] ?? '').trim().replace(/[٠-٩]/g, c => String(c.charCodeAt(0)-1632)).replace(/[۰-۹]/g, c => String(c.charCodeAt(0)-1776)).replace(/\.0+$/, '').replace(/[\s-]/g, '');
+      if (/^\d{14}$/.test(rawNi)) lid = rawNi;
+    }
+    if (!lid && li >= 0) {
+      const name = String(r[li] ?? '').trim().toLowerCase();
+      if (name) lid = 'name:' + name;
+    }
+    return lid || 'unknown';
+  };
+  const getQtcKey = r => (qi >= 0 ? String(r[qi] || '').normalize('NFC').trim().replace(/\s+/gu, ' ') : '') || 'unknown';
+
+  // Filter rows for Shift Comparison view (Floor, Date, Modality)
   const filteredRows = baseRows.filter(r => {
     const floor = fi >= 0 ? deriveFloor(r[fi]) : 'Unknown';
-    const mod = mi < 0 ? '' : String(r[mi] || '').toLowerCase().replace(/[\s_-]+/g, '');
     const d = rDate(r);
+    if (globalUnifiedFilters.date && d !== globalUnifiedFilters.date) return false;
+    if (globalUnifiedFilters.from && d && d < globalUnifiedFilters.from) return false;
+    if (globalUnifiedFilters.to && d && d > globalUnifiedFilters.to) return false;
+    if (globalUnifiedFilters.floor && fi >= 0 && floor !== globalUnifiedFilters.floor) return false;
+    if (globalUnifiedFilters.qtc && qi >= 0 && String(r[qi] || '').trim() !== globalUnifiedFilters.qtc) return false;
 
     if (shiftCompFilters.floor && floor !== shiftCompFilters.floor) return false;
     if (shiftCompFilters.modality && shiftCompFilters.modality !== 'all') {
-      const isLidar = mod === 'lidar';
-      const isLane = mod === 'laneline' || mod === 'lane';
+      const isLidar = isModPass(r, 'lidar', 'any');
+      const isLane = isModPass(r, 'laneline', 'any');
       if (shiftCompFilters.modality === 'lidar' && !isLidar) return false;
       if (shiftCompFilters.modality === 'laneline' && !isLane) return false;
     }
-    if (shiftCompFilters.from && d && d < shiftCompFilters.from) return false;
-    if (shiftCompFilters.to && d && d > shiftCompFilters.to) return false;
     return true;
   });
 
-  const distinctShifts = [...new Set(baseRows.map(r => si >= 0 ? String(r[si] || '').trim() : '').filter(Boolean))].sort();
   const distinctFloors = [...new Set(baseRows.map(r => fi >= 0 ? deriveFloor(r[fi]) : '').filter(Boolean))].sort();
 
-  // Shift-by-Shift Aggregations
-  const shiftAggs = {};
-  distinctShifts.forEach(sh => {
-    const shRows = filteredRows.filter(r => si >= 0 && String(r[si] || '').trim() === sh);
-    const labSet = new Set();
-    const qtcSet = new Set();
-    let fp = 0, qa = 0;
-    shRows.forEach(r => {
-      const lab = li >= 0 ? String(r[li] || '').trim() : '';
-      if (lab) labSet.add(lab);
-      const qtc = qi >= 0 ? String(r[qi] || '').trim() : '';
-      if (qtc) qtcSet.add(qtc);
-      if (isModPass(r, 'any', 'FP')) fp++;
-      if (isModPass(r, 'any', 'QA')) qa++;
-    });
-    shiftAggs[sh] = {
+  // The 3 canonical operational shifts
+  const mainShifts = ['Morning', 'Night', 'Over Night'];
+
+  // Calculate 3-Shift Aggregations for the Permanent Main Matrix (Section 8.1 & 8.2)
+  const shiftMatrixData = {};
+  let all3ShiftsTotal = 0;
+
+  mainShifts.forEach(sh => {
+    const sRows = filteredRows.filter(r => si >= 0 && normalizeShift(r[si]) === sh);
+    all3ShiftsTotal += sRows.length;
+
+    // Lidar FP
+    const rLFP = sRows.filter(r => isModPass(r, 'lidar', 'FP'));
+    // Lidar QA
+    const rLQA = sRows.filter(r => isModPass(r, 'lidar', 'QA'));
+    // Lane Line FP
+    const rLNFP = sRows.filter(r => isModPass(r, 'laneline', 'FP'));
+    // Lane Line QA
+    const rLNQA = sRows.filter(r => isModPass(r, 'laneline', 'QA'));
+
+    const sLabelers = new Set(sRows.map(getEmpKey)).size;
+    const sQtcs = new Set(sRows.map(getQtcKey)).size;
+    const sObjects = sRows.reduce((acc, r) => acc + (parseFloat(oi >= 0 ? r[oi] : 0) || 0), 0);
+    const sQueues = new Set(sRows.map(r => qni >= 0 ? String(r[qni]||'').trim() : '').filter(Boolean)).size;
+    const sUnits = new Set(sRows.map(r => fi >= 0 ? deriveFloor(r[fi]) : '').filter(Boolean)).size;
+    const sDates = new Set(sRows.map(r => rDate(r)).filter(Boolean)).size;
+
+    shiftMatrixData[sh] = {
       shift: sh,
-      total: shRows.length,
-      fp,
-      qa,
-      labelers: labSet.size,
-      qtcs: qtcSet.size,
-      avgPerLabeler: labSet.size > 0 ? (shRows.length / labSet.size).toFixed(1) : '0'
+      total: sRows.length,
+      lidarFP: { tasks: rLFP.length, labelers: new Set(rLFP.map(getEmpKey)).size, qtcs: new Set(rLFP.map(getQtcKey)).size },
+      lidarQA: { tasks: rLQA.length, labelers: new Set(rLQA.map(getEmpKey)).size, qtcs: new Set(rLQA.map(getQtcKey)).size },
+      laneFP: { tasks: rLNFP.length, labelers: new Set(rLNFP.map(getEmpKey)).size, qtcs: new Set(rLNFP.map(getQtcKey)).size },
+      laneQA: { tasks: rLNQA.length, labelers: new Set(rLNQA.map(getEmpKey)).size, qtcs: new Set(rLNQA.map(getQtcKey)).size },
+      labelers: sLabelers,
+      qtcs: sQtcs,
+      avgPerLabeler: sLabelers > 0 ? (sRows.length / sLabelers).toFixed(1) : '0',
+      totalObjects: sObjects,
+      avgObjects: sRows.length > 0 ? (sObjects / sRows.length).toFixed(1) : '0',
+      queues: sQueues,
+      units: sUnits,
+      activeDays: sDates,
+      avgDaily: sDates > 0 ? Math.round(sRows.length / sDates) : 0
     };
   });
 
@@ -4480,8 +4718,8 @@ function renderShiftComparison(){
     const flLabelers = uniq(flRows, 'Labeler Name') || 0;
     const flQtcs = uniq(flRows, 'Qtc Name') || 0;
     const perShift = {};
-    distinctShifts.forEach(sh => {
-      const cellRows = flRows.filter(r => si >= 0 && String(r[si] || '').trim() === sh);
+    mainShifts.forEach(sh => {
+      const cellRows = flRows.filter(r => si >= 0 && normalizeShift(r[si]) === sh);
       perShift[sh] = {
         total: cellRows.length,
         labelers: uniq(cellRows, 'Labeler Name') || 0,
@@ -4498,49 +4736,166 @@ function renderShiftComparison(){
   });
   floorMatrix.sort((a,b) => b.total - a.total);
 
-  // TAB 2: QTC Supervisor Breakdown
+  // TAB 2: Queue x Shift Comparison (Section 8.4)
+  const queueMap = new Map();
+  filteredRows.forEach(r => {
+    const qn = qni >= 0 ? String(r[qni] || '').trim() : '';
+    if (!qn) return;
+    const sh = normalizeShift(si >= 0 ? r[si] : '');
+    if (!queueMap.has(qn)) {
+      queueMap.set(qn, {
+        name: qn,
+        total: 0,
+        totalObjects: 0,
+        morning: 0,
+        night: 0,
+        on: 0,
+        lFP: 0,
+        lQA: 0,
+        lnFP: 0,
+        lnQA: 0,
+        labSet: new Set(),
+        qtcSet: new Set()
+      });
+    }
+    const item = queueMap.get(qn);
+    item.total++;
+    const objCnt = parseFloat(oi >= 0 ? r[oi] : 0) || 0;
+    item.totalObjects += objCnt;
+
+    if (sh === 'Morning') item.morning++;
+    else if (sh === 'Night') item.night++;
+    else if (sh === 'Over Night') item.on++;
+
+    if (isModPass(r, 'lidar', 'FP')) item.lFP++;
+    if (isModPass(r, 'lidar', 'QA')) item.lQA++;
+    if (isModPass(r, 'laneline', 'FP')) item.lnFP++;
+    if (isModPass(r, 'laneline', 'QA')) item.lnQA++;
+
+    const lab = getEmpKey(r);
+    if (lab) item.labSet.add(lab);
+    const qtc = getQtcKey(r);
+    if (qtc) item.qtcSet.add(qtc);
+  });
+  const queueRows = [...queueMap.values()].map(q => ({
+    ...q,
+    uniqueLabelers: q.labSet.size,
+    uniqueQtcs: q.qtcSet.size,
+    avgSubmit: q.labSet.size > 0 ? (q.total / q.labSet.size).toFixed(1) : '0'
+  })).sort((a,b) => b.total - a.total);
+
+  // TAB 3: QTC Supervisor Breakdown (Grouped by QTC + Shift + Unit) (Section 8.5)
   const qtcMap = new Map();
   filteredRows.forEach(r => {
     const qtc = qi >= 0 ? String(r[qi] || '').normalize('NFC').trim().replace(/\s+/gu, ' ') : '';
     if (!qtc) return;
-    const sh = si >= 0 ? String(r[si] || '').trim() : 'Unknown';
+    const sh = normalizeShift(si >= 0 ? r[si] : 'Unknown');
     const fl = fi >= 0 ? deriveFloor(r[fi]) : 'Unknown';
-    const key = qtc + '__' + sh;
+    const key = qtc + '__' + sh + '__' + fl;
     if (!qtcMap.has(key)) {
-      qtcMap.set(key, { qtc, shift: sh, floor: fl, total: 0, fp: 0, qa: 0, labSet: new Set(), queueSet: new Set() });
+      qtcMap.set(key, {
+        qtc,
+        shift: sh,
+        floor: fl,
+        total: 0,
+        totalObjects: 0,
+        lFP: 0,
+        lQA: 0,
+        lnFP: 0,
+        lnQA: 0,
+        labSet: new Set(),
+        queueSet: new Set()
+      });
     }
     const item = qtcMap.get(key);
     item.total++;
-    if (isModPass(r, 'any', 'FP')) item.fp++;
-    if (isModPass(r, 'any', 'QA')) item.qa++;
-    const lab = li >= 0 ? String(r[li] || '').trim() : '';
+    const objCnt = parseFloat(oi >= 0 ? r[oi] : 0) || 0;
+    item.totalObjects += objCnt;
+
+    if (isModPass(r, 'lidar', 'FP')) item.lFP++;
+    if (isModPass(r, 'lidar', 'QA')) item.lQA++;
+    if (isModPass(r, 'laneline', 'FP')) item.lnFP++;
+    if (isModPass(r, 'laneline', 'QA')) item.lnQA++;
+
+    const lab = getEmpKey(r);
     if (lab) item.labSet.add(lab);
-    const qn = idx('queue name') >= 0 ? String(r[idx('queue name')] || '').trim() : '';
+    const qn = qni >= 0 ? String(r[qni] || '').trim() : '';
     if (qn) item.queueSet.add(qn);
   });
-  const qtcRows = [...qtcMap.values()].sort((a,b) => b.total - a.total);
+  const qtcRows = [...qtcMap.values()].map(item => ({
+    ...item,
+    teamSize: item.labSet.size,
+    queuesCovered: item.queueSet.size,
+    avgSubmit: item.labSet.size > 0 ? (item.total / item.labSet.size).toFixed(1) : '0'
+  })).sort((a,b) => b.total - a.total);
 
-  // TAB 3: Labelers Breakdown
+  // TAB 4: Labelers Breakdown (Section 8.6 - Full pagination, no 100 limit)
   const labMap = new Map();
   filteredRows.forEach(r => {
-    const lab = li >= 0 ? String(r[li] || '').trim() : '';
-    if (!lab) return;
+    const rawName = li >= 0 ? String(r[li] || '').trim() : '';
+    if (!rawName) return;
     const rawId = ni >= 0 ? String(r[ni] || '').trim() : '';
-    const sh = si >= 0 ? String(r[si] || '').trim() : 'Unknown';
+    const sh = normalizeShift(si >= 0 ? r[si] : 'Unknown');
     const fl = fi >= 0 ? deriveFloor(r[fi]) : 'Unknown';
     const qtc = qi >= 0 ? String(r[qi] || '').trim() : 'Unknown';
     const d = rDate(r);
-    const key = lab + '__' + sh;
+    const key = rawName.toLowerCase() + '__' + sh + '__' + fl;
     if (!labMap.has(key)) {
-      labMap.set(key, { name: lab, rawId, maskedId: maskEmployeeId(rawId, lab), shift: sh, floor: fl, qtc, total: 0, fp: 0, qa: 0, dates: new Set() });
+      labMap.set(key, {
+        name: rawName,
+        rawId,
+        maskedId: maskEmployeeId(rawId, rawName),
+        shift: sh,
+        floor: fl,
+        qtc,
+        total: 0,
+        totalObjects: 0,
+        lFP: 0,
+        lQA: 0,
+        lnFP: 0,
+        lnQA: 0,
+        dates: new Set()
+      });
     }
     const item = labMap.get(key);
     item.total++;
-    if (isModPass(r, 'any', 'FP')) item.fp++;
-    if (isModPass(r, 'any', 'QA')) item.qa++;
+    const objCnt = parseFloat(oi >= 0 ? r[oi] : 0) || 0;
+    item.totalObjects += objCnt;
+
+    if (isModPass(r, 'lidar', 'FP')) item.lFP++;
+    if (isModPass(r, 'lidar', 'QA')) item.lQA++;
+    if (isModPass(r, 'laneline', 'FP')) item.lnFP++;
+    if (isModPass(r, 'laneline', 'QA')) item.lnQA++;
     if (d) item.dates.add(d);
   });
-  const labelerRows = [...labMap.values()].sort((a,b) => b.total - a.total);
+  const allLabelerRows = [...labMap.values()].map(l => ({
+    ...l,
+    activeDays: Math.max(1, l.dates.size),
+    avgPerDay: (l.total / Math.max(1, l.dates.size)).toFixed(1)
+  })).sort((a,b) => b.total - a.total);
+
+  // Pagination for Labelers Table
+  const labPageSize = 25;
+  const labTotalPages = Math.max(1, Math.ceil(allLabelerRows.length / labPageSize));
+  shiftCompFilters.labPage = Math.min(shiftCompFilters.labPage || 0, labTotalPages - 1);
+  const visibleLabelerRows = allLabelerRows.slice(shiftCompFilters.labPage * labPageSize, (shiftCompFilters.labPage + 1) * labPageSize);
+
+  // TAB 5: Daily Shift Trends chart data
+  const shiftDailyMap = { Morning: new Map(), Night: new Map(), 'Over Night': new Map() };
+  filteredRows.forEach(r => {
+    const d = rDate(r);
+    const sh = normalizeShift(si >= 0 ? r[si] : '');
+    if (d && shiftDailyMap[sh]) {
+      shiftDailyMap[sh].set(d, (shiftDailyMap[sh].get(d) || 0) + 1);
+    }
+  });
+  const allChartDates = [...new Set(filteredRows.map(r => rDate(r)).filter(Boolean))].sort();
+
+  // Smart Insights (Section 8.9)
+  const shiftLeader = mainShifts.map(s => shiftMatrixData[s]).sort((a,b) => b.total - a.total)[0] || { shift: '—', total: 0 };
+  const prodLeader = mainShifts.map(s => shiftMatrixData[s]).sort((a,b) => Number(b.avgPerLabeler) - Number(a.avgPerLabeler))[0] || { shift: '—', avgPerLabeler: 0 };
+  const lidarLeader = mainShifts.map(s => shiftMatrixData[s]).sort((a,b) => (b.lidarFP.tasks + b.lidarQA.tasks) - (a.lidarFP.tasks + a.lidarQA.tasks))[0] || { shift: '—' };
+  const laneLeader = mainShifts.map(s => shiftMatrixData[s]).sort((a,b) => (b.laneFP.tasks + b.laneQA.tasks) - (a.laneFP.tasks + a.laneQA.tasks))[0] || { shift: '—' };
 
   page.innerHTML = `
     <div class="ux-overview">
@@ -4548,54 +4903,211 @@ function renderShiftComparison(){
         <div>
           <div class="ux-eyebrow">Workforce &amp; Facility Shift Diagnostics</div>
           <h2>⚖️ Detailed Shift Comparison</h2>
-          <p>Multi-dimensional operational comparison across shifts by Facility Floor (= Unit), QTC Supervisors, and Labelers.</p>
+          <p>Side-by-side comparison across Morning, Night, and Over Night by Workstreams, Stages, Facility Floors (= Units), Queues, and Workforce.</p>
         </div>
         ${renderHeaderControlsHTML('sc')}
       </div>
 
       ${renderUniversalFilterBar('shift_comparison')}
 
-      <!-- Shift Summary KPI Cards -->
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin-bottom: 20px;">
-        ${distinctShifts.map((sh, idx) => {
-          const sData = shiftAggs[sh] || { total: 0, fp: 0, qa: 0, labelers: 0, qtcs: 0, avgPerLabeler: '0' };
-          const share = totalSubmissions > 0 ? ((sData.total / totalSubmissions) * 100).toFixed(1) : 0;
-          const colors = ['#0d9488', '#ed9a35', '#3b82f6', '#8b5cf6', '#ec4899', '#10b981'];
-          const tone = colors[idx % colors.length];
-          return `
-            <div class="ux-panel" style="border-top: 4px solid ${tone}; padding: 16px;">
-              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
-                <h3 style="margin:0; font-size: 15px; color:${tone};">⏱️ ${esc(sh)}</h3>
-                <span class="q-badge" style="background:${tone}22; color:${tone}; font-weight:700;">${share}% share</span>
-              </div>
-              <div style="font-size: 24px; font-weight: 800; color: var(--text); margin-bottom: 6px;">${sData.total.toLocaleString()} <span style="font-size:12px; font-weight:500; color:var(--text-soft);">tasks</span></div>
-              <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 11px; color: var(--text-soft); background: var(--bg-2); padding: 8px; border-radius: 8px;">
-                <div><b>FP:</b> ${sData.fp.toLocaleString()}</div>
-                <div><b>QA:</b> ${sData.qa.toLocaleString()}</div>
-                <div><b>Labelers:</b> ${sData.labelers}</div>
-                <div><b>QTCs:</b> ${sData.qtcs}</div>
-              </div>
-              <div style="margin-top: 8px; font-size: 11px; color: var(--muted); text-align: right;">Avg: <b>${sData.avgPerLabeler}</b> tasks/labeler</div>
-            </div>
-          `;
-        }).join('')}
+      <!-- 8.1 MAIN THREE-SHIFT COMPARISON MATRIX (Permanent Side-by-Side Table) -->
+      <div class="ux-panel" style="margin-bottom: 24px; padding: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 12px;">
+        <div style="padding: 16px 20px; background: var(--bg-2); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+          <div>
+            <h3 style="margin: 0; font-size: 16px; color: var(--text);">⏱️ Main Three-Shift Comparison Matrix</h3>
+            <p style="margin: 2px 0 0; font-size: 12px; color: var(--text-soft);">Permanent side-by-side view across Morning, Night, and Over Night (Floor = Unit).</p>
+          </div>
+          <span class="q-badge" style="background: var(--primary); color: #fff; font-weight: 700;">Side-by-Side 3 Shifts</span>
+        </div>
+        <div style="overflow-x: auto;">
+          <table style="width: 100%; border-collapse: collapse; font-size: 12px; text-align: left;">
+            <thead>
+              <tr style="background: var(--bg-3); border-bottom: 2px solid var(--border);">
+                <th style="padding: 12px 18px; width: 34%; font-size: 13px;">Metric / Operational Stage</th>
+                <th style="padding: 12px 16px; text-align: center; width: 22%; font-size: 13px; color: #0d9488;">🌅 Morning</th>
+                <th style="padding: 12px 16px; text-align: center; width: 22%; font-size: 13px; color: #ed9a35;">🌙 Night</th>
+                <th style="padding: 12px 16px; text-align: center; width: 22%; font-size: 13px; color: #3b82f6;">🌌 Over Night</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- GROUP 1: LIDAR FP -->
+              <tr style="background: rgba(13,148,136,0.06); font-weight: 700; border-top: 1px solid var(--border);">
+                <td colspan="4" style="padding: 8px 18px; color: #0d9488; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">📡 1. Lidar First Pass (FP)</td>
+              </tr>
+              <tr style="border-bottom: 1px solid var(--border-light);">
+                <td style="padding: 8px 18px 8px 30px;">Total Submissions</td>
+                <td style="padding: 8px 16px; text-align: center; font-weight: 700; color: #0d9488;">${shiftMatrixData.Morning.lidarFP.tasks.toLocaleString()}</td>
+                <td style="padding: 8px 16px; text-align: center; font-weight: 700; color: #ed9a35;">${shiftMatrixData.Night.lidarFP.tasks.toLocaleString()}</td>
+                <td style="padding: 8px 16px; text-align: center; font-weight: 700; color: #3b82f6;">${shiftMatrixData['Over Night'].lidarFP.tasks.toLocaleString()}</td>
+              </tr>
+              <tr style="border-bottom: 1px solid var(--border-light);">
+                <td style="padding: 8px 18px 8px 30px;">Unique Labelers</td>
+                <td style="padding: 8px 16px; text-align: center;">${shiftMatrixData.Morning.lidarFP.labelers.toLocaleString()}</td>
+                <td style="padding: 8px 16px; text-align: center;">${shiftMatrixData.Night.lidarFP.labelers.toLocaleString()}</td>
+                <td style="padding: 8px 16px; text-align: center;">${shiftMatrixData['Over Night'].lidarFP.labelers.toLocaleString()}</td>
+              </tr>
+              <tr style="border-bottom: 1px solid var(--border);">
+                <td style="padding: 8px 18px 8px 30px;">Unique QTCs</td>
+                <td style="padding: 8px 16px; text-align: center;">${shiftMatrixData.Morning.lidarFP.qtcs.toLocaleString()}</td>
+                <td style="padding: 8px 16px; text-align: center;">${shiftMatrixData.Night.lidarFP.qtcs.toLocaleString()}</td>
+                <td style="padding: 8px 16px; text-align: center;">${shiftMatrixData['Over Night'].lidarFP.qtcs.toLocaleString()}</td>
+              </tr>
+
+              <!-- GROUP 2: LIDAR QA -->
+              <tr style="background: rgba(20,184,166,0.06); font-weight: 700;">
+                <td colspan="4" style="padding: 8px 18px; color: #14b8a6; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">🔍 2. Lidar Quality Assurance (QA)</td>
+              </tr>
+              <tr style="border-bottom: 1px solid var(--border-light);">
+                <td style="padding: 8px 18px 8px 30px;">Total Submissions</td>
+                <td style="padding: 8px 16px; text-align: center; font-weight: 700; color: #0d9488;">${shiftMatrixData.Morning.lidarQA.tasks.toLocaleString()}</td>
+                <td style="padding: 8px 16px; text-align: center; font-weight: 700; color: #ed9a35;">${shiftMatrixData.Night.lidarQA.tasks.toLocaleString()}</td>
+                <td style="padding: 8px 16px; text-align: center; font-weight: 700; color: #3b82f6;">${shiftMatrixData['Over Night'].lidarQA.tasks.toLocaleString()}</td>
+              </tr>
+              <tr style="border-bottom: 1px solid var(--border-light);">
+                <td style="padding: 8px 18px 8px 30px;">Unique Labelers</td>
+                <td style="padding: 8px 16px; text-align: center;">${shiftMatrixData.Morning.lidarQA.labelers.toLocaleString()}</td>
+                <td style="padding: 8px 16px; text-align: center;">${shiftMatrixData.Night.lidarQA.labelers.toLocaleString()}</td>
+                <td style="padding: 8px 16px; text-align: center;">${shiftMatrixData['Over Night'].lidarQA.labelers.toLocaleString()}</td>
+              </tr>
+              <tr style="border-bottom: 1px solid var(--border);">
+                <td style="padding: 8px 18px 8px 30px;">Unique QTCs</td>
+                <td style="padding: 8px 16px; text-align: center;">${shiftMatrixData.Morning.lidarQA.qtcs.toLocaleString()}</td>
+                <td style="padding: 8px 16px; text-align: center;">${shiftMatrixData.Night.lidarQA.qtcs.toLocaleString()}</td>
+                <td style="padding: 8px 16px; text-align: center;">${shiftMatrixData['Over Night'].lidarQA.qtcs.toLocaleString()}</td>
+              </tr>
+
+              <!-- GROUP 3: LANE LINE FP -->
+              <tr style="background: rgba(237,154,53,0.06); font-weight: 700;">
+                <td colspan="4" style="padding: 8px 18px; color: #ed9a35; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">🛣️ 3. Lane Line First Pass (FP)</td>
+              </tr>
+              <tr style="border-bottom: 1px solid var(--border-light);">
+                <td style="padding: 8px 18px 8px 30px;">Total Submissions</td>
+                <td style="padding: 8px 16px; text-align: center; font-weight: 700; color: #0d9488;">${shiftMatrixData.Morning.laneFP.tasks.toLocaleString()}</td>
+                <td style="padding: 8px 16px; text-align: center; font-weight: 700; color: #ed9a35;">${shiftMatrixData.Night.laneFP.tasks.toLocaleString()}</td>
+                <td style="padding: 8px 16px; text-align: center; font-weight: 700; color: #3b82f6;">${shiftMatrixData['Over Night'].laneFP.tasks.toLocaleString()}</td>
+              </tr>
+              <tr style="border-bottom: 1px solid var(--border-light);">
+                <td style="padding: 8px 18px 8px 30px;">Unique Labelers</td>
+                <td style="padding: 8px 16px; text-align: center;">${shiftMatrixData.Morning.laneFP.labelers.toLocaleString()}</td>
+                <td style="padding: 8px 16px; text-align: center;">${shiftMatrixData.Night.laneFP.labelers.toLocaleString()}</td>
+                <td style="padding: 8px 16px; text-align: center;">${shiftMatrixData['Over Night'].laneFP.labelers.toLocaleString()}</td>
+              </tr>
+              <tr style="border-bottom: 1px solid var(--border);">
+                <td style="padding: 8px 18px 8px 30px;">Unique QTCs</td>
+                <td style="padding: 8px 16px; text-align: center;">${shiftMatrixData.Morning.laneFP.qtcs.toLocaleString()}</td>
+                <td style="padding: 8px 16px; text-align: center;">${shiftMatrixData.Night.laneFP.qtcs.toLocaleString()}</td>
+                <td style="padding: 8px 16px; text-align: center;">${shiftMatrixData['Over Night'].laneFP.qtcs.toLocaleString()}</td>
+              </tr>
+
+              <!-- GROUP 4: LANE LINE QA -->
+              <tr style="background: rgba(236,72,153,0.06); font-weight: 700;">
+                <td colspan="4" style="padding: 8px 18px; color: #ec4899; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">✅ 4. Lane Line Quality Assurance (QA)</td>
+              </tr>
+              <tr style="border-bottom: 1px solid var(--border-light);">
+                <td style="padding: 8px 18px 8px 30px;">Total Submissions</td>
+                <td style="padding: 8px 16px; text-align: center; font-weight: 700; color: #0d9488;">${shiftMatrixData.Morning.laneQA.tasks.toLocaleString()}</td>
+                <td style="padding: 8px 16px; text-align: center; font-weight: 700; color: #ed9a35;">${shiftMatrixData.Night.laneQA.tasks.toLocaleString()}</td>
+                <td style="padding: 8px 16px; text-align: center; font-weight: 700; color: #3b82f6;">${shiftMatrixData['Over Night'].laneQA.tasks.toLocaleString()}</td>
+              </tr>
+              <tr style="border-bottom: 1px solid var(--border-light);">
+                <td style="padding: 8px 18px 8px 30px;">Unique Labelers</td>
+                <td style="padding: 8px 16px; text-align: center;">${shiftMatrixData.Morning.laneQA.labelers.toLocaleString()}</td>
+                <td style="padding: 8px 16px; text-align: center;">${shiftMatrixData.Night.laneQA.labelers.toLocaleString()}</td>
+                <td style="padding: 8px 16px; text-align: center;">${shiftMatrixData['Over Night'].laneQA.labelers.toLocaleString()}</td>
+              </tr>
+              <tr style="border-bottom: 2px solid var(--border);">
+                <td style="padding: 8px 18px 8px 30px;">Unique QTCs</td>
+                <td style="padding: 8px 16px; text-align: center;">${shiftMatrixData.Morning.laneQA.qtcs.toLocaleString()}</td>
+                <td style="padding: 8px 16px; text-align: center;">${shiftMatrixData.Night.laneQA.qtcs.toLocaleString()}</td>
+                <td style="padding: 8px 16px; text-align: center;">${shiftMatrixData['Over Night'].laneQA.qtcs.toLocaleString()}</td>
+              </tr>
+
+              <!-- GROUP 5: OVERALL SHIFT SUMMARY ROWS (Section 8.2) -->
+              <tr style="background: var(--bg-2); font-weight: 800;">
+                <td colspan="4" style="padding: 10px 18px; color: var(--text); font-size: 12px; text-transform: uppercase;">📊 Overall Shift Diagnostics &amp; Capacity</td>
+              </tr>
+              <tr style="border-bottom: 1px solid var(--border-light); background: var(--bg-1);">
+                <td style="padding: 9px 18px 9px 30px; font-weight: 700;">Total Shift Submissions</td>
+                <td style="padding: 9px 16px; text-align: center; font-weight: 800; color: #0d9488; font-size: 13px;">${shiftMatrixData.Morning.total.toLocaleString()}</td>
+                <td style="padding: 9px 16px; text-align: center; font-weight: 800; color: #ed9a35; font-size: 13px;">${shiftMatrixData.Night.total.toLocaleString()}</td>
+                <td style="padding: 9px 16px; text-align: center; font-weight: 800; color: #3b82f6; font-size: 13px;">${shiftMatrixData['Over Night'].total.toLocaleString()}</td>
+              </tr>
+              <tr style="border-bottom: 1px solid var(--border-light);">
+                <td style="padding: 8px 18px 8px 30px;">Shift Share % of Output</td>
+                <td style="padding: 8px 16px; text-align: center; font-weight: 700;">${(all3ShiftsTotal > 0 ? ((shiftMatrixData.Morning.total / all3ShiftsTotal)*100).toFixed(1) : 0)}%</td>
+                <td style="padding: 8px 16px; text-align: center; font-weight: 700;">${(all3ShiftsTotal > 0 ? ((shiftMatrixData.Night.total / all3ShiftsTotal)*100).toFixed(1) : 0)}%</td>
+                <td style="padding: 8px 16px; text-align: center; font-weight: 700;">${(all3ShiftsTotal > 0 ? ((shiftMatrixData['Over Night'].total / all3ShiftsTotal)*100).toFixed(1) : 0)}%</td>
+              </tr>
+              <tr style="border-bottom: 1px solid var(--border-light);">
+                <td style="padding: 8px 18px 8px 30px;">Total Unique Labelers (Counted Once)</td>
+                <td style="padding: 8px 16px; text-align: center; font-weight: 700;">${shiftMatrixData.Morning.labelers.toLocaleString()}</td>
+                <td style="padding: 8px 16px; text-align: center; font-weight: 700;">${shiftMatrixData.Night.labelers.toLocaleString()}</td>
+                <td style="padding: 8px 16px; text-align: center; font-weight: 700;">${shiftMatrixData['Over Night'].labelers.toLocaleString()}</td>
+              </tr>
+              <tr style="border-bottom: 1px solid var(--border-light);">
+                <td style="padding: 8px 18px 8px 30px;">Total Unique QTCs (Counted Once)</td>
+                <td style="padding: 8px 16px; text-align: center; font-weight: 700;">${shiftMatrixData.Morning.qtcs.toLocaleString()}</td>
+                <td style="padding: 8px 16px; text-align: center; font-weight: 700;">${shiftMatrixData.Night.qtcs.toLocaleString()}</td>
+                <td style="padding: 8px 16px; text-align: center; font-weight: 700;">${shiftMatrixData['Over Night'].qtcs.toLocaleString()}</td>
+              </tr>
+              <tr style="border-bottom: 1px solid var(--border-light);">
+                <td style="padding: 8px 18px 8px 30px;">Avg Submissions / Labeler</td>
+                <td style="padding: 8px 16px; text-align: center; font-weight: 700; color: var(--primary);">${shiftMatrixData.Morning.avgPerLabeler}</td>
+                <td style="padding: 8px 16px; text-align: center; font-weight: 700; color: var(--primary);">${shiftMatrixData.Night.avgPerLabeler}</td>
+                <td style="padding: 8px 16px; text-align: center; font-weight: 700; color: var(--primary);">${shiftMatrixData['Over Night'].avgPerLabeler}</td>
+              </tr>
+              <tr style="border-bottom: 1px solid var(--border-light);">
+                <td style="padding: 8px 18px 8px 30px;">Total Annotated Objects</td>
+                <td style="padding: 8px 16px; text-align: center; font-weight: 700; color: #0284c7;">${shiftMatrixData.Morning.totalObjects.toLocaleString()}</td>
+                <td style="padding: 8px 16px; text-align: center; font-weight: 700; color: #0284c7;">${shiftMatrixData.Night.totalObjects.toLocaleString()}</td>
+                <td style="padding: 8px 16px; text-align: center; font-weight: 700; color: #0284c7;">${shiftMatrixData['Over Night'].totalObjects.toLocaleString()}</td>
+              </tr>
+              <tr style="border-bottom: 1px solid var(--border-light);">
+                <td style="padding: 8px 18px 8px 30px;">Avg Objects / Task</td>
+                <td style="padding: 8px 16px; text-align: center;">${shiftMatrixData.Morning.avgObjects}</td>
+                <td style="padding: 8px 16px; text-align: center;">${shiftMatrixData.Night.avgObjects}</td>
+                <td style="padding: 8px 16px; text-align: center;">${shiftMatrixData['Over Night'].avgObjects}</td>
+              </tr>
+              <tr style="border-bottom: 1px solid var(--border-light);">
+                <td style="padding: 8px 18px 8px 30px;">Active Queues</td>
+                <td style="padding: 8px 16px; text-align: center;">${shiftMatrixData.Morning.queues}</td>
+                <td style="padding: 8px 16px; text-align: center;">${shiftMatrixData.Night.queues}</td>
+                <td style="padding: 8px 16px; text-align: center;">${shiftMatrixData['Over Night'].queues}</td>
+              </tr>
+              <tr style="border-bottom: 1px solid var(--border-light);">
+                <td style="padding: 8px 18px 8px 30px;">Active Floors / Units</td>
+                <td style="padding: 8px 16px; text-align: center;">${shiftMatrixData.Morning.units}</td>
+                <td style="padding: 8px 16px; text-align: center;">${shiftMatrixData.Night.units}</td>
+                <td style="padding: 8px 16px; text-align: center;">${shiftMatrixData['Over Night'].units}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 18px 8px 30px;">Avg Daily Submissions</td>
+                <td style="padding: 8px 16px; text-align: center;">${shiftMatrixData.Morning.avgDaily.toLocaleString()} / day</td>
+                <td style="padding: 8px 16px; text-align: center;">${shiftMatrixData.Night.avgDaily.toLocaleString()} / day</td>
+                <td style="padding: 8px 16px; text-align: center;">${shiftMatrixData['Over Night'].avgDaily.toLocaleString()} / day</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      <!-- Navigation Sub-Tabs & Filter Bar -->
+      <!-- Navigation Sub-Tabs & Filter Bar (Preserving All Sub-Tabs) -->
       <div class="ux-panel" style="padding: 14px 18px; margin-bottom: 18px;">
         <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px;">
-          <!-- Tabs -->
-          <div style="display: flex; gap: 6px; background: var(--bg-2); padding: 4px; border-radius: 10px; border: 1px solid var(--border);">
-            <button class="btn ${activeSubTab === 'floor' ? 'btn-c' : ''}" id="scTabFloor" style="padding: 6px 14px; font-size: 12px; font-weight: 600;">🏢 Floor (= Unit) Breakdown</button>
-            <button class="btn ${activeSubTab === 'qtc' ? 'btn-c' : ''}" id="scTabQtc" style="padding: 6px 14px; font-size: 12px; font-weight: 600;">👥 QTC Supervisors</button>
-            <button class="btn ${activeSubTab === 'labelers' ? 'btn-c' : ''}" id="scTabLabelers" style="padding: 6px 14px; font-size: 12px; font-weight: 600;">👤 Labelers Breakdown</button>
-            <button class="btn ${activeSubTab === 'chart' ? 'btn-c' : ''}" id="scTabChart" style="padding: 6px 14px; font-size: 12px; font-weight: 600;">📊 Shift Volume Chart</button>
+          <!-- 6 Sub-Tabs -->
+          <div style="display: flex; gap: 6px; flex-wrap: wrap; background: var(--bg-2); padding: 4px; border-radius: 10px; border: 1px solid var(--border);">
+            <button class="btn ${activeSubTab === 'floor' ? 'btn-c' : ''}" id="scTabFloor" style="padding: 6px 12px; font-size: 12px; font-weight: 600;">🏢 Floor (= Unit) Matrix</button>
+            <button class="btn ${activeSubTab === 'queue' ? 'btn-c' : ''}" id="scTabQueue" style="padding: 6px 12px; font-size: 12px; font-weight: 600;">🗂️ Queue Breakdown</button>
+            <button class="btn ${activeSubTab === 'qtc' ? 'btn-c' : ''}" id="scTabQtc" style="padding: 6px 12px; font-size: 12px; font-weight: 600;">👥 QTC Supervisors</button>
+            <button class="btn ${activeSubTab === 'labelers' ? 'btn-c' : ''}" id="scTabLabelers" style="padding: 6px 12px; font-size: 12px; font-weight: 600;">👤 Labelers Breakdown</button>
+            <button class="btn ${activeSubTab === 'chart' ? 'btn-c' : ''}" id="scTabChart" style="padding: 6px 12px; font-size: 12px; font-weight: 600;">📊 Daily Trends Chart</button>
+            <button class="btn ${activeSubTab === 'fair' ? 'btn-c' : ''}" id="scTabFair" style="padding: 6px 12px; font-size: 12px; font-weight: 600;">⚖️ Fair Benchmarking</button>
           </div>
           <!-- Quick filters & export -->
           <div style="display: flex; gap: 8px; align-items: center;">
             <select id="scFloorSelect" style="padding: 7px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-3); color: var(--text); font-size: 12px;">
               <option value="">All Floors (Units)</option>
-              ${distinctFloors.map(f => `<option value="${esc(f)}" ${shiftCompFilters.floor === f ? 'selected' : ''}>${esc(f)}</option>`).join('')}
+              ${distinctFloors.map(f => `<option value="${esc(f)}" ${shiftCompFilters.floor === f ? 'selected' : ''}>Unit ${esc(f)}</option>`).join('')}
             </select>
             <button class="btn btn-c" id="scExportBtn" style="padding: 7px 14px; font-size: 12px; font-weight: 600;">↓ Export CSV</button>
           </div>
@@ -4604,18 +5116,18 @@ function renderShiftComparison(){
 
       <!-- SUB-TAB CONTENT -->
       ${activeSubTab === 'floor' ? `
-        <!-- TAB 1: Floor Comparison Matrix -->
+        <!-- SUB-TAB 1: Floor Comparison Matrix (Floor = Unit) -->
         <div class="ux-panel" style="padding: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 12px;">
           <div style="padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
             <h3 style="margin:0;">🏢 Floor (= Unit) Production by Shift</h3>
-            <span class="ux-note">Direct comparison of operational units across shifts</span>
+            <span class="ux-note">Comparison across operational units and shifts (Floor = Unit)</span>
           </div>
           <div style="overflow-x: auto;">
             <table style="width: 100%; border-collapse: collapse; font-size: 12px; text-align: left;">
               <thead>
                 <tr style="background: var(--bg-2); border-bottom: 1px solid var(--border);">
                   <th style="padding: 10px 14px;">Floor / Unit</th>
-                  ${distinctShifts.map(sh => `<th style="padding: 10px 12px; text-align: center;">${esc(sh)} Tasks</th><th style="padding: 10px 12px; text-align: center; color: var(--text-soft); font-size: 11px;">Labelers</th>`).join('')}
+                  ${mainShifts.map(sh => `<th style="padding: 10px 12px; text-align: center;">${esc(sh)} Tasks</th><th style="padding: 10px 12px; text-align: center; color: var(--text-soft); font-size: 11px;">Labelers</th>`).join('')}
                   <th style="padding: 10px 14px; text-align: center;">Total Submits</th>
                   <th style="padding: 10px 14px; text-align: center;">Floor Share %</th>
                 </tr>
@@ -4625,8 +5137,8 @@ function renderShiftComparison(){
                   const pct = totalSubmissions > 0 ? ((item.total / totalSubmissions) * 100).toFixed(1) : 0;
                   return `
                     <tr style="border-bottom: 1px solid var(--border);" onmouseover="this.style.background='var(--accent-light)'" onmouseout="this.style.background='transparent'">
-                      <td style="padding: 10px 14px; font-weight: 700; color: var(--accent);"><span style="display:flex; align-items:center; gap:6px;">🏢 ${esc(item.floor)}</span></td>
-                      ${distinctShifts.map(sh => {
+                      <td style="padding: 10px 14px; font-weight: 700; color: var(--accent);"><span style="display:flex; align-items:center; gap:6px;">🏢 Unit ${esc(item.floor)}</span></td>
+                      ${mainShifts.map(sh => {
                         const cell = item.perShift[sh] || { total: 0, labelers: 0 };
                         return `
                           <td style="padding: 10px 12px; text-align: center; font-weight: 700; ${cell.total > 0 ? 'color: var(--primary);' : 'color: var(--muted);'}">${cell.total.toLocaleString()}</td>
@@ -4650,12 +5162,56 @@ function renderShiftComparison(){
             ${!floorMatrix.length ? '<div class="ux-empty" style="padding: 24px; text-align:center;">No floor records found.</div>' : ''}
           </div>
         </div>
-      ` : activeSubTab === 'qtc' ? `
-        <!-- TAB 2: QTC Supervisors Comparison -->
+      ` : activeSubTab === 'queue' ? `
+        <!-- SUB-TAB 2: Queue x Shift Breakdown (Section 8.4) -->
         <div class="ux-panel" style="padding: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 12px;">
           <div style="padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
-            <h3 style="margin:0;">👥 QTC Supervisor Performance Across Shifts</h3>
-            <span class="ux-note">Team sizes, queue coverage, and volume per shift</span>
+            <h3 style="margin:0;">🗂️ Queue Production by Shift (${queueRows.length} Queues)</h3>
+            <span class="ux-note">Throughput across shifts for each operational queue</span>
+          </div>
+          <div style="overflow-x: auto; max-height: 60vh;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 12px; text-align: left;">
+              <thead>
+                <tr style="background: var(--bg-2); border-bottom: 1px solid var(--border); position: sticky; top:0; z-index:1;">
+                  <th style="padding: 10px 14px;">Queue Name</th>
+                  <th style="padding: 10px 12px; text-align: center; color:#0d9488;">Morning</th>
+                  <th style="padding: 10px 12px; text-align: center; color:#ed9a35;">Night</th>
+                  <th style="padding: 10px 12px; text-align: center; color:#3b82f6;">Over Night</th>
+                  <th style="padding: 10px 12px; text-align: center;">Lidar FP</th>
+                  <th style="padding: 10px 12px; text-align: center;">Lidar QA</th>
+                  <th style="padding: 10px 12px; text-align: center;">Lane FP</th>
+                  <th style="padding: 10px 12px; text-align: center;">Lane QA</th>
+                  <th style="padding: 10px 14px; text-align: center; font-weight:800;">Total Submits</th>
+                  <th style="padding: 10px 12px; text-align: center; color:#0284c7;">Total Objects</th>
+                  <th style="padding: 10px 12px; text-align: center;">Labelers</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${queueRows.map(q => `
+                  <tr style="border-bottom: 1px solid var(--border);" onmouseover="this.style.background='var(--accent-light)'" onmouseout="this.style.background='transparent'">
+                    <td style="padding: 9px 14px; font-weight: 700; color: var(--primary);">🗂️ ${esc(q.name)}</td>
+                    <td style="padding: 9px 12px; text-align: center; font-weight: 700; color:#0d9488;">${q.morning.toLocaleString()}</td>
+                    <td style="padding: 9px 12px; text-align: center; font-weight: 700; color:#ed9a35;">${q.night.toLocaleString()}</td>
+                    <td style="padding: 9px 12px; text-align: center; font-weight: 700; color:#3b82f6;">${q.on.toLocaleString()}</td>
+                    <td style="padding: 9px 12px; text-align: center;">${q.lFP.toLocaleString()}</td>
+                    <td style="padding: 9px 12px; text-align: center;">${q.lQA.toLocaleString()}</td>
+                    <td style="padding: 9px 12px; text-align: center;">${q.lnFP.toLocaleString()}</td>
+                    <td style="padding: 9px 12px; text-align: center;">${q.lnQA.toLocaleString()}</td>
+                    <td style="padding: 9px 14px; text-align: center; font-weight: 800; color: var(--text);">${q.total.toLocaleString()}</td>
+                    <td style="padding: 9px 12px; text-align: center; font-weight: 700; color: #0284c7;">${q.totalObjects.toLocaleString()}</td>
+                    <td style="padding: 9px 12px; text-align: center;">${q.uniqueLabelers}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ` : activeSubTab === 'qtc' ? `
+        <!-- SUB-TAB 3: QTC Supervisors Comparison (Grouped by QTC + Shift + Unit) -->
+        <div class="ux-panel" style="padding: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 12px;">
+          <div style="padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+            <h3 style="margin:0;">👥 QTC Supervisor Performance Across Shifts &amp; Units</h3>
+            <span class="ux-note">Grouping: QTC + Shift + Unit</span>
           </div>
           <div style="overflow-x: auto; max-height: 60vh;">
             <table style="width: 100%; border-collapse: collapse; font-size: 12px; text-align: left;">
@@ -4664,218 +5220,324 @@ function renderShiftComparison(){
                   <th style="padding: 10px 14px;">QTC Supervisor</th>
                   <th style="padding: 10px 12px;">Shift</th>
                   <th style="padding: 10px 12px;">Floor (Unit)</th>
-                  <th style="padding: 10px 12px; text-align: center;">Team Size (Labelers)</th>
+                  <th style="padding: 10px 12px; text-align: center;">Team Size</th>
                   <th style="padding: 10px 12px; text-align: center;">Queues Covered</th>
-                  <th style="padding: 10px 12px; text-align: center;">FP Tasks</th>
-                  <th style="padding: 10px 12px; text-align: center;">QA Tasks</th>
-                  <th style="padding: 10px 14px; text-align: center;">Total Submits</th>
+                  <th style="padding: 10px 12px; text-align: center; color:#0d9488;">Lidar FP</th>
+                  <th style="padding: 10px 12px; text-align: center; color:#14b8a6;">Lidar QA</th>
+                  <th style="padding: 10px 12px; text-align: center; color:#ed9a35;">Lane FP</th>
+                  <th style="padding: 10px 12px; text-align: center; color:#ec4899;">Lane QA</th>
+                  <th style="padding: 10px 14px; text-align: center; font-weight:800;">Total Submits</th>
+                  <th style="padding: 10px 12px; text-align: center; color:#0284c7;">Total Objects</th>
                   <th style="padding: 10px 12px; text-align: center;">Avg / Labeler</th>
                 </tr>
               </thead>
               <tbody>
-                ${qtcRows.map(item => {
-                  const avg = item.labSet.size > 0 ? (item.total / item.labSet.size).toFixed(1) : '0';
-                  return `
-                    <tr style="border-bottom: 1px solid var(--border);" onmouseover="this.style.background='var(--accent-light)'" onmouseout="this.style.background='transparent'">
-                      <td style="padding: 9px 14px; font-weight: 700; color: var(--primary);">👤 ${esc(item.qtc)}</td>
-                      <td style="padding: 9px 12px;"><span class="q-badge q-shift">${esc(item.shift)}</span></td>
-                      <td style="padding: 9px 12px;">${esc(item.floor)}</td>
-                      <td style="padding: 9px 12px; text-align: center; font-weight: 700;">${item.labSet.size}</td>
-                      <td style="padding: 9px 12px; text-align: center;">${item.queueSet.size}</td>
-                      <td style="padding: 9px 12px; text-align: center; color: #10b981;">${item.fp.toLocaleString()}</td>
-                      <td style="padding: 9px 12px; text-align: center; color: #8b5cf6;">${item.qa.toLocaleString()}</td>
-                      <td style="padding: 9px 14px; text-align: center; font-weight: 800; font-size: 13px; color: var(--text);">${item.total.toLocaleString()}</td>
-                      <td style="padding: 9px 12px; text-align: center; font-weight: 600;">${avg}</td>
-                    </tr>
-                  `;
-                }).join('')}
+                ${qtcRows.map(item => `
+                  <tr style="border-bottom: 1px solid var(--border);" onmouseover="this.style.background='var(--accent-light)'" onmouseout="this.style.background='transparent'">
+                    <td style="padding: 9px 14px; font-weight: 700; color: var(--primary);">👤 ${esc(item.qtc)}</td>
+                    <td style="padding: 9px 12px;"><span class="q-badge" style="background:var(--bg-3);">${esc(item.shift)}</span></td>
+                    <td style="padding: 9px 12px; font-weight:600; color:var(--accent);">🏢 Unit ${esc(item.floor)}</td>
+                    <td style="padding: 9px 12px; text-align: center; font-weight: 600;">${item.teamSize}</td>
+                    <td style="padding: 9px 12px; text-align: center;"><span class="ux-note">${item.queuesCovered} queues</span></td>
+                    <td style="padding: 9px 12px; text-align: center; color:#0d9488;">${item.lFP.toLocaleString()}</td>
+                    <td style="padding: 9px 12px; text-align: center; color:#14b8a6;">${item.lQA.toLocaleString()}</td>
+                    <td style="padding: 9px 12px; text-align: center; color:#ed9a35;">${item.lnFP.toLocaleString()}</td>
+                    <td style="padding: 9px 12px; text-align: center; color:#ec4899;">${item.lnQA.toLocaleString()}</td>
+                    <td style="padding: 9px 14px; text-align: center; font-weight: 800; color: var(--text);">${item.total.toLocaleString()}</td>
+                    <td style="padding: 9px 12px; text-align: center; font-weight: 700; color: #0284c7;">${item.totalObjects.toLocaleString()}</td>
+                    <td style="padding: 9px 12px; text-align: center; font-weight: 600; color: var(--primary);">${item.avgSubmit}</td>
+                  </tr>
+                `).join('')}
               </tbody>
             </table>
-            ${!qtcRows.length ? '<div class="ux-empty" style="padding: 24px; text-align:center;">No supervisor records found.</div>' : ''}
           </div>
         </div>
       ` : activeSubTab === 'labelers' ? `
-        <!-- TAB 3: Labelers Breakdown -->
+        <!-- SUB-TAB 4: Labelers Breakdown (Section 8.6 - Full pagination, no 100 limit) -->
         <div class="ux-panel" style="padding: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 12px;">
-          <div style="padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
-            <h3 style="margin:0;">👤 Individual Labeler Output by Shift</h3>
-            <span class="ux-note">Showing ${labelerRows.length.toLocaleString()} active labelers across shifts</span>
+          <div style="padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-wrap:wrap; gap:8px;">
+            <div>
+              <h3 style="margin:0;">👤 Labelers Performance by Shift (${allLabelerRows.length} Labeler-Shift records)</h3>
+              <p style="margin:2px 0 0; font-size:11px; color:var(--text-soft);">Complete paginated directory. National IDs masked for privacy.</p>
+            </div>
+            <span class="ux-note">Showing ${(visibleLabelerRows.length ? (shiftCompFilters.labPage*labPageSize+1) : 0)} – ${Math.min((shiftCompFilters.labPage+1)*labPageSize, allLabelerRows.length)} of ${allLabelerRows.length} records</span>
           </div>
-          <div style="overflow-x: auto; max-height: 60vh;">
+          <div style="overflow-x: auto;">
             <table style="width: 100%; border-collapse: collapse; font-size: 12px; text-align: left;">
               <thead>
-                <tr style="background: var(--bg-2); border-bottom: 1px solid var(--border); position: sticky; top:0; z-index:1;">
+                <tr style="background: var(--bg-2); border-bottom: 1px solid var(--border);">
                   <th style="padding: 10px 14px;">Labeler Name</th>
-                  <th style="padding: 10px 12px;">ID</th>
+                  <th style="padding: 10px 12px;">Masked ID</th>
                   <th style="padding: 10px 12px;">Shift</th>
                   <th style="padding: 10px 12px;">Floor (Unit)</th>
                   <th style="padding: 10px 12px;">QTC Supervisor</th>
-                  <th style="padding: 10px 12px; text-align: center;">FP Tasks</th>
-                  <th style="padding: 10px 12px; text-align: center;">QA Tasks</th>
-                  <th style="padding: 10px 14px; text-align: center;">Total Tasks</th>
+                  <th style="padding: 10px 12px; text-align: center; color:#0d9488;">Lidar FP</th>
+                  <th style="padding: 10px 12px; text-align: center; color:#14b8a6;">Lidar QA</th>
+                  <th style="padding: 10px 12px; text-align: center; color:#ed9a35;">Lane FP</th>
+                  <th style="padding: 10px 12px; text-align: center; color:#ec4899;">Lane QA</th>
+                  <th style="padding: 10px 14px; text-align: center; font-weight:800;">Total Tasks</th>
+                  <th style="padding: 10px 12px; text-align: center; color:#0284c7;">Objects</th>
                   <th style="padding: 10px 12px; text-align: center;">Active Days</th>
                   <th style="padding: 10px 12px; text-align: center;">Avg / Day</th>
                 </tr>
               </thead>
               <tbody>
-                ${labelerRows.slice(0, 100).map(item => {
-                  const avg = item.dates.size > 0 ? (item.total / item.dates.size).toFixed(1) : item.total;
-                  return `
-                    <tr style="border-bottom: 1px solid var(--border);" onmouseover="this.style.background='var(--accent-light)'" onmouseout="this.style.background='transparent'">
-                      <td style="padding: 8px 14px; font-weight: 700; color: var(--text);">${esc(item.name)}</td>
-                      <td style="padding: 8px 12px;"><span class="q-badge" style="font-family:var(--mono);">${esc(item.maskedId)}</span></td>
-                      <td style="padding: 8px 12px;"><span class="q-badge q-shift">${esc(item.shift)}</span></td>
-                      <td style="padding: 8px 12px;">${esc(item.floor)}</td>
-                      <td style="padding: 8px 12px; color: var(--text-soft);">${esc(item.qtc)}</td>
-                      <td style="padding: 8px 12px; text-align: center; color: #10b981;">${item.fp.toLocaleString()}</td>
-                      <td style="padding: 8px 12px; text-align: center; color: #8b5cf6;">${item.qa.toLocaleString()}</td>
-                      <td style="padding: 8px 14px; text-align: center; font-weight: 800; color: var(--primary);">${item.total.toLocaleString()}</td>
-                      <td style="padding: 8px 12px; text-align: center;">${item.dates.size}</td>
-                      <td style="padding: 8px 12px; text-align: center; font-weight: 600;">${avg}</td>
-                    </tr>
-                  `;
-                }).join('')}
+                ${visibleLabelerRows.map(l => `
+                  <tr style="border-bottom: 1px solid var(--border);" onmouseover="this.style.background='var(--accent-light)'" onmouseout="this.style.background='transparent'">
+                    <td style="padding: 9px 14px; font-weight: 700; color: var(--primary);">${esc(l.name)}</td>
+                    <td style="padding: 9px 12px;"><span class="ux-note" style="font-family:monospace; font-size:11px;">${esc(l.maskedId)}</span></td>
+                    <td style="padding: 9px 12px;"><span class="q-badge" style="background:var(--bg-3);">${esc(l.shift)}</span></td>
+                    <td style="padding: 9px 12px; font-weight:600; color:var(--accent);">Unit ${esc(l.floor)}</td>
+                    <td style="padding: 9px 12px;">${esc(l.qtc)}</td>
+                    <td style="padding: 9px 12px; text-align: center; color:#0d9488;">${l.lFP.toLocaleString()}</td>
+                    <td style="padding: 9px 12px; text-align: center; color:#14b8a6;">${l.lQA.toLocaleString()}</td>
+                    <td style="padding: 9px 12px; text-align: center; color:#ed9a35;">${l.lnFP.toLocaleString()}</td>
+                    <td style="padding: 9px 12px; text-align: center; color:#ec4899;">${l.lnQA.toLocaleString()}</td>
+                    <td style="padding: 9px 14px; text-align: center; font-weight: 800; color: var(--text);">${l.total.toLocaleString()}</td>
+                    <td style="padding: 9px 12px; text-align: center; font-weight: 700; color: #0284c7;">${l.totalObjects.toLocaleString()}</td>
+                    <td style="padding: 9px 12px; text-align: center;">${l.activeDays}</td>
+                    <td style="padding: 9px 12px; text-align: center; font-weight: 600;">${l.avgPerDay}</td>
+                  </tr>
+                `).join('')}
               </tbody>
             </table>
-            ${labelerRows.length > 100 ? `<div style="padding: 10px 18px; text-align: center; color: var(--muted); font-size: 11px;">Showing top 100 labelers of ${labelerRows.length.toLocaleString()}. Use CSV export for full dataset.</div>` : ''}
-            ${!labelerRows.length ? '<div class="ux-empty" style="padding: 24px; text-align:center;">No labeler records found.</div>' : ''}
+          </div>
+          <div class="perf-pagination" style="display:flex; justify-content:space-between; align-items:center; padding:12px 18px; border-top:1px solid var(--border);">
+            <button class="btn" id="scLabPrev" ${shiftCompFilters.labPage === 0 ? 'disabled' : ''}>Previous</button>
+            <span class="ux-note">Page ${shiftCompFilters.labPage + 1} of ${labTotalPages}</span>
+            <button class="btn" id="scLabNext" ${shiftCompFilters.labPage >= labTotalPages - 1 ? 'disabled' : ''}>Next</button>
           </div>
         </div>
-      ` : `
-        <!-- TAB 4: Shift Comparison Chart -->
+      ` : activeSubTab === 'chart' ? `
+        <!-- SUB-TAB 5: Daily Shift Trends Chart (Section 8.7) -->
         <div class="ux-panel" style="padding: 20px;">
-          <h3 style="margin-top:0;">📊 Shift Productivity Distribution by Floor (Unit)</h3>
-          <p>Visual comparison of shift throughput across operational floors.</p>
-          <div style="display: flex; flex-direction: column; gap: 14px; margin-top: 20px;">
-            ${floorMatrix.map(flItem => {
-              return `
-                <div style="background: var(--bg-2); padding: 12px 16px; border-radius: 10px; border: 1px solid var(--border);">
-                  <div style="display:flex; justify-content:space-between; margin-bottom: 8px; font-weight: 700;">
-                    <span>🏢 ${esc(flItem.floor)}</span>
-                    <span>${flItem.total.toLocaleString()} tasks</span>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <div>
+              <h3 style="margin:0;">📊 Daily Shift Volume Trends</h3>
+              <p style="margin:2px 0 0;">Comparing daily task submissions across Morning, Night, and Over Night over time.</p>
+            </div>
+            <div style="display:flex; gap:16px; font-size:12px; font-weight:600;">
+              <span><span style="display:inline-block; width:12px; height:12px; background:#0d9488; border-radius:2px; vertical-align:middle; margin-right:4px;"></span> Morning</span>
+              <span><span style="display:inline-block; width:12px; height:12px; background:#ed9a35; border-radius:2px; vertical-align:middle; margin-right:4px;"></span> Night</span>
+              <span><span style="display:inline-block; width:12px; height:12px; background:#3b82f6; border-radius:2px; vertical-align:middle; margin-right:4px;"></span> Over Night</span>
+            </div>
+          </div>
+          <div id="scDailyChart" class="an-line" style="min-height:280px;"></div>
+        </div>
+      ` : `
+        <!-- SUB-TAB 6: Fair Shift Benchmarking & Smart Insights (Section 8.8 & 8.9) -->
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:16px;">
+          <!-- Benchmarking Card -->
+          <div class="ux-panel">
+            <h3 style="margin:0 0 12px;">⚖️ Fair Normalized Benchmarking</h3>
+            <p style="margin:0 0 16px; font-size:12px; color:var(--text-soft);">Normalizing production by headcount and active days rather than raw totals.</p>
+            <div style="display:flex; flex-direction:column; gap:12px;">
+              ${mainShifts.map(sh => {
+                const s = shiftMatrixData[sh];
+                const tone = sh === 'Morning' ? '#0d9488' : sh === 'Night' ? '#ed9a35' : '#3b82f6';
+                return `
+                  <div style="background:var(--bg-2); padding:12px 14px; border-radius:10px; border-left:4px solid ${tone};">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                      <strong style="color:${tone}; font-size:14px;">${esc(sh)} Shift</strong>
+                      <span class="q-badge" style="background:${tone}22; color:${tone}; font-weight:700;">${s.avgPerLabeler} tasks / labeler</span>
+                    </div>
+                    <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:6px; font-size:11px; color:var(--text-soft);">
+                      <div>Headcount: <b>${s.labelers}</b></div>
+                      <div>Daily Avg: <b>${s.avgDaily}</b></div>
+                      <div>Avg Obj: <b>${s.avgObjects}</b></div>
+                    </div>
                   </div>
-                  <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                    ${distinctShifts.map((sh, sIdx) => {
-                      const count = flItem.perShift[sh]?.total || 0;
-                      const colors = ['#0d9488', '#ed9a35', '#3b82f6', '#8b5cf6', '#ec4899', '#10b981'];
-                      const c = colors[sIdx % colors.length];
-                      const pct = flItem.total > 0 ? ((count / flItem.total) * 100).toFixed(0) : 0;
-                      return `
-                        <div style="flex: 1; min-width: 110px; background: var(--bg-3); padding: 8px 10px; border-radius: 8px; border-left: 3px solid ${c};">
-                          <div style="font-size: 11px; color: var(--text-soft);">${esc(sh)}</div>
-                          <div style="font-size: 14px; font-weight: 800; color: ${c}; margin-top: 2px;">${count.toLocaleString()} <span style="font-size:10px; color:var(--muted);">(${pct}%)</span></div>
-                        </div>
-                      `;
-                    }).join('')}
-                  </div>
-                </div>
-              `;
-            }).join('')}
+                `;
+              }).join('')}
+            </div>
+          </div>
+
+          <!-- Automated Insights Card -->
+          <div class="ux-panel">
+            <h3 style="margin:0 0 12px;">💡 Automated Shift Intelligence</h3>
+            <p style="margin:0 0 16px; font-size:12px; color:var(--text-soft);">Data-backed operational findings derived directly from Turso database records.</p>
+            <div style="display:flex; flex-direction:column; gap:10px; font-size:12px;">
+              <div style="padding:10px 14px; background:var(--bg-2); border-radius:8px; border-left:3px solid #10b981;">
+                <b>🏆 Highest Total Output:</b> ${shiftLeader.shift} contributed <b>${shiftLeader.total.toLocaleString()}</b> submissions (${all3ShiftsTotal > 0 ? ((shiftLeader.total/all3ShiftsTotal)*100).toFixed(1) : 0}% of all output).
+              </div>
+              <div style="padding:10px 14px; background:var(--bg-2); border-radius:8px; border-left:3px solid #3b82f6;">
+                <b>⚡ Highest Per-Capita Velocity:</b> ${prodLeader.shift} achieved <b>${prodLeader.avgPerLabeler}</b> average tasks per active labeler.
+              </div>
+              <div style="padding:10px 14px; background:var(--bg-2); border-radius:8px; border-left:3px solid #0d9488;">
+                <b>📡 Lidar Production Leader:</b> ${lidarLeader.shift} produced ${(lidarLeader.lidarFP.tasks + lidarLeader.lidarQA.tasks).toLocaleString()} Lidar tasks.
+              </div>
+              <div style="padding:10px 14px; background:var(--bg-2); border-radius:8px; border-left:3px solid #ed9a35;">
+                <b>🛣️ Lane Line Production Leader:</b> ${laneLeader.shift} produced ${(laneLeader.laneFP.tasks + laneLeader.laneQA.tasks).toLocaleString()} Lane Line tasks.
+              </div>
+            </div>
           </div>
         </div>
       `}
     </div>
   `;
 
-  bindHeaderControls(page, 'sc'); bindUniversalFilterBar(page, 'shift_comparison');
+  bindHeaderControls(page, 'sc');
+  bindUniversalFilterBar(page, 'shift_comparison');
 
+  // Sub-tab button events
   page.querySelector('#scTabFloor')?.addEventListener('click', () => { shiftCompFilters.subTab = 'floor'; renderShiftComparison(); });
+  page.querySelector('#scTabQueue')?.addEventListener('click', () => { shiftCompFilters.subTab = 'queue'; renderShiftComparison(); });
   page.querySelector('#scTabQtc')?.addEventListener('click', () => { shiftCompFilters.subTab = 'qtc'; renderShiftComparison(); });
   page.querySelector('#scTabLabelers')?.addEventListener('click', () => { shiftCompFilters.subTab = 'labelers'; renderShiftComparison(); });
   page.querySelector('#scTabChart')?.addEventListener('click', () => { shiftCompFilters.subTab = 'chart'; renderShiftComparison(); });
+  page.querySelector('#scTabFair')?.addEventListener('click', () => { shiftCompFilters.subTab = 'fair'; renderShiftComparison(); });
+
+  // Pagination for labelers tab
+  page.querySelector('#scLabPrev')?.addEventListener('click', () => { if(shiftCompFilters.labPage > 0){ shiftCompFilters.labPage--; renderShiftComparison(); } });
+  page.querySelector('#scLabNext')?.addEventListener('click', () => { if(shiftCompFilters.labPage < labTotalPages - 1){ shiftCompFilters.labPage++; renderShiftComparison(); } });
 
   const floorSel = page.querySelector('#scFloorSelect');
   if (floorSel) {
     floorSel.onchange = (e) => { shiftCompFilters.floor = e.target.value; renderShiftComparison(); };
   }
 
+  // Multi-line chart rendering for TAB 5
+  if (activeSubTab === 'chart') {
+    const chartEl = page.querySelector('#scDailyChart');
+    if (chartEl && allChartDates.length > 0) {
+      const datesSlice = allChartDates.slice(-21);
+      let maxVol = 1;
+      mainShifts.forEach(sh => {
+        datesSlice.forEach(d => {
+          const v = shiftDailyMap[sh].get(d) || 0;
+          if (v > maxVol) maxVol = v;
+        });
+      });
+
+      const W = 760, H = 260, L = 55, R = 20, T = 20, B = 45;
+      const x = i => L + (datesSlice.length === 1 ? (W - L - R) / 2 : (i / (datesSlice.length - 1)) * (W - L - R));
+      const y = v => H - B - (v / maxVol) * (H - T - B);
+
+      const colors = { Morning: '#0d9488', Night: '#ed9a35', 'Over Night': '#3b82f6' };
+      let svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="group" aria-label="Shift daily trends">';
+      for (let i = 0; i < 5; i++) {
+        const val = (maxVol * i) / 4, yy = y(val);
+        svg += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + yy + '" y2="' + yy + '" stroke="var(--border)" stroke-dasharray="3 3"/><text x="' + (L - 8) + '" y="' + (yy + 4) + '" text-anchor="end" font-size="10" fill="var(--text-soft)">' + Math.round(val) + '</text>';
+      }
+
+      mainShifts.forEach(sh => {
+        const pts = datesSlice.map((d, i) => x(i) + ',' + y(shiftDailyMap[sh].get(d) || 0)).join(' ');
+        svg += '<polyline fill="none" stroke="' + colors[sh] + '" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" points="' + pts + '"/>';
+        datesSlice.forEach((d, i) => {
+          const cnt = shiftDailyMap[sh].get(d) || 0;
+          svg += '<circle cx="' + x(i) + '" cy="' + y(cnt) + '" r="3.5" fill="' + colors[sh] + '"><title>' + d + ' (' + sh + '): ' + cnt + ' tasks</title></circle>';
+        });
+      });
+
+      datesSlice.forEach((d, i) => {
+        if (i === 0 || i === datesSlice.length - 1 || (datesSlice.length > 4 && i % 4 === 0)) {
+          svg += '<text x="' + x(i) + '" y="' + (H - 12) + '" text-anchor="middle" font-size="10" fill="var(--text-soft)">' + d.slice(5) + '</text>';
+        }
+      });
+      svg += '</svg>';
+      chartEl.innerHTML = svg;
+    }
+  }
+
+  // Export CSV
   const expBtn = page.querySelector('#scExportBtn');
   if (expBtn) {
     expBtn.onclick = () => {
       let headers = [], dataRows = [];
       if (activeSubTab === 'floor') {
-        headers = ['Floor', ...distinctShifts.map(s => s + ' Tasks'), 'Total Submissions'];
-        dataRows = floorMatrix.map(f => [f.floor, ...distinctShifts.map(s => f.perShift[s]?.total || 0), f.total]);
+        headers = ['Floor / Unit', ...mainShifts.map(s => s + ' Tasks'), 'Total Submissions', 'Floor Share %'];
+        dataRows = floorMatrix.map(f => [f.floor, ...mainShifts.map(s => f.perShift[s]?.total || 0), f.total, ((f.total / totalSubmissions) * 100).toFixed(1) + '%']);
+      } else if (activeSubTab === 'queue') {
+        headers = ['Queue Name', 'Morning Tasks', 'Night Tasks', 'Over Night Tasks', 'Lidar FP', 'Lidar QA', 'Lane Line FP', 'Lane Line QA', 'Total Submissions', 'Total Objects', 'Unique Labelers'];
+        dataRows = queueRows.map(q => [q.name, q.morning, q.night, q.on, q.lFP, q.lQA, q.lnFP, q.lnQA, q.total, q.totalObjects, q.uniqueLabelers]);
       } else if (activeSubTab === 'qtc') {
-        headers = ['QTC Supervisor', 'Shift', 'Floor', 'Team Size', 'Queues Covered', 'FP Tasks', 'QA Tasks', 'Total Submissions'];
-        dataRows = qtcRows.map(q => [q.qtc, q.shift, q.floor, q.labSet.size, q.queueSet.size, q.fp, q.qa, q.total]);
+        headers = ['QTC Supervisor', 'Shift', 'Floor / Unit', 'Team Size', 'Queues Covered', 'Lidar FP', 'Lidar QA', 'Lane Line FP', 'Lane Line QA', 'Total Submissions', 'Total Objects', 'Avg / Labeler'];
+        dataRows = qtcRows.map(q => [q.qtc, q.shift, q.floor, q.teamSize, q.queuesCovered, q.lFP, q.lQA, q.lnFP, q.lnQA, q.total, q.totalObjects, q.avgSubmit]);
       } else {
-        headers = ['Labeler Name', 'Employee ID', 'Shift', 'Floor', 'QTC Supervisor', 'FP Tasks', 'QA Tasks', 'Total Tasks', 'Active Days'];
-        dataRows = labelerRows.map(l => [l.name, l.maskedId, l.shift, l.floor, l.qtc, l.fp, l.qa, l.total, l.dates.size]);
+        headers = ['Labeler Name', 'Masked Employee ID', 'Shift', 'Floor / Unit', 'QTC Supervisor', 'Lidar FP', 'Lidar QA', 'Lane Line FP', 'Lane Line QA', 'Total Tasks', 'Total Objects', 'Active Days', 'Avg Tasks / Day'];
+        dataRows = allLabelerRows.map(l => [l.name, l.maskedId, l.shift, l.floor, l.qtc, l.lFP, l.lQA, l.lnFP, l.lnQA, l.total, l.totalObjects, l.activeDays, l.avgPerDay]);
       }
-      const csv = [headers, ...dataRows].map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\r\n');
-      downloadBlob(new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' }), `Shift_Comparison_${activeSubTab}_${cairoToday()}.csv`);
+      const cell = v => '"' + String(v ?? '').replace(/^[=+@\-\t\r]/, "'$&").replace(/"/g, '""') + '"';
+      const csv = [headers, ...dataRows].map(r => r.map(cell).join(',')).join('\r\n');
+      downloadBlob(new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' }), 'Shift_Comparison_' + activeSubTab + '_' + cairoToday() + '.csv');
     };
   }
 }
 
 function qtcFloorAggregateData(rows){
- const idx=name=>hdrs.findIndex(h=>h.trim().toLowerCase()===name.toLowerCase());
- const qi=idx('qtc name'), fi=hdrs.findIndex(h=>['floor','unit'].includes(h.trim().toLowerCase()));
- const si=idx('shift'), mi=idx('modality'), pi=idx('pass');
- const ni=idx('national id'), li=idx('labeler name');
+  const idx = name => hdrs.findIndex(h => h.trim().toLowerCase() === name.toLowerCase());
+  const qi = idx('qtc name'), fi = hdrs.findIndex(h => ['floor','unit'].includes(h.trim().toLowerCase()));
+  const si = idx('shift'), mi = idx('modality'), pi = idx('pass');
+  const ni = idx('national id'), li = idx('labeler name');
+  const oi = idx('object count'), qni = idx('queue name');
 
- const groups=new Map();
- rows.forEach(r=>{
-  const qtc=qi>=0?(String(r[qi]||'').normalize('NFC').trim().replace(/\s+/gu,' ')||'Unknown QTC'):'Unknown QTC';
-  const floor=fi>=0?(String(r[fi]||'').trim()||'Unknown Floor'):'Unknown Floor';
-  const key=qtc+'|||'+floor;
-  if(!groups.has(key)){
-   groups.set(key,{
-    qtc,
-    floor,
-    shifts:new Set(),
-    lidarFP:0,
-    lidarQA:0,
-    laneFP:0,
-    laneQA:0,
-    totalSubmit:0,
-    labelerSet:new Set()
-   });
-  }
-  const g=groups.get(key);
-  g.totalSubmit++;
-  if(si>=0){
-   const s=String(r[si]||'').trim();
-   if(s)g.shifts.add(s);
-  }
-  let lid='';
-  if(ni>=0){
-   const rawNi=String(r[ni]??'').trim()
-    .replace(/[٠-٩]/g,c=>String(c.charCodeAt(0)-1632))
-    .replace(/[۰-۹]/g,c=>String(c.charCodeAt(0)-1776))
-    .replace(/\.0+$/,'').replace(/[\s-]/g,'');
-   if(/^\d{14}$/.test(rawNi))lid=rawNi;
-  }
-  if(!lid&&li>=0){
-   const name=String(r[li]??'').trim().toLowerCase();
-   if(name)lid='name:'+name;
-  }
-  if(lid)g.labelerSet.add(lid);
+  const groups = new Map();
+  rows.forEach(r => {
+    const qtc = qi >= 0 ? (String(r[qi] || '').normalize('NFC').trim().replace(/\s+/gu, ' ') || 'Unknown QTC') : 'Unknown QTC';
+    const floor = fi >= 0 ? (deriveFloor(r[fi]) || 'Unknown Floor') : 'Unknown Floor';
+    const key = qtc + '|||' + floor;
+    if (!groups.has(key)) {
+      groups.set(key, {
+        qtc,
+        floor,
+        shifts: new Set(),
+        queues: new Set(),
+        lidarFP: 0,
+        lidarQA: 0,
+        laneFP: 0,
+        laneQA: 0,
+        totalSubmit: 0,
+        totalObjects: 0,
+        labelerSet: new Set()
+      });
+    }
+    const g = groups.get(key);
+    g.totalSubmit++;
+    const objCnt = parseFloat(oi >= 0 ? r[oi] : 0) || 0;
+    g.totalObjects += objCnt;
 
-  const mod=mi<0?'':String(r[mi]||'').toLowerCase().replace(/[\s_-]+/g,'');
-  const pass=pi<0?'':String(r[pi]||'').trim().toUpperCase();
-  const prefix=mod==='lidar'?'lidar':(mod==='laneline'||mod==='lane')?'lane':'';
-  if(prefix&&(pass==='FP'||pass==='QA')){
-   const cat=prefix+pass;
-   if(cat==='lidarFP')g.lidarFP++;
-   else if(cat==='lidarQA')g.lidarQA++;
-   else if(cat==='laneFP')g.laneFP++;
-   else if(cat==='laneQA')g.laneQA++;
-  }
- });
+    if (si >= 0 && r[si]) {
+      const s = String(r[si] || '').trim();
+      if (s) g.shifts.add(s);
+    }
+    if (qni >= 0 && r[qni]) {
+      const qn = String(r[qni] || '').trim();
+      if (qn) g.queues.add(qn);
+    }
 
- return [...groups.values()].map(g=>{
-  const uniqueLabelers=g.labelerSet.size;
-  const avgSubmit=uniqueLabelers>0?(g.totalSubmit/uniqueLabelers):0;
-  return {
-   ...g,
-   shifts:[...g.shifts].sort(),
-   uniqueLabelers,
-   avgSubmit,
-   avgSubmitStr:avgSubmit.toFixed(1)
-  };
- });
+    let lid = '';
+    if (ni >= 0) {
+      const rawNi = String(r[ni] ?? '').trim()
+        .replace(/[٠-٩]/g, c => String(c.charCodeAt(0) - 1632))
+        .replace(/[۰-۹]/g, c => String(c.charCodeAt(0) - 1776))
+        .replace(/\.0+$/, '').replace(/[\s-]/g, '');
+      if (/^\d{14}$/.test(rawNi)) lid = rawNi;
+    }
+    if (!lid && li >= 0) {
+      const name = String(r[li] ?? '').trim().toLowerCase();
+      if (name) lid = 'name:' + name;
+    }
+    if (lid) g.labelerSet.add(lid);
+
+    if (isModPass(r, 'lidar', 'FP')) g.lidarFP++;
+    if (isModPass(r, 'lidar', 'QA')) g.lidarQA++;
+    if (isModPass(r, 'laneline', 'FP')) g.laneFP++;
+    if (isModPass(r, 'laneline', 'QA')) g.laneQA++;
+  });
+
+  return [...groups.values()].map(g => {
+    const uniqueLabelers = g.labelerSet.size;
+    const avgSubmit = uniqueLabelers > 0 ? (g.totalSubmit / uniqueLabelers) : 0;
+    return {
+      ...g,
+      shifts: [...g.shifts].sort(),
+      queues: [...g.queues].sort(),
+      uniqueQueues: g.queues.size,
+      uniqueLabelers,
+      avgSubmit,
+      avgSubmitStr: avgSubmit.toFixed(1)
+    };
+  });
 }
 
 function exportQtcFloorCSV(items){
@@ -4902,80 +5564,81 @@ function exportQtcFloorCSV(items){
 }
 
 function floorAggregateData(rows){
- const idx=name=>hdrs.findIndex(h=>h.trim().toLowerCase()===name.toLowerCase());
- const qi=idx('qtc name'), fi=hdrs.findIndex(h=>['floor','unit'].includes(h.trim().toLowerCase()));
- const si=idx('shift'), mi=idx('modality'), pi=idx('pass');
- const ni=idx('national id'), li=idx('labeler name');
+  const idx = name => hdrs.findIndex(h => h.trim().toLowerCase() === name.toLowerCase());
+  const qi = idx('qtc name'), fi = hdrs.findIndex(h => ['floor','unit'].includes(h.trim().toLowerCase()));
+  const si = idx('shift'), mi = idx('modality'), pi = idx('pass');
+  const ni = idx('national id'), li = idx('labeler name');
+  const oi = idx('object count');
 
- const groups=new Map();
- rows.forEach(r=>{
-  const floor=fi>=0?(String(r[fi]||'').trim()||'Unknown Floor'):'Unknown Floor';
-  const qtc=qi>=0?(String(r[qi]||'').normalize('NFC').trim().replace(/\s+/gu,' ')||'Unknown QTC'):'Unknown QTC';
-  if(!groups.has(floor)){
-   groups.set(floor,{
-    floor,
-    shifts:new Set(),
-    qtcs:new Set(),
-    lidarFP:0,
-    lidarQA:0,
-    laneFP:0,
-    laneQA:0,
-    totalSubmit:0,
-    labelerSet:new Set()
-   });
-  }
-  const g=groups.get(floor);
-  g.totalSubmit++;
-  if(si>=0){
-   const s=String(r[si]||'').trim();
-   if(s)g.shifts.add(s);
-  }
-  if(qtc&&qtc!=='Unknown QTC')g.qtcs.add(qtc);
+  const groups = new Map();
+  rows.forEach(r => {
+    const floor = fi >= 0 ? (deriveFloor(r[fi]) || 'Unknown Floor') : 'Unknown Floor';
+    const qtc = qi >= 0 ? (String(r[qi] || '').normalize('NFC').trim().replace(/\s+/gu, ' ') || 'Unknown QTC') : 'Unknown QTC';
+    if (!groups.has(floor)) {
+      groups.set(floor, {
+        floor,
+        shifts: new Set(),
+        qtcs: new Set(),
+        lidarFP: 0,
+        lidarQA: 0,
+        laneFP: 0,
+        laneQA: 0,
+        totalSubmit: 0,
+        totalObjects: 0,
+        labelerSet: new Set()
+      });
+    }
+    const g = groups.get(floor);
+    g.totalSubmit++;
+    const objCnt = parseFloat(oi >= 0 ? r[oi] : 0) || 0;
+    g.totalObjects += objCnt;
 
-  let lid='';
-  if(ni>=0){
-   const rawNi=String(r[ni]??'').trim()
-    .replace(/[٠-٩]/g,c=>String(c.charCodeAt(0)-1632))
-    .replace(/[۰-۹]/g,c=>String(c.charCodeAt(0)-1776))
-    .replace(/\.0+$/,'').replace(/[\s-]/g,'');
-   if(/^\d{14}$/.test(rawNi))lid=rawNi;
-  }
-  if(!lid&&li>=0){
-   const name=String(r[li]??'').trim().toLowerCase();
-   if(name)lid='name:'+name;
-  }
-  if(lid)g.labelerSet.add(lid);
+    if (si >= 0 && r[si]) {
+      const s = String(r[si] || '').trim();
+      if (s) g.shifts.add(s);
+    }
+    if (qtc && qtc !== 'Unknown QTC') g.qtcs.add(qtc);
 
-  const mod=mi<0?'':String(r[mi]||'').toLowerCase().replace(/[\s_-]+/g,'');
-  const pass=pi<0?'':String(r[pi]||'').trim().toUpperCase();
-  const prefix=mod==='lidar'?'lidar':(mod==='laneline'||mod==='lane')?'lane':'';
-  if(prefix&&(pass==='FP'||pass==='QA')){
-   const cat=prefix+pass;
-   if(cat==='lidarFP')g.lidarFP++;
-   else if(cat==='lidarQA')g.lidarQA++;
-   else if(cat==='laneFP')g.laneFP++;
-   else if(cat==='laneQA')g.laneQA++;
-  }
- });
+    let lid = '';
+    if (ni >= 0) {
+      const rawNi = String(r[ni] ?? '').trim()
+        .replace(/[٠-٩]/g, c => String(c.charCodeAt(0) - 1632))
+        .replace(/[۰-۹]/g, c => String(c.charCodeAt(0) - 1776))
+        .replace(/\.0+$/, '').replace(/[\s-]/g, '');
+      if (/^\d{14}$/.test(rawNi)) lid = rawNi;
+    }
+    if (!lid && li >= 0) {
+      const name = String(r[li] ?? '').trim().toLowerCase();
+      if (name) lid = 'name:' + name;
+    }
+    if (lid) g.labelerSet.add(lid);
 
- const overallTotal=rows.length||1;
+    if (isModPass(r, 'lidar', 'FP')) g.lidarFP++;
+    if (isModPass(r, 'lidar', 'QA')) g.lidarQA++;
+    if (isModPass(r, 'laneline', 'FP')) g.laneFP++;
+    if (isModPass(r, 'laneline', 'QA')) g.laneQA++;
+  });
 
- return [...groups.values()].map(g=>{
-  const uniqueLabelers=g.labelerSet.size;
-  const avgSubmit=uniqueLabelers>0?(g.totalSubmit/uniqueLabelers):0;
-  const sharePct=((g.totalSubmit/overallTotal)*100).toFixed(1);
-  return {
-   ...g,
-   shifts:[...g.shifts].sort(),
-   qtcs:[...g.qtcs].sort(),
-   uniqueQtcs:g.qtcs.size,
-   uniqueLabelers,
-   avgSubmit,
-   avgSubmitStr:avgSubmit>0?avgSubmit.toFixed(1):'—',
-   sharePct:Number(sharePct)||0,
-   sharePctStr:sharePct+'%'
-  };
- });
+  const overallTotal = rows.length || 1;
+
+  return [...groups.values()].map(g => {
+    const uniqueLabelers = g.labelerSet.size;
+    const avgSubmit = uniqueLabelers > 0 ? (g.totalSubmit / uniqueLabelers) : 0;
+    const sharePct = ((g.totalSubmit / overallTotal) * 100).toFixed(1);
+    return {
+      ...g,
+      shifts: [...g.shifts].sort(),
+      qtcs: [...g.qtcs].sort(),
+      uniqueQtcs: g.qtcs.size,
+      uniqueLabelers,
+      totalFP: g.lidarFP + g.laneFP,
+      totalQA: g.lidarQA + g.laneQA,
+      avgSubmit,
+      avgSubmitStr: avgSubmit > 0 ? avgSubmit.toFixed(1) : '—',
+      sharePct: Number(sharePct) || 0,
+      sharePctStr: sharePct + '%'
+    };
+  });
 }
 
 function exportFloorPerformanceCSV(groups){
@@ -5012,6 +5675,7 @@ function renderQtcFloorPerformance(){
   const si = idx('shift');
   const mi = idx('modality');
   const pi = idx('pass');
+  const oi = idx('object count');
 
   const distinctQtcs = [...new Set(baseRows.map(r => qi >= 0 ? String(r[qi] || '').normalize('NFC').trim().replace(/\s+/gu, ' ') : '').filter(Boolean))].sort();
   const distinctFloors = [...new Set(baseRows.map(r => fi >= 0 ? deriveFloor(r[fi]) : '').filter(Boolean))].sort();
@@ -5021,16 +5685,18 @@ function renderQtcFloorPerformance(){
   const q = (qtcFloorFilters.query || '').toLowerCase().trim();
   const filteredRows = baseRows.filter(r => {
     const qtc = qi >= 0 ? String(r[qi] || '').normalize('NFC').trim().replace(/\s+/gu, ' ') : '';
-    const floor = fi >= 0 ? deriveFloor(r[fi]) : 'Floor 01';
+    const floor = fi >= 0 ? deriveFloor(r[fi]) : 'Unknown';
     const shift = si >= 0 ? String(r[si] || '').trim() : '';
-    const mod = mi < 0 ? '' : String(r[mi] || '').toLowerCase().replace(/[\s_-]+/g, '');
-    const pass = pi < 0 ? '' : String(r[pi] || '').trim().toUpperCase();
-    const cat = (mod === 'lidar' ? 'lidar' : (mod === 'laneline' || mod === 'lane') ? 'lane' : '') + pass;
 
     if (qtcFloorFilters.qtc && qtc !== qtcFloorFilters.qtc) return false;
     if (qtcFloorFilters.floor && floor !== qtcFloorFilters.floor) return false;
     if (qtcFloorFilters.shift && shift !== qtcFloorFilters.shift) return false;
-    if (qtcFloorFilters.category && cat !== qtcFloorFilters.category) return false;
+    if (qtcFloorFilters.category) {
+      if (qtcFloorFilters.category === 'lidarFP' && !isModPass(r, 'lidar', 'FP')) return false;
+      if (qtcFloorFilters.category === 'lidarQA' && !isModPass(r, 'lidar', 'QA')) return false;
+      if (qtcFloorFilters.category === 'laneFP' && !isModPass(r, 'laneline', 'FP')) return false;
+      if (qtcFloorFilters.category === 'laneQA' && !isModPass(r, 'laneline', 'QA')) return false;
+    }
 
     if (q) {
       const matchQ = qtc.toLowerCase().includes(q);
@@ -5041,7 +5707,7 @@ function renderQtcFloorPerformance(){
     return true;
   });
 
-  // Table 1: QTC & Floor aggregation
+  // Table 1: QTC & Floor aggregation (Composite QTC + Unit)
   const allQTCFloorGroups = qtcFloorAggregateData(filteredRows);
   allQTCFloorGroups.sort((a,b) => {
     const col = qtcFloorFilters.sortCol || 'totalSubmit';
@@ -5056,7 +5722,7 @@ function renderQtcFloorPerformance(){
   qtcFloorFilters.page = Math.min(qtcFloorFilters.page || 0, qfTotalPages - 1);
   const qfVisible = allQTCFloorGroups.slice(qtcFloorFilters.page * qfPageSize, (qtcFloorFilters.page + 1) * qfPageSize);
 
-  // Table 2: Floor Performance aggregation
+  // Table 2: Floor Performance aggregation (Floor = Unit)
   const allFloorGroups = floorAggregateData(filteredRows);
   allFloorGroups.sort((a,b) => {
     const col = floorPerformanceFilters.sortCol || 'totalSubmit';
@@ -5066,156 +5732,147 @@ function renderQtcFloorPerformance(){
     return floorPerformanceFilters.sortAsc ? (va - vb) : (vb - va);
   });
 
-  // Summary Metrics for 8 KPI Cards
+  // Summary Metrics for Main KPIs (Section 7.1)
   const totalSubmissions = filteredRows.length;
+  const totalObjectsAll = filteredRows.reduce((acc, r) => acc + (parseFloat(oi >= 0 ? r[oi] : 0) || 0), 0);
   const totalActiveLabelers = uniq(filteredRows, 'Labeler Name') || 0;
   const totalActiveQtcs = distinctQtcs.length;
   const totalFloorsCount = distinctFloors.length;
   const avgSubmitsPerQtcTeam = totalActiveQtcs > 0 ? (totalSubmissions / totalActiveQtcs).toFixed(1) : '0';
   const avgLabelersPerQtc = totalActiveQtcs > 0 ? (totalActiveLabelers / totalActiveQtcs).toFixed(1) : '0';
-  const totalQaReviewVolume = filteredRows.filter(r => isModPass(r, 'lidar', 'QA') || isModPass(r, 'laneline', 'QA')).length;
-  const avgFloorProductivity = totalFloorsCount > 0 ? (totalSubmissions / totalFloorsCount).toFixed(0) : '0';
+  const avgObjectsPerTask = totalSubmissions > 0 ? (totalObjectsAll / totalSubmissions).toFixed(1) : '0';
 
   // Heatmap Matrix: Floor (Unit) x Shift
   const heatmapData = {};
   distinctFloors.forEach(fl => {
     heatmapData[fl] = {};
-    distinctShifts.forEach(sh => { heatmapData[fl][sh] = 0; });
+    distinctShifts.forEach(sh => {
+      heatmapData[fl][sh] = filteredRows.filter(r => (fi >= 0 && deriveFloor(r[fi]) === fl) && (si >= 0 && String(r[si] || '').trim() === sh)).length;
+    });
   });
-  filteredRows.forEach(r => {
-    const fl = fi >= 0 ? deriveFloor(r[fi]) : 'Unknown';
-    const sh = si >= 0 ? String(r[si] || '').trim() : '';
-    if (heatmapData[fl] && sh) {
-      heatmapData[fl][sh] = (heatmapData[fl][sh] || 0) + 1;
-    }
+  let maxHeat = 1;
+  distinctFloors.forEach(fl => {
+    distinctShifts.forEach(sh => {
+      if (heatmapData[fl][sh] > maxHeat) maxHeat = heatmapData[fl][sh];
+    });
   });
 
-  // 8 KPI Cards
-  const kpi8 = [
-    { title: 'Total Active QTCs', val: totalActiveQtcs.toLocaleString(), sub: 'Supervising reviewers', tone: '#df8b24' },
-    { title: 'Total Active Labelers', val: totalActiveLabelers.toLocaleString(), sub: 'Supervised workforce', tone: '#0a9d8c' },
-    { title: 'Operational Floors (Units)', val: totalFloorsCount + ' Units', sub: distinctFloors.slice(0, 2).join(', ') + (distinctFloors.length > 2 ? '...' : ''), tone: '#3b82f6' },
-    { title: 'Total Submissions', val: totalSubmissions.toLocaleString(), sub: 'Workforce output', tone: '#0d9488' },
-    { title: 'Avg Submissions / QTC Team', val: avgSubmitsPerQtcTeam, sub: 'Team throughput', tone: '#8b5cf6' },
-    { title: 'Avg Labelers / QTC', val: avgLabelersPerQtc, sub: 'Team capacity', tone: '#10b981' },
-    { title: 'QA Review Volume', val: totalQaReviewVolume.toLocaleString(), sub: 'QA validation volume', tone: '#ec4899' },
-    { title: 'Avg Floor Productivity', val: avgFloorProductivity, sub: 'Submissions per floor', tone: '#f59e0b' }
+  // 8 Main KPI Cards (Including Total Objects)
+  const kpiDefs = [
+    { title: 'Total Submissions', val: totalSubmissions.toLocaleString(), sub: 'In current view', tone: '#0d9488' },
+    { title: 'Total Objects', val: totalObjectsAll.toLocaleString(), sub: 'Cumulative annotated objects (' + avgObjectsPerTask + ' avg/task)', tone: '#0284c7' },
+    { title: 'Active QTC Supervisors', val: totalActiveQtcs.toLocaleString(), sub: 'Supervising teams', tone: '#df8b24' },
+    { title: 'Active Floors / Units', val: totalFloorsCount.toLocaleString(), sub: 'Operational units', tone: '#3b82f6' },
+    { title: 'Active Labelers', val: totalActiveLabelers.toLocaleString(), sub: 'Production workforce', tone: '#0a9d8c' },
+    { title: 'Avg Tasks / QTC Team', val: avgSubmitsPerQtcTeam, sub: 'Average output per supervisor', tone: '#8b5cf6' },
+    { title: 'Avg Labelers / QTC', val: avgLabelersPerQtc, sub: 'Average team size', tone: '#10b981' },
+    { title: 'Floor Count', val: totalFloorsCount.toLocaleString(), sub: 'Distinct Unit dimension', tone: '#df5c99' }
   ];
 
   page.innerHTML = '<div class="ux-overview">'
     + '<div class="ux-heading">'
       + '<div>'
-        + '<div class="ux-eyebrow">Supervisory & Facility Intelligence</div>'
-        + '<h2>Performance per QTC & Floor</h2>'
-        + '<p>Supervisor team throughput, floor capacity utilization, and operational room balance.</p>'
+        + '<div class="ux-eyebrow">Supervisory &amp; Facility Diagnostics</div>'
+        + '<h2>Performance per QTC &amp; Floor</h2>'
+        + '<p>Operational productivity analyzed by QTC Supervisor Teams and Facility Floors (= Units).</p>'
       + '</div>'
-      + renderHeaderControlsHTML('qtcfloor')
+      + renderHeaderControlsHTML('qf')
     + '</div>'
 
     + renderUniversalFilterBar('qtcfloor')
 
-    // 8 KPI Grid
+    // 8 Main KPI Cards Grid
     + '<div class="ux-grid-8">'
-      + kpi8.map(k => '<div class="kpi-mini-card" style="--tone:' + k.tone + '">'
+      + kpiDefs.map(k => '<div class="kpi-mini-card" style="--tone:' + k.tone + '">'
         + '<div class="kpi-title"><span>' + esc(k.title) + '</span><span style="color:' + k.tone + '">●</span></div>'
         + '<div class="kpi-val">' + k.val + '</div>'
         + '<div class="kpi-sub">' + esc(k.sub) + '</div>'
       + '</div>').join('')
     + '</div>'
 
-    // Distinction Notice
-    + '<div class="ux-panel" style="margin-top:16px; padding:12px 18px; border-left:4px solid #8b5cf6; background:rgba(139,92,246,0.06); font-size:12px; color:var(--text);">'
-      + '<b>📌 Distinction Notice:</b> Individual QTC review counts (QA Review Volume) are clearly distinguished from overall team submissions. Team submissions reflect the cumulative output of all labelers reporting to that supervisor.'
-    + '</div>'
-
-    // Filters
+    // Controls & Filter Bar
     + '<div class="queues-controls" style="margin-top:16px;">'
-      + '<label>Search QTC / Floor / Shift<input id="qfQuery" placeholder="Type QTC name, floor, shift…" value="' + esc(qtcFloorFilters.query || '') + '"></label>'
-      + '<label>QTC Supervisor<select id="qfQtcSelect"><option value="">All QTCs (' + distinctQtcs.length + ')</option>' + distinctQtcs.map(q => '<option value="' + esc(q) + '" ' + (qtcFloorFilters.qtc===q?'selected':'') + '>' + esc(q) + '</option>').join('') + '</select></label>'
-      + '<label>Floor<select id="qfFloorSelect"><option value="">All Floors</option>' + distinctFloors.map(f => '<option value="' + esc(f) + '" ' + (qtcFloorFilters.floor===f?'selected':'') + '>' + esc(f) + '</option>').join('') + '</select></label>'
-      + '<label>Shift<select id="qfShiftSelect"><option value="">All Shifts</option>' + distinctShifts.map(s => '<option value="' + esc(s) + '" ' + (qtcFloorFilters.shift===s?'selected':'') + '>' + esc(s) + '</option>').join('') + '</select></label>'
+      + '<label>Search QTC / Unit / Shift<input id="qfSearch" placeholder="Type QTC name, unit, shift…" value="' + esc(qtcFloorFilters.query || '') + '"></label>'
+      + '<label>Select QTC<select id="qfSelectQtc"><option value="">All QTC Supervisors (' + distinctQtcs.length + ')</option>' + distinctQtcs.map(q => '<option value="' + esc(q) + '" ' + (qtcFloorFilters.qtc===q?'selected':'') + '>' + esc(q) + '</option>').join('') + '</select></label>'
+      + '<label>Select Floor / Unit<select id="qfSelectFloor"><option value="">All Floors (' + distinctFloors.length + ')</option>' + distinctFloors.map(f => '<option value="' + esc(f) + '" ' + (qtcFloorFilters.floor===f?'selected':'') + '>Unit ' + esc(f) + '</option>').join('') + '</select></label>'
+      + '<label>Select Shift<select id="qfSelectShift"><option value="">All Shifts (' + distinctShifts.length + ')</option>' + distinctShifts.map(s => '<option value="' + esc(s) + '" ' + (qtcFloorFilters.shift===s?'selected':'') + '>' + esc(s) + '</option>').join('') + '</select></label>'
       + '<div style="margin-left:auto; display:flex; gap:8px; align-items:flex-end;">'
-        + '<button class="btn btn-c" id="qfExportCSV">↓ Export QTC CSV</button>'
-        + '<button class="btn" id="qfReset">Reset Filters</button>'
+        + '<button class="btn btn-c" id="qfExportCSV">↓ Export QTC &amp; Floor CSV</button>'
+        + '<button class="btn" id="qfReset">Reset filters</button>'
       + '</div>'
     + '</div>'
 
-    // SHIFT x FLOOR HEATMAP MATRIX
-    + '<section class="ux-panel" style="margin-top:20px;">'
-      + '<div class="ux-heading" style="margin-bottom:12px;">'
-        + '<div><h3>Shift × Floor Throughput Heatmap</h3><p>Task submissions across operating shifts and facility floors.</p></div>'
-        + '<span class="ux-note">Live Floor Cross-Matrix</span>'
+    // HEATMAP: Floor (Unit) x Shift Matrix
+    + '<div class="ux-panel" style="margin-top:20px;">'
+      + '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">'
+        + '<h3 style="margin:0;">🔥 Facility Heatmap: Floor / Unit × Shift</h3>'
+        + '<span class="ux-note">Color intensity represents submission throughput volume</span>'
       + '</div>'
       + '<div style="overflow-x:auto;">'
-        + '<table class="heatmap-table">'
-          + '<thead><tr>'
-            + '<th>Floor</th>'
-            + distinctShifts.map(s => '<th>' + esc(s) + '</th>').join('')
-            + '<th>Floor Total</th>'
-          + '</tr></thead>'
+        + '<table style="width:100%; border-collapse:collapse; font-size:12px; text-align:center;">'
+          + '<thead><tr style="background:var(--bg-2); border-bottom:1px solid var(--border);"><th style="padding:10px 14px; text-align:left;">Floor / Unit</th>' + distinctShifts.map(sh => '<th style="padding:10px 14px;">' + esc(sh) + '</th>').join('') + '<th style="padding:10px 14px; font-weight:700;">Unit Total</th></tr></thead>'
           + '<tbody>'
             + distinctFloors.map(fl => {
-              let fTot = 0;
-              return '<tr>'
-                + '<td><b>' + fl + '</b></td>'
+              let rowTot = 0;
+              return '<tr style="border-bottom:1px solid var(--border);">'
+                + '<td style="padding:10px 14px; text-align:left; font-weight:700; color:var(--accent);">🏢 Unit ' + esc(fl) + '</td>'
                 + distinctShifts.map(sh => {
-                  const val = (heatmapData[fl] && heatmapData[fl][sh]) || 0;
-                  fTot += val;
-                  const intensity = Math.min(1, val / Math.max(1, (totalSubmissions / 10)));
-                  const bg = val > 0 ? ('rgba(13,148,136,' + Math.max(0.12, intensity * 0.45) + ')') : 'transparent';
-                  return '<td style="background:' + bg + ';" class="heatmap-cell">' + (val > 0 ? '<b>' + val.toLocaleString() + '</b>' : '<span style="color:var(--muted);">—</span>') + '</td>';
+                  const val = heatmapData[fl][sh] || 0;
+                  rowTot += val;
+                  const ratio = maxHeat > 0 ? (val / maxHeat) : 0;
+                  const bg = val > 0 ? 'rgba(13,148,136,' + Math.max(0.12, ratio * 0.75).toFixed(2) + ')' : 'transparent';
+                  return '<td style="padding:10px 14px; background:' + bg + '; font-weight:' + (val > 0 ? '700' : '400') + '; color:var(--text);">' + val.toLocaleString() + '</td>';
                 }).join('')
-                + '<td><strong style="color:var(--primary);">' + fTot.toLocaleString() + '</strong></td>'
+                + '<td style="padding:10px 14px; font-weight:800; color:var(--primary); font-size:13px;">' + rowTot.toLocaleString() + '</td>'
               + '</tr>';
             }).join('')
           + '</tbody>'
         + '</table>'
       + '</div>'
-    + '</section>'
+    + '</div>'
 
-    // TABLE 1: QTC PERFORMANCE TABLE
+    // TABLE 1: QTC × Unit Performance Table (Section 7.2)
     + '<section class="ux-panel" style="margin-top:20px;">'
       + '<div class="ux-heading" style="margin-bottom:12px;">'
-        + '<div><h3>QTC Team Performance Table (' + allQTCFloorGroups.length.toLocaleString() + ' supervisor records)</h3><p>Click column headers with ↕ to sort. Click any QTC to drill down to team labelers.</p></div>'
-        + '<span class="ux-note">Showing ' + (qfVisible.length ? (qtcFloorFilters.page*qfPageSize+1) : 0) + ' – ' + Math.min((qtcFloorFilters.page+1)*qfPageSize, allQTCFloorGroups.length) + ' of ' + allQTCFloorGroups.length + ' teams</span>'
+        + '<div><h3>Table 1: QTC × Floor Performance Table (' + allQTCFloorGroups.length + ' combinations)</h3><p>Composite groups: each row represents an actual QTC + Unit assignment. Never combines different Units.</p></div>'
+        + '<span class="ux-note">Showing ' + (qfVisible.length ? (qtcFloorFilters.page*qfPageSize+1) : 0) + ' – ' + Math.min((qtcFloorFilters.page+1)*qfPageSize, allQTCFloorGroups.length) + ' of ' + allQTCFloorGroups.length + ' records</span>'
       + '</div>'
       + '<div class="perf-table">'
         + '<table>'
           + '<thead><tr>'
-            + '<th data-qf-sort="qtc">QTC Name ↕</th>'
-            + '<th>Shift(s)</th>'
-            + '<th>Assigned Floor</th>'
-            + '<th data-qf-sort="uniqueLabelers">Team Labelers ↕</th>'
-            + '<th data-qf-sort="totalSubmit" style="color:var(--primary);">Team Submits ↕</th>'
-            + '<th data-qf-sort="lidarFP" style="color:#0d9488;">Lidar FP ↕</th>'
-            + '<th data-qf-sort="lidarQA" style="color:#14b8a6;">Lidar QA ↕</th>'
-            + '<th data-qf-sort="laneFP" style="color:#ed9a35;">Lane Line FP ↕</th>'
-            + '<th data-qf-sort="laneQA" style="color:#ec4899;">Lane Line QA ↕</th>'
-            + '<th data-qf-sort="avgSubmit">Avg / Labeler ↕</th>'
-            + '<th>Verified Quality</th>'
+            + '<th data-sort="qtc">QTC Supervisor ↕</th>'
+            + '<th data-sort="floor">Floor / Unit ↕</th>'
+            + '<th>Active Shifts</th>'
+            + '<th data-sort="lidarFP" style="color:#0d9488;">Lidar FP ↕</th>'
+            + '<th data-sort="lidarQA" style="color:#14b8a6;">Lidar QA ↕</th>'
+            + '<th data-sort="laneFP" style="color:#ed9a35;">Lane FP ↕</th>'
+            + '<th data-sort="laneQA" style="color:#ec4899;">Lane QA ↕</th>'
+            + '<th data-sort="totalSubmit" style="color:var(--primary);">Total Submit ↕</th>'
+            + '<th data-sort="totalObjects" style="color:#0284c7;">Total Objects ↕</th>'
+            + '<th data-sort="uniqueLabelers">Team (Labelers) ↕</th>'
+            + '<th data-sort="avgSubmit">Avg / Labeler ↕</th>'
+            + '<th>Queues Covered</th>'
           + '</tr></thead>'
           + '<tbody>'
-            + qfVisible.map(q => {
-              const qScore = getQtcQuality(q.qtc);
-              const qStr = qScore ? (qScore.totalAccuracy*100).toFixed(1)+'%' : '—';
-              const tierClass = qScore ? (qScore.totalAccuracy >= 0.95 ? 'tier-high' : qScore.totalAccuracy >= 0.85 ? 'tier-mid' : 'tier-low') : '';
-              return '<tr class="qtc-row-item" data-qtc-name="' + esc(q.qtc) + '" style="cursor:pointer;" title="Click to view labelers under this QTC">'
-                + '<td><b style="color:var(--primary);">' + esc(q.qtc) + '</b></td>'
-                + '<td>' + (q.shifts.map(s => '<span class="q-badge q-shift">' + esc(s) + '</span>').join('') || '—') + '</td>'
-                + '<td>' + esc(q.floor) + '</td>'
-                + '<td><b>' + q.uniqueLabelers.toLocaleString() + '</b></td>'
-                + '<td><strong style="color:var(--primary); font-size:14px;">' + q.totalSubmit.toLocaleString() + '</strong></td>'
-                + '<td>' + q.lidarFP.toLocaleString() + '</td>'
-                + '<td>' + q.lidarQA.toLocaleString() + '</td>'
-                + '<td>' + q.laneFP.toLocaleString() + '</td>'
-                + '<td>' + q.laneQA.toLocaleString() + '</td>'
-                + '<td><span class="q-val-avg">' + q.avgSubmitStr + '</span></td>'
-                + '<td>' + (qScore ? '<span class="tier-badge ' + tierClass + '">' + qStr + '</span>' : '<span class="ux-note">—</span>') + '</td>'
-              + '</tr>';
-            }).join('')
+            + qfVisible.map(item => `
+              <tr style="border-bottom:1px solid var(--border);" onmouseover="this.style.background='var(--accent-light)'" onmouseout="this.style.background='transparent'">
+                <td style="padding:9px 12px; font-weight:700; color:var(--primary);">👤 ${esc(item.qtc)}</td>
+                <td style="padding:9px 12px; font-weight:600; color:var(--accent);">🏢 Unit ${esc(item.floor)}</td>
+                <td style="padding:9px 12px;"><span class="ux-note">${esc(item.shifts.join(', ') || '—')}</span></td>
+                <td style="padding:9px 12px; text-align:center; color:#0d9488;">${item.lidarFP.toLocaleString()}</td>
+                <td style="padding:9px 12px; text-align:center; color:#14b8a6;">${item.lidarQA.toLocaleString()}</td>
+                <td style="padding:9px 12px; text-align:center; color:#ed9a35;">${item.laneFP.toLocaleString()}</td>
+                <td style="padding:9px 12px; text-align:center; color:#ec4899;">${item.laneQA.toLocaleString()}</td>
+                <td style="padding:9px 12px; text-align:center; font-weight:800; color:var(--text); font-size:13px;">${item.totalSubmit.toLocaleString()}</td>
+                <td style="padding:9px 12px; text-align:center; font-weight:700; color:#0284c7;">${item.totalObjects.toLocaleString()}</td>
+                <td style="padding:9px 12px; text-align:center; font-weight:600;">${item.uniqueLabelers.toLocaleString()}</td>
+                <td style="padding:9px 12px; text-align:center; font-weight:600; color:var(--primary);">${item.avgSubmitStr}</td>
+                <td style="padding:9px 12px;"><span class="ux-note">${item.uniqueQueues} queues</span></td>
+              </tr>
+            `).join('')
           + '</tbody>'
         + '</table>'
-        + (!allQTCFloorGroups.length ? '<div class="ux-empty">No QTC team records match filters.</div>' : '')
+        + (!allQTCFloorGroups.length ? '<div class="ux-empty">No QTC &amp; Floor combinations match your filter.</div>' : '')
       + '</div>'
       + '<div class="perf-pagination" style="display:flex; justify-content:space-between; align-items:center; margin-top:14px;">'
         + '<button class="btn" id="qfPrev" ' + (qtcFloorFilters.page === 0 ? 'disabled' : '') + '>Previous</button>'
@@ -5224,148 +5881,94 @@ function renderQtcFloorPerformance(){
       + '</div>'
     + '</section>'
 
-    // TABLE 2: FLOOR PERFORMANCE TABLE
+    // TABLE 2: Floor Performance Table (Section 7.3)
     + '<section class="ux-panel" style="margin-top:20px;">'
       + '<div class="ux-heading" style="margin-bottom:12px;">'
-        + '<div><h3>Floor Performance Analysis (Units)</h3><p>Production, capacity, and workforce distribution per operational floor unit.</p></div>'
-        + '<button class="btn btn-c" id="floorExportCSV">↓ Export Floor CSV</button>'
+        + '<div><h3>Table 2: Floor (= Unit) Performance Table (' + allFloorGroups.length + ' Units)</h3><p>Overall operational throughput per facility unit (Floor = Unit).</p></div>'
+        + '<button class="btn btn-c" id="floorExportCSV" style="font-size:11px; padding:5px 12px;">↓ Export Floor CSV</button>'
       + '</div>'
       + '<div class="perf-table">'
         + '<table>'
           + '<thead><tr>'
-            + '<th>Floor</th>'
-            + '<th>Total Submissions</th>'
-            + '<th>Active Labelers</th>'
-            + '<th>Active QTCs</th>'
-            + '<th>Lidar FP</th>'
-            + '<th>Lidar QA</th>'
-            + '<th>Lane Line FP</th>'
-            + '<th>Lane Line QA</th>'
-            + '<th>Floor Share %</th>'
-            + '<th>Avg / Labeler</th>'
-            + '<th>Operating Shifts</th>'
+            + '<th data-sort="floor">Floor / Unit ↕</th>'
+            + '<th>Active Shifts</th>'
+            + '<th data-sort="uniqueQtcs">Unique QTCs ↕</th>'
+            + '<th data-sort="uniqueLabelers">Unique Labelers ↕</th>'
+            + '<th data-sort="lidarFP" style="color:#0d9488;">Lidar FP</th>'
+            + '<th data-sort="lidarQA" style="color:#14b8a6;">Lidar QA</th>'
+            + '<th data-sort="laneFP" style="color:#ed9a35;">Lane FP</th>'
+            + '<th data-sort="laneQA" style="color:#ec4899;">Lane QA</th>'
+            + '<th data-sort="totalFP">Total FP</th>'
+            + '<th data-sort="totalQA">Total QA</th>'
+            + '<th data-sort="totalSubmit" style="color:var(--primary); font-weight:800;">Total Submits ↕</th>'
+            + '<th data-sort="totalObjects" style="color:#0284c7;">Total Objects</th>'
+            + '<th data-sort="avgSubmit">Avg / Labeler</th>'
+            + '<th>Unit Share %</th>'
           + '</tr></thead>'
           + '<tbody>'
-            + distinctFloors.map(fl => {
-              const g = allFloorGroups.find(x => x.floor === fl) || { floor: fl, totalSubmit: 0, uniqueLabelers: 0, uniqueQtcs: 0, lidarFP: 0, lidarQA: 0, laneFP: 0, laneQA: 0, shifts: [], sharePctStr: '0%' };
-              const avg = g.uniqueLabelers > 0 ? (g.totalSubmit / g.uniqueLabelers).toFixed(1) : '—';
-              const share = totalSubmissions ? ((g.totalSubmit / totalSubmissions) * 100).toFixed(1) + '%' : '0%';
-              return '<tr class="floor-row-item" data-floor-name="' + fl + '" style="cursor:pointer;" title="Click to view rooms on this floor">'
-                + '<td><b>' + fl + '</b></td>'
-                + '<td><strong style="color:var(--primary);">' + g.totalSubmit.toLocaleString() + '</strong></td>'
-                + '<td><b>' + g.uniqueLabelers.toLocaleString() + '</b></td>'
-                + '<td><b>' + g.uniqueQtcs.toLocaleString() + '</b></td>'
-                + '<td>' + g.lidarFP.toLocaleString() + '</td>'
-                + '<td>' + g.lidarQA.toLocaleString() + '</td>'
-                + '<td>' + g.laneFP.toLocaleString() + '</td>'
-                + '<td>' + g.laneQA.toLocaleString() + '</td>'
-                + '<td><b>' + share + '</b></td>'
-                + '<td>' + avg + '</td>'
-                + '<td>' + (g.shifts.slice(0, 3).map(s => '<span class="q-badge q-shift">' + esc(s) + '</span>').join('') || '—') + '</td>'
-              + '</tr>';
-            }).join('')
+            + allFloorGroups.map(g => `
+              <tr style="border-bottom:1px solid var(--border);" onmouseover="this.style.background='var(--accent-light)'" onmouseout="this.style.background='transparent'">
+                <td style="padding:10px 14px; font-weight:700; color:var(--accent);">🏢 Unit ${esc(g.floor)}</td>
+                <td style="padding:10px 12px;"><span class="ux-note">${esc(g.shifts.join(', ') || '—')}</span></td>
+                <td style="padding:10px 12px; text-align:center; font-weight:600;">${g.uniqueQtcs}</td>
+                <td style="padding:10px 12px; text-align:center; font-weight:600;">${g.uniqueLabelers}</td>
+                <td style="padding:10px 12px; text-align:center; color:#0d9488;">${g.lidarFP.toLocaleString()}</td>
+                <td style="padding:10px 12px; text-align:center; color:#14b8a6;">${g.lidarQA.toLocaleString()}</td>
+                <td style="padding:10px 12px; text-align:center; color:#ed9a35;">${g.laneFP.toLocaleString()}</td>
+                <td style="padding:10px 12px; text-align:center; color:#ec4899;">${g.laneQA.toLocaleString()}</td>
+                <td style="padding:10px 12px; text-align:center; font-weight:700; color:#3b82f6;">${g.totalFP.toLocaleString()}</td>
+                <td style="padding:10px 12px; text-align:center; font-weight:700; color:#8b5cf6;">${g.totalQA.toLocaleString()}</td>
+                <td style="padding:10px 12px; text-align:center; font-weight:800; color:var(--text); font-size:13px;">${g.totalSubmit.toLocaleString()}</td>
+                <td style="padding:10px 12px; text-align:center; font-weight:700; color:#0284c7;">${g.totalObjects.toLocaleString()}</td>
+                <td style="padding:10px 12px; text-align:center; font-weight:600; color:var(--primary);">${g.avgSubmitStr}</td>
+                <td style="padding:10px 14px; text-align:center;">
+                  <div style="display:flex; align-items:center; justify-content:center; gap:6px;">
+                    <div style="width:45px; height:6px; border-radius:3px; background:var(--border); overflow:hidden;">
+                      <div style="width:${g.sharePct}%; height:100%; background:var(--primary);"></div>
+                    </div>
+                    <b>${g.sharePctStr}</b>
+                  </div>
+                </td>
+              </tr>
+            `).join('')
           + '</tbody>'
         + '</table>'
       + '</div>'
     + '</section>'
   + '</div>';
 
-  bindHeaderControls(page, 'qtcfloor'); bindUniversalFilterBar(page, 'qtcfloor');
+  bindHeaderControls(page, 'qf');
+  bindUniversalFilterBar(page, 'qtcfloor');
 
-  // Input & Dropdowns
-  const qfSearch = page.querySelector('#qfQuery');
-  if(qfSearch){
-    qfSearch.oninput = (e) => {
-      qtcFloorFilters.query = e.target.value;
-      qtcFloorFilters.page = 0;
-      renderQtcFloorPerformance();
-    };
-  }
+  // Event handlers
+  const qfSearch = $('qfSearch');
+  if(qfSearch) qfSearch.oninput = e => { qtcFloorFilters.query = e.target.value; qtcFloorFilters.page = 0; renderQtcFloorPerformance(); };
 
-  $('qfQtcSelect').onchange = (e) => { qtcFloorFilters.qtc = e.target.value; qtcFloorFilters.page = 0; renderQtcFloorPerformance(); };
-  $('qfFloorSelect').onchange = (e) => { qtcFloorFilters.floor = e.target.value; qtcFloorFilters.page = 0; renderQtcFloorPerformance(); };
-  $('qfShiftSelect').onchange = (e) => { qtcFloorFilters.shift = e.target.value; qtcFloorFilters.page = 0; renderQtcFloorPerformance(); };
-  $('qfReset').onclick = () => { qtcFloorFilters.query = ''; qtcFloorFilters.qtc = ''; qtcFloorFilters.floor = ''; qtcFloorFilters.shift = ''; qtcFloorFilters.page = 0; renderQtcFloorPerformance(); };
+  const qfSelQtc = $('qfSelectQtc');
+  if(qfSelQtc) qfSelQtc.onchange = e => { qtcFloorFilters.qtc = e.target.value; qtcFloorFilters.page = 0; renderQtcFloorPerformance(); };
 
-  // Sorting
-  page.querySelectorAll('th[data-qf-sort]').forEach(th => {
-    th.style.cursor = 'pointer';
-    th.onclick = () => {
-      const col = th.dataset.qfSort;
-      if (qtcFloorFilters.sortCol === col) qtcFloorFilters.sortAsc = !qtcFloorFilters.sortAsc;
-      else { qtcFloorFilters.sortCol = col; qtcFloorFilters.sortAsc = false; }
-      renderQtcFloorPerformance();
-    };
-  });
+  const qfSelFl = $('qfSelectFloor');
+  if(qfSelFl) qfSelFl.onchange = e => { qtcFloorFilters.floor = e.target.value; qtcFloorFilters.page = 0; renderQtcFloorPerformance(); };
 
-  // Pagination
-  $('qfPrev').onclick = () => { if(qtcFloorFilters.page > 0){ qtcFloorFilters.page--; renderQtcFloorPerformance(); } };
-  $('qfNext').onclick = () => { if(qtcFloorFilters.page < qfTotalPages - 1){ qtcFloorFilters.page++; renderQtcFloorPerformance(); } };
+  const qfSelSh = $('qfSelectShift');
+  if(qfSelSh) qfSelSh.onchange = e => { qtcFloorFilters.shift = e.target.value; qtcFloorFilters.page = 0; renderQtcFloorPerformance(); };
 
-  // Export CSVs
-  $('qfExportCSV').onclick = () => exportQtcFloorCSV(allQTCFloorGroups);
-  $('floorExportCSV').onclick = () => exportFloorPerformanceCSV(allFloorGroups);
+  const qfReset = $('qfReset');
+  if(qfReset) qfReset.onclick = () => {
+    Object.assign(qtcFloorFilters, { query: '', qtc: '', floor: '', shift: '', category: '', sortCol: 'totalSubmit', sortAsc: false, page: 0 });
+    renderQtcFloorPerformance();
+  };
 
-  // Drilldown to QTC labelers
-  page.querySelectorAll('.qtc-row-item').forEach(tr => {
-    tr.onclick = () => {
-      const qtcName = tr.dataset.qtcName;
-      const teamRows = filteredRows.filter(r => qi >= 0 && String(r[qi] || '').normalize('NFC').trim() === qtcName);
-      const li = hdrs.findIndex(h => h.toLowerCase() === 'labeler name');
-      const ni = hdrs.findIndex(h => h.toLowerCase() === 'national id');
-      const ti = hdrs.findIndex(h => ['task id', 'id'].includes(h.toLowerCase()));
-      const si = hdrs.findIndex(h => h.toLowerCase() === 'shift');
-      const fi = hdrs.findIndex(h => ['floor', 'unit'].includes(h.toLowerCase()));
+  // Pagination Table 1
+  const qfPrev = $('qfPrev'); if(qfPrev) qfPrev.onclick = () => { if(qtcFloorFilters.page > 0){ qtcFloorFilters.page--; renderQtcFloorPerformance(); } };
+  const qfNext = $('qfNext'); if(qfNext) qfNext.onclick = () => { if(qtcFloorFilters.page < qfTotalPages - 1){ qtcFloorFilters.page++; renderQtcFloorPerformance(); } };
 
-      const drillRows = teamRows.map(r => [
-        ti >= 0 ? esc(r[ti]) : '—',
-        rDate(r) || '—',
-        li >= 0 ? esc(r[li]) : '—',
-        maskEmployeeId(ni >= 0 ? r[ni] : '', r[li]),
-        si >= 0 ? esc(r[si]) : '—',
-        fi >= 0 ? esc(r[fi]) : '—',
-        esc(r[hdrs.findIndex(h => h.toLowerCase() === 'queue name')] || ''),
-        esc(r[hdrs.findIndex(h => h.toLowerCase() === 'pass')] || '')
-      ]);
+  // Exports
+  const qfExp = $('qfExportCSV');
+  if(qfExp) qfExp.onclick = () => exportQtcFloorCSV(allQTCFloorGroups);
 
-      openDrilldownModal({
-        title: qtcName + ' · Team Submissions',
-        subtitle: teamRows.length.toLocaleString() + ' submissions under this supervisor',
-        badge: 'Supervisor Team',
-        columns: ['Task ID', 'Date', 'Labeler Name', 'Employee ID', 'Shift', 'Unit', 'Queue', 'Pass'],
-        rows: drillRows
-      });
-    };
-  });
-
-  // Drilldown to Floor rooms
-  page.querySelectorAll('.floor-row-item').forEach(tr => {
-    tr.onclick = () => {
-      const flName = tr.dataset.floorName;
-      const flRows = filteredRows.filter(r => fi >= 0 && deriveFloor(r[fi]) === flName);
-      const ti = hdrs.findIndex(h => ['task id', 'id'].includes(h.toLowerCase()));
-      const li = hdrs.findIndex(h => h.toLowerCase() === 'labeler name');
-      const ni = hdrs.findIndex(h => h.toLowerCase() === 'national id');
-
-      const drillRows = flRows.map(r => [
-        ti >= 0 ? esc(r[ti]) : '—',
-        rDate(r) || '—',
-        esc(r[fi] || '—'),
-        li >= 0 ? esc(r[li]) : '—',
-        maskEmployeeId(ni >= 0 ? r[ni] : '', r[li]),
-        esc(r[hdrs.findIndex(h => h.toLowerCase() === 'shift')] || ''),
-        esc(r[hdrs.findIndex(h => h.toLowerCase() === 'queue name')] || '')
-      ]);
-
-      openDrilldownModal({
-        title: flName + ' · Facility Records',
-        subtitle: flRows.length.toLocaleString() + ' total submissions across this floor',
-        badge: 'Facility Operations',
-        columns: ['Task ID', 'Date', 'Room / Unit', 'Labeler Name', 'Employee ID', 'Shift', 'Queue'],
-        rows: drillRows
-      });
-    };
-  });
+  const flExp = $('floorExportCSV');
+  if(flExp) flExp.onclick = () => exportFloorPerformanceCSV(allFloorGroups);
 }
 
 renderAllSections=function(){
@@ -5419,3 +6022,199 @@ renderSharedPeriods();
 })();
 
 
+
+function openQueueDetailModal(queueName) {
+  const allRows = rowsInView();
+  const qi = hdrs.findIndex(h => h.toLowerCase() === 'queue name');
+  const qRows = allRows.filter(r => qi >= 0 && String(r[qi] || '').trim() === queueName);
+  if (!qRows.length) {
+    showToast('No record history found for queue: ' + queueName);
+    return;
+  }
+
+  const si = hdrs.findIndex(h => h.toLowerCase() === 'shift');
+  const fi = hdrs.findIndex(h => ['floor', 'unit'].includes(h.toLowerCase()));
+  const qci = hdrs.findIndex(h => h.toLowerCase() === 'qtc name');
+  const li = hdrs.findIndex(h => h.toLowerCase() === 'labeler name');
+  const oi = hdrs.findIndex(h => ['object count', 'object_count', 'objects'].includes(h.toLowerCase()));
+  const ti = hdrs.findIndex(h => ['task id', 'id'].includes(h.toLowerCase()));
+  const tsIdx = hdrs.findIndex(h => ['timestamp', 'created at', 'date'].includes(h.toLowerCase()));
+  const ni = hdrs.findIndex(h => h.toLowerCase() === 'national id');
+
+  const totalTasks = qRows.length;
+  const totalObjects = qRows.reduce((n, r) => n + (parseFloat(oi >= 0 ? r[oi] : 0) || 0), 0);
+  const uniqueLabelers = uniq(qRows, 'Labeler Name') || 0;
+  const uniqueQtcs = uniq(qRows, 'QTC Name') || 0;
+
+  const lFP = qRows.filter(r => isModPass(r, 'lidar', 'FP')).length;
+  const lQA = qRows.filter(r => isModPass(r, 'lidar', 'QA')).length;
+  const lnFP = qRows.filter(r => isModPass(r, 'laneline', 'FP')).length;
+  const lnQA = qRows.filter(r => isModPass(r, 'laneline', 'QA')).length;
+
+  const shifts = [...new Set(qRows.map(r => si >= 0 ? String(r[si] || '').trim() : '').filter(Boolean))].sort();
+  const floors = [...new Set(qRows.map(r => fi >= 0 ? deriveFloor(r[fi]) : '').filter(Boolean))].sort();
+
+  // Daily map
+  const dateMap = new Map();
+  qRows.forEach(r => { const d = rDate(r); if (d) dateMap.set(d, (dateMap.get(d) || 0) + 1); });
+  const sortedDates = [...dateMap.keys()].sort();
+  const maxDay = Math.max(1, ...dateMap.values());
+
+  let modal = $('uxQueueDetailModal');
+  if (modal) modal.remove();
+
+  modal = document.createElement('div');
+  modal.id = 'uxQueueDetailModal';
+  modal.className = 'modal-overlay show';
+  modal.style.cssText = 'display:flex; position:fixed; inset:0; background:rgba(15,23,42,0.7); backdrop-filter:blur(4px); z-index:9999; align-items:center; justify-content:center; padding:16px;';
+
+  modal.innerHTML = '<div class="modal-box" style="width:100%; max-width:850px; max-height:90vh; overflow-y:auto; background:var(--bg-1); border-radius:14px; border:1px solid var(--border); box-shadow:0 24px 48px rgba(0,0,0,0.3);">'
+    + '<div class="modal-hd" style="display:flex; justify-content:space-between; align-items:center; padding:16px 22px; border-bottom:1px solid var(--border); background:var(--bg-2);">'
+      + '<div>'
+        + '<div style="font-size:11px; font-weight:700; color:var(--primary); text-transform:uppercase;">Queue Deep-Dive · Turso Verified</div>'
+        + '<h3 style="margin:2px 0 0; font-size:17px; color:var(--text);">' + esc(queueName) + '</h3>'
+      + '</div>'
+      + '<button class="modal-close" id="closeQModalBtn" style="background:none; border:none; font-size:20px; cursor:pointer; color:var(--text-soft);">&times;</button>'
+    + '</div>'
+    + '<div class="modal-bd" style="padding:20px 22px;">'
+      // KPI Grid
+      + '<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:10px; margin-bottom:18px;">'
+        + '<div style="background:var(--bg-2); padding:10px; border-radius:8px; border:1px solid var(--border); text-align:center;"><div class="ux-note">Total Tasks</div><div style="font-size:18px; font-weight:800; color:var(--primary);">' + totalTasks.toLocaleString() + '</div></div>'
+        + '<div style="background:var(--bg-2); padding:10px; border-radius:8px; border:1px solid var(--border); text-align:center;"><div class="ux-note">Total Objects</div><div style="font-size:18px; font-weight:800; color:#0284c7;">' + totalObjects.toLocaleString() + '</div></div>'
+        + '<div style="background:var(--bg-2); padding:10px; border-radius:8px; border:1px solid var(--border); text-align:center;"><div class="ux-note">Unique Labelers</div><div style="font-size:18px; font-weight:800; color:#0a9d8c;">' + uniqueLabelers.toLocaleString() + '</div></div>'
+        + '<div style="background:var(--bg-2); padding:10px; border-radius:8px; border:1px solid var(--border); text-align:center;"><div class="ux-note">Unique QTCs</div><div style="font-size:18px; font-weight:800; color:#df8b24;">' + uniqueQtcs.toLocaleString() + '</div></div>'
+        + '<div style="background:var(--bg-2); padding:10px; border-radius:8px; border:1px solid var(--border); text-align:center;"><div class="ux-note">Units Covered</div><div style="font-size:18px; font-weight:800; color:var(--text);">' + floors.length + '</div></div>'
+      + '</div>'
+      // Stage Breakdown Box
+      + '<div style="background:var(--bg-2); padding:12px 16px; border-radius:10px; margin-bottom:18px; border:1px solid var(--border);">'
+        + '<div style="font-weight:700; font-size:12px; margin-bottom:8px; color:var(--text);">Workstream Distribution:</div>'
+        + '<div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; text-align:center; font-size:12px;">'
+          + '<div style="background:var(--bg-3); padding:8px; border-radius:6px; border-left:3px solid #0d9488;"><span class="ux-note">Lidar FP</span><div style="font-weight:700; color:#0d9488;">' + lFP.toLocaleString() + '</div></div>'
+          + '<div style="background:var(--bg-3); padding:8px; border-radius:6px; border-left:3px solid #14b8a6;"><span class="ux-note">Lidar QA</span><div style="font-weight:700; color:#14b8a6;">' + lQA.toLocaleString() + '</div></div>'
+          + '<div style="background:var(--bg-3); padding:8px; border-radius:6px; border-left:3px solid #ed9a35;"><span class="ux-note">Lane Line FP</span><div style="font-weight:700; color:#ed9a35;">' + lnFP.toLocaleString() + '</div></div>'
+          + '<div style="background:var(--bg-3); padding:8px; border-radius:6px; border-left:3px solid #ec4899;"><span class="ux-note">Lane Line QA</span><div style="font-weight:700; color:#ec4899;">' + lnQA.toLocaleString() + '</div></div>'
+        + '</div>'
+      + '</div>'
+      // Daily Trend Sparkline Bars
+      + '<div style="margin-bottom:18px;">'
+        + '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;"><span style="font-weight:700; font-size:12px;">Daily Activity Timeline (' + sortedDates.length + ' active dates)</span><span class="ux-note">Peak: ' + maxDay.toLocaleString() + ' tasks</span></div>'
+        + '<div class="ux-bars" style="height:90px;">'
+          + (sortedDates.length ? sortedDates.map(d => '<button class="ux-bar" style="height:' + Math.max(8, ((dateMap.get(d)||0) / maxDay) * 100) + '%;" title="' + d + ': ' + (dateMap.get(d)||0) + ' tasks"></button>').join('') : '<div class="ux-empty">No dated submissions</div>')
+        + '</div>'
+        + '<div style="display:flex; justify-content:space-between; font-size:10px; color:var(--text-soft); margin-top:4px;"><span>' + (sortedDates[0] || '') + '</span><span>' + (sortedDates[sortedDates.length - 1] || '') + '</span></div>'
+      + '</div>'
+      // Recent Tasks Sample Table
+      + '<div style="border-top:1px solid var(--border); padding-top:14px;">'
+        + '<div style="font-weight:700; font-size:12px; margin-bottom:8px;">Recent Submissions Sample:</div>'
+        + '<div style="max-height:220px; overflow-y:auto; border:1px solid var(--border); border-radius:8px;">'
+          + '<table style="width:100%; border-collapse:collapse; font-size:11px; text-align:left;">'
+            + '<thead><tr style="background:var(--bg-2); position:sticky; top:0;"><th style="padding:6px 10px;">Date</th><th style="padding:6px 10px;">Labeler</th><th style="padding:6px 10px;">Shift</th><th style="padding:6px 10px;">Unit</th><th style="padding:6px 10px;">Stage</th><th style="padding:6px 10px; text-align:right;">Objects</th></tr></thead>'
+            + '<tbody>'
+              + qRows.slice(0, 30).map(r => '<tr style="border-bottom:1px solid var(--border);"><td style="padding:5px 10px;">' + (tsIdx >= 0 ? esc(r[tsIdx]) : '') + '</td><td style="padding:5px 10px; font-weight:600;">' + (li >= 0 ? esc(r[li]) : '') + '</td><td style="padding:5px 10px;">' + (si >= 0 ? esc(r[si]) : '') + '</td><td style="padding:5px 10px;">Unit ' + (fi >= 0 ? esc(deriveFloor(r[fi])) : '') + '</td><td style="padding:5px 10px;">' + esc(r[hdrs.findIndex(h=>h.toLowerCase()==='pass')]||'') + '</td><td style="padding:5px 10px; text-align:right; font-weight:700;">' + (oi >= 0 ? esc(r[oi]) : '0') + '</td></tr>').join('')
+            + '</tbody>'
+          + '</table>'
+        + '</div>'
+      + '</div>'
+    + '</div>'
+  + '</div>';
+
+  document.body.appendChild(modal);
+  const hide = () => modal.remove();
+  modal.querySelector('#closeQModalBtn').onclick = hide;
+  modal.onclick = e => { if (e.target === modal) hide(); };
+}
+window.openQueueDetailModal = openQueueDetailModal;
+
+function openLabelerDetailModal(personKey) {
+  const peopleMap = window._allPeoplePerfMap;
+  if (!peopleMap || !peopleMap.has(personKey)) {
+    showToast('Could not load employee details for: ' + personKey);
+    return;
+  }
+  const p = peopleMap.get(personKey);
+
+  let modal = $('uxLabelerDetailModal');
+  if (modal) modal.remove();
+
+  modal = document.createElement('div');
+  modal.id = 'uxLabelerDetailModal';
+  modal.className = 'modal-overlay show';
+  modal.style.cssText = 'display:flex; position:fixed; inset:0; background:rgba(15,23,42,0.7); backdrop-filter:blur(4px); z-index:9999; align-items:center; justify-content:center; padding:16px;';
+
+  const shiftsStr = [...p.shifts].map(esc).join(', ') || '—';
+  const unitsStr = [...p.units].map(u => 'Unit ' + esc(u)).join(', ') || '—';
+  const qtcsStr = [...p.qtcs].map(esc).join(', ') || '—';
+  const queuesStr = [...p.queues].map(esc).join(', ') || '—';
+
+  // Daily points
+  const dateCounts = new Map();
+  p.tasks.forEach(t => { if (t.date && t.date !== 'Unknown') dateCounts.set(t.date, (dateCounts.get(t.date)||0) + 1); });
+  const sortedDates = [...dateCounts.keys()].sort();
+  const maxDay = Math.max(1, ...dateCounts.values());
+
+  modal.innerHTML = '<div class="modal-box" style="width:100%; max-width:900px; max-height:90vh; overflow-y:auto; background:var(--bg-1); border-radius:14px; border:1px solid var(--border); box-shadow:0 24px 48px rgba(0,0,0,0.3);">'
+    + '<div class="modal-hd" style="display:flex; justify-content:space-between; align-items:center; padding:16px 22px; border-bottom:1px solid var(--border); background:var(--bg-2);">'
+      + '<div>'
+        + '<div style="font-size:11px; font-weight:700; color:var(--primary); text-transform:uppercase;">Employee Performance Intelligence · ID Masked</div>'
+        + '<h3 style="margin:2px 0 0; font-size:18px; color:var(--text);">' + esc(p.name) + ' <span style="font-family:monospace; font-size:12px; color:var(--text-soft); font-weight:400;">(' + esc(p.maskedId) + ')</span></h3>'
+      + '</div>'
+      + '<button class="modal-close" id="closeLabModalBtn" style="background:none; border:none; font-size:20px; cursor:pointer; color:var(--text-soft);">&times;</button>'
+    + '</div>'
+    + '<div class="modal-bd" style="padding:20px 22px;">'
+      // Stats KPI Grid
+      + '<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:10px; margin-bottom:18px;">'
+        + '<div style="background:var(--bg-2); padding:10px; border-radius:8px; border:1px solid var(--border); text-align:center;"><div class="ux-note">Total Objects</div><div style="font-size:18px; font-weight:800; color:#0284c7;">' + p.totalObjects.toLocaleString() + '</div></div>'
+        + '<div style="background:var(--bg-2); padding:10px; border-radius:8px; border:1px solid var(--border); text-align:center;"><div class="ux-note">Total Tasks</div><div style="font-size:18px; font-weight:800; color:var(--primary);">' + p.total.toLocaleString() + '</div></div>'
+        + '<div style="background:var(--bg-2); padding:10px; border-radius:8px; border:1px solid var(--border); text-align:center;"><div class="ux-note">Avg Obj / Task</div><div style="font-size:18px; font-weight:800; color:var(--accent);">' + (p.total > 0 ? (p.totalObjects/p.total).toFixed(1) : 0) + '</div></div>'
+        + '<div style="background:var(--bg-2); padding:10px; border-radius:8px; border:1px solid var(--border); text-align:center;"><div class="ux-note">Active Days</div><div style="font-size:18px; font-weight:800; color:var(--text);">' + p.dates.size + '</div></div>'
+        + '<div style="background:var(--bg-2); padding:10px; border-radius:8px; border:1px solid var(--border); text-align:center;"><div class="ux-note">Avg Tasks/Day</div><div style="font-size:18px; font-weight:800; color:#10b981;">' + (p.dates.size > 0 ? (p.total/p.dates.size).toFixed(1) : 0) + '</div></div>'
+      + '</div>'
+      // Operational Context Meta Box
+      + '<div style="background:var(--bg-2); padding:12px 16px; border-radius:10px; margin-bottom:18px; border:1px solid var(--border); font-size:12px; display:grid; grid-template-columns:1fr 1fr; gap:10px;">'
+        + '<div><b>Shifts:</b> <span class="ux-note">' + shiftsStr + '</span></div>'
+        + '<div><b>Floors / Units:</b> <span class="ux-note">' + unitsStr + '</span></div>'
+        + '<div><b>QTC Supervisors:</b> <span class="ux-note">' + qtcsStr + '</span></div>'
+        + '<div><b>Active Queues:</b> <span class="ux-note">' + queuesStr + '</span></div>'
+      + '</div>'
+      // Daily Production Trend
+      + '<div style="margin-bottom:18px;">'
+        + '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;"><span style="font-weight:700; font-size:12px;">Daily Output Timeline (' + sortedDates.length + ' active dates)</span><span class="ux-note">Peak: ' + maxDay + ' tasks</span></div>'
+        + '<div class="ux-bars" style="height:80px;">'
+          + (sortedDates.length ? sortedDates.map(d => '<button class="ux-bar" style="height:' + Math.max(8, ((dateCounts.get(d)||0) / maxDay) * 100) + '%;" title="' + d + ': ' + (dateCounts.get(d)||0) + ' tasks"></button>').join('') : '<div class="ux-empty">No dated tasks</div>')
+        + '</div>'
+        + '<div style="display:flex; justify-content:space-between; font-size:10px; color:var(--text-soft); margin-top:4px;"><span>' + (sortedDates[0] || '') + '</span><span>' + (sortedDates[sortedDates.length - 1] || '') + '</span></div>'
+      + '</div>'
+      // Searchable Task History Table
+      + '<div style="border-top:1px solid var(--border); padding-top:14px;">'
+        + '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">'
+          + '<div style="font-weight:700; font-size:13px;">Task History (' + p.tasks.length + ' tasks):</div>'
+          + '<input id="labTaskSearch" placeholder="Filter tasks by date, queue, stage…" style="padding:4px 10px; border-radius:6px; border:1px solid var(--border); font-size:11px; width:220px; background:var(--bg-3); color:var(--text);">'
+        + '</div>'
+        + '<div style="max-height:260px; overflow-y:auto; border:1px solid var(--border); border-radius:8px;">'
+          + '<table style="width:100%; border-collapse:collapse; font-size:11px; text-align:left;">'
+            + '<thead><tr style="background:var(--bg-2); position:sticky; top:0;"><th style="padding:6px 10px;">Task ID</th><th style="padding:6px 10px;">Date</th><th style="padding:6px 10px;">Shift</th><th style="padding:6px 10px;">Queue</th><th style="padding:6px 10px;">Unit</th><th style="padding:6px 10px;">QTC</th><th style="padding:6px 10px;">Stage</th><th style="padding:6px 10px; text-align:right;">Objects</th><th style="padding:6px 10px; text-align:center;">Link</th></tr></thead>'
+            + '<tbody id="labTaskTableBody">'
+              + p.tasks.map(t => '<tr style="border-bottom:1px solid var(--border);"><td style="padding:5px 10px; font-weight:600;">' + esc(t.id) + '</td><td style="padding:5px 10px;">' + esc(t.date) + '</td><td style="padding:5px 10px;">' + esc(t.shift) + '</td><td style="padding:5px 10px;">' + esc(t.queue) + '</td><td style="padding:5px 10px;">Unit ' + esc(t.unit) + '</td><td style="padding:5px 10px;">' + esc(t.qtc) + '</td><td style="padding:5px 10px;">' + esc(t.pass) + '</td><td style="padding:5px 10px; text-align:right; font-weight:700; color:#0284c7;">' + esc(t.objects) + '</td><td style="padding:5px 10px; text-align:center;">' + (t.link ? '<a href="' + esc(t.link) + '" target="_blank" rel="noopener noreferrer" style="color:var(--primary);">🔗 Open</a>' : '—') + '</td></tr>').join('')
+            + '</tbody>'
+          + '</table>'
+        + '</div>'
+      + '</div>'
+    + '</div>'
+  + '</div>';
+
+  document.body.appendChild(modal);
+  const hide = () => modal.remove();
+  modal.querySelector('#closeLabModalBtn').onclick = hide;
+  modal.onclick = e => { if (e.target === modal) hide(); };
+
+  // Task filter inside modal
+  const sInput = modal.querySelector('#labTaskSearch');
+  if (sInput) {
+    sInput.oninput = e => {
+      const q = e.target.value.toLowerCase().trim();
+      const filtered = p.tasks.filter(t => !q || [t.id, t.date, t.shift, t.queue, t.unit, t.qtc, t.pass, String(t.objects)].some(v => String(v).toLowerCase().includes(q)));
+      modal.querySelector('#labTaskTableBody').innerHTML = filtered.map(t => '<tr style="border-bottom:1px solid var(--border);"><td style="padding:5px 10px; font-weight:600;">' + esc(t.id) + '</td><td style="padding:5px 10px;">' + esc(t.date) + '</td><td style="padding:5px 10px;">' + esc(t.shift) + '</td><td style="padding:5px 10px;">' + esc(t.queue) + '</td><td style="padding:5px 10px;">Unit ' + esc(t.unit) + '</td><td style="padding:5px 10px;">' + esc(t.qtc) + '</td><td style="padding:5px 10px;">' + esc(t.pass) + '</td><td style="padding:5px 10px; text-align:right; font-weight:700; color:#0284c7;">' + esc(t.objects) + '</td><td style="padding:5px 10px; text-align:center;">' + (t.link ? '<a href="' + esc(t.link) + '" target="_blank" rel="noopener noreferrer" style="color:var(--primary);">🔗 Open</a>' : '—') + '</td></tr>').join('');
+    };
+  }
+}
+window.openLabelerDetailModal = openLabelerDetailModal;
