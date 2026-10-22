@@ -163,6 +163,33 @@ async function db(env, sql, params = []) {
 }
 
 // ============================================================
+// ROLE HIERARCHY & PERMISSIONS
+// ============================================================
+function isSuperAdmin(role) {
+  const r = (role || "").toLowerCase().trim().replace(/[\s_-]+/g, "");
+  return r === "superadmin";
+}
+
+function isAdminOrSuper(role) {
+  const r = (role || "").toLowerCase().trim().replace(/[\s_-]+/g, "");
+  return r === "admin" || r === "superadmin";
+}
+
+function isSupervisorOrAdmin(role) {
+  const r = (role || "").toLowerCase().trim().replace(/[\s_-]+/g, " ");
+  return [
+    "admin",
+    "super admin",
+    "superadmin",
+    "shift sv",
+    "floor sv",
+    "traning sv",
+    "training sv",
+    "wla"
+  ].includes(r);
+}
+
+// ============================================================
 // SESSION MANAGEMENT (Signed Token + Dual Cookie/Bearer Auth)
 // ============================================================
 async function createSessionToken(user, env) {
@@ -222,7 +249,10 @@ async function verifySession(request, env) {
     [payload.id]
   );
   const u = rows[0];
-  if (!u || u.status !== "active" || u.role !== payload.role) {
+  const tokenRole = (payload.role || "").toLowerCase().trim();
+  const dbRole = (u ? u.role : "").toLowerCase().trim();
+  const rolesMatch = (tokenRole === dbRole) || (isAdminOrSuper(tokenRole) && isAdminOrSuper(dbRole));
+  if (!u || u.status !== "active" || !rolesMatch) {
     return null;
   }
 
@@ -299,11 +329,6 @@ async function dispatchResetEmail(webhookUrl, toEmail, fullName, username, code)
   }
 }
 
-// Helper: Check if user is Supervisor or Admin
-function isSupervisorOrAdmin(role) {
-  const r = (role || "").toLowerCase().trim();
-  return ["admin", "shift sv", "floor sv", "traning sv", "training sv", "wla"].includes(r);
-}
 
 // Mask sensitive national ID for regular/unauthorized roles
 function maskNationalId(natId, role) {
@@ -889,7 +914,8 @@ export default {
         return json({ error: "unauthorized", message: "Authentication required" }, 401, corsHeaders);
       }
 
-      const isAdmin = user.role === "admin";
+      const isAdmin = isAdminOrSuper(user.role);
+      const isSuper = isSuperAdmin(user.role);
       const isSupervisor = isSupervisorOrAdmin(user.role);
 
       // ------------------------------------------------------------
@@ -905,13 +931,17 @@ export default {
       }
 
       if (pathname === "/api/users" && request.method === "POST") {
-        if (!isAdmin) return json({ error: "forbidden" }, 403, corsHeaders);
+        if (!isAdmin) return json({ error: "forbidden", message: "Admin privilege required" }, 403, corsHeaders);
         const b = await request.json().catch(() => ({}));
         const username = String(b.username || "").trim().toLowerCase();
         const full_name = String(b.full_name || "").trim();
         const email = String(b.email || "").trim().toLowerCase();
         const role = String(b.role || "shift sv").trim();
         const allowed_pages = String(b.allowed_pages || "*").trim();
+
+        if (isSuperAdmin(role) && !isSuper) {
+          return json({ error: "forbidden", message: "Only a Super Admin can create another Super Admin account." }, 403, corsHeaders);
+        }
 
         if (!username || !full_name || !email) {
           return json({ error: "validation_error", message: "Username, full name, and email are required" }, 400, corsHeaders);
@@ -932,12 +962,40 @@ export default {
         return json({ ok: true, recovery_pin, message: `User authorized. Activation PIN: ${recovery_pin}` }, 201, corsHeaders);
       }
 
-      // Update User (Admin only)
+      // Update User (Admin or Super Admin)
       const userUpdateMatch = pathname.match(/^\/api\/users\/(\d+)$/);
       if (userUpdateMatch && request.method === "PUT") {
         if (!isAdmin) return json({ error: "forbidden" }, 403, corsHeaders);
         const targetId = userUpdateMatch[1];
         const b = await request.json().catch(() => ({}));
+
+        const targetRows = await db(env, "SELECT id, username, full_name, email, role, status FROM dashboard_users WHERE id = ? LIMIT 1", [targetId]);
+        const targetUser = targetRows[0];
+        if (!targetUser) {
+          return json({ error: "not_found", message: "User not found" }, 404, corsHeaders);
+        }
+
+        const targetIsSuper = isSuperAdmin(targetUser.role);
+
+        // Security rule 1: If target user is a Super Admin, regular Admin cannot modify them
+        if (targetIsSuper && !isSuper) {
+          return json({ error: "forbidden", message: "Regular Admins cannot modify a Super Admin account." }, 403, corsHeaders);
+        }
+
+        // Security rule 2: Super Admins cannot be demoted or removed from the Super Admin role by anyone (even another Super Admin)
+        if (targetIsSuper && b.role && !isSuperAdmin(b.role)) {
+          return json({ error: "forbidden", message: "Super Admin role is permanent and cannot be demoted or removed." }, 403, corsHeaders);
+        }
+
+        // Security rule 3: Super Admins cannot be deactivated or suspended
+        if (targetIsSuper && b.status && b.status !== "active") {
+          return json({ error: "forbidden", message: "Super Admin accounts must always remain active." }, 403, corsHeaders);
+        }
+
+        // Security rule 4: Only Super Admins can promote someone to Super Admin
+        if (b.role && isSuperAdmin(b.role) && !isSuper) {
+          return json({ error: "forbidden", message: "Only Super Admins can assign the Super Admin role." }, 403, corsHeaders);
+        }
 
         let updateSql = "UPDATE dashboard_users SET full_name = COALESCE(?, full_name), email = COALESCE(?, email), role = COALESCE(?, role), status = COALESCE(?, status), allowed_pages = COALESCE(?, allowed_pages), recovery_pin = COALESCE(?, recovery_pin)";
         const params = [b.full_name || null, b.email || null, b.role || null, b.status || null, b.allowed_pages || null, b.recovery_pin || null];
@@ -951,13 +1009,31 @@ export default {
         return json({ ok: true, message: "User updated" }, 200, corsHeaders);
       }
 
-      // Delete User (Admin only)
+      // Delete User (Admin or Super Admin)
       if (userUpdateMatch && request.method === "DELETE") {
         if (!isAdmin) return json({ error: "forbidden" }, 403, corsHeaders);
         const targetId = userUpdateMatch[1];
+
+        const targetRows = await db(env, "SELECT id, username, full_name, email, role FROM dashboard_users WHERE id = ? LIMIT 1", [targetId]);
+        const targetUser = targetRows[0];
+        if (!targetUser) {
+          return json({ error: "not_found", message: "User not found" }, 404, corsHeaders);
+        }
+
+        // Absolute rule: Super Admins CANNOT be deleted by ANYONE (neither regular admins nor other Super Admins)
+        if (isSuperAdmin(targetUser.role)) {
+          return json({ error: "forbidden", message: "Super Admin accounts are permanently protected and cannot be deleted by anyone." }, 403, corsHeaders);
+        }
+
         if (String(user.id) === String(targetId)) {
           return json({ error: "bad_request", message: "Cannot delete your own admin account" }, 400, corsHeaders);
         }
+
+        // Regular admins cannot delete other admins; only Super Admins can delete regular admins
+        if (isAdminOrSuper(targetUser.role) && !isSuper) {
+          return json({ error: "forbidden", message: "Only Super Admins can delete Admin accounts." }, 403, corsHeaders);
+        }
+
         await db(env, "DELETE FROM dashboard_users WHERE id = ?", [targetId]);
         return json({ ok: true, message: "User deleted" }, 200, corsHeaders);
       }
@@ -968,8 +1044,12 @@ export default {
         if (!isAdmin) return json({ error: "forbidden" }, 403, corsHeaders);
         const targetId = approveResetMatch[1];
 
-        const targetUser = (await db(env, "SELECT id, username, full_name, email FROM dashboard_users WHERE id = ? LIMIT 1", [targetId]))[0];
+        const targetUser = (await db(env, "SELECT id, username, full_name, email, role FROM dashboard_users WHERE id = ? LIMIT 1", [targetId]))[0];
         if (!targetUser) return json({ error: "not_found", message: "User not found" }, 404, corsHeaders);
+
+        if (isSuperAdmin(targetUser.role) && !isSuper) {
+          return json({ error: "forbidden", message: "Only Super Admins can manage Super Admin accounts." }, 403, corsHeaders);
+        }
 
         const code = String(Math.floor(100000 + Math.random() * 900000));
         await db(env, "UPDATE dashboard_users SET reset_status = 'approved', reset_code = ? WHERE id = ?", [code, targetId]);
@@ -988,6 +1068,12 @@ export default {
       if (rejectResetMatch && request.method === "POST") {
         if (!isAdmin) return json({ error: "forbidden" }, 403, corsHeaders);
         const targetId = rejectResetMatch[1];
+
+        const targetUser = (await db(env, "SELECT id, username, full_name, email, role FROM dashboard_users WHERE id = ? LIMIT 1", [targetId]))[0];
+        if (targetUser && isSuperAdmin(targetUser.role) && !isSuper) {
+          return json({ error: "forbidden", message: "Only Super Admins can manage Super Admin accounts." }, 403, corsHeaders);
+        }
+
         await db(env, "UPDATE dashboard_users SET reset_status = 'rejected', reset_code = '' WHERE id = ?", [targetId]);
         return json({ ok: true, message: "Reset request rejected" }, 200, corsHeaders);
       }

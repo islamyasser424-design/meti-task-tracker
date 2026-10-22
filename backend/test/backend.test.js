@@ -60,7 +60,7 @@ describe("MEEG Secure Backend Comprehensive Test Suite", () => {
     const data = await res.json();
     assert.equal(data.ok, true);
     assert.equal(data.user.username, "admin");
-    assert.equal(data.user.role, "admin");
+    assert.ok(["admin", "super admin"].includes(data.user.role));
     assert.ok(data.token, "Expected session token in response");
     adminToken = data.token;
 
@@ -82,7 +82,7 @@ describe("MEEG Secure Backend Comprehensive Test Suite", () => {
     const meData = await meRes.json();
     assert.equal(meData.ok, true);
     assert.equal(meData.user.username, "admin");
-    assert.equal(meData.user.role, "admin");
+    assert.ok(["admin", "super admin"].includes(meData.user.role));
   });
 
   test("/api/me rejects unauthenticated request", async () => {

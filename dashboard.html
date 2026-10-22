@@ -579,6 +579,7 @@
       user-select: none;
     }
     .role-badge-admin { color: #b91c1c; background: #fee2e2; border-color: #fecaca; }
+    .role-badge-superadmin { color: #4338ca; background: #e0e7ff; border-color: #c7d2fe; font-weight: 800; }
     .role-badge-sv { color: #047857; background: #d1fae5; border-color: #a7f3d0; }
     .role-badge-wla { color: #6b21a8; background: #f3e8ff; border-color: #e9d5ff; }
     .role-badge-qt { color: #1d4ed8; background: #dbeafe; border-color: #bfdbfe; }
@@ -1461,6 +1462,7 @@
 
     /* Role Badges Dark Mode */
     html[data-theme="dark"] .role-badge-admin { color: #f87171; background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.35); }
+    html[data-theme="dark"] .role-badge-superadmin { color: #a5b4fc; background: rgba(99, 102, 241, 0.2); border-color: rgba(99, 102, 241, 0.45); font-weight: 800; }
     html[data-theme="dark"] .role-badge-sv { color: #34d399; background: rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.35); }
     html[data-theme="dark"] .role-badge-wla { color: #c084fc; background: rgba(168, 85, 247, 0.15); border-color: rgba(168, 85, 247, 0.35); }
     html[data-theme="dark"] .role-badge-qt { color: #60a5fa; background: rgba(59, 130, 246, 0.15); border-color: rgba(59, 130, 246, 0.35); }
@@ -2026,6 +2028,7 @@
             <input type="text" id="newUserFullName" placeholder="Full Name (e.g. Omar Khalil)" style="flex:1.3; min-width:160px; padding:9px 12px; border:1.5px solid var(--border); border-radius:6px; font-size:0.85rem;">
             <input type="email" id="newUserEmail" placeholder="Official Email (e.g. omar@gmail.com)" style="flex:1.5; min-width:180px; padding:9px 12px; border:1.5px solid var(--border); border-radius:6px; font-size:0.85rem;" required>
             <select id="newUserRole" style="padding:9px 12px; border:1.5px solid var(--border); border-radius:6px; font-size:0.85rem; min-width:140px;">
+              <option id="optSuperAdmin" value="super admin" style="display:none; font-weight:bold; color:#4338ca;">⭐ SUPER ADMIN (Protected + Primary Owner)</option>
               <option value="admin">ADMIN (Full Control + Manage Users + Edit/Delete Data)</option>
               <option value="shift sv" selected>Shift SV (Operations + Manage QA/QTC + Full Analytics)</option>
               <option value="floor sv">Floor SV (Floor Operations + Manage QA/QTC + Analytics)</option>
@@ -2517,6 +2520,15 @@
     // APPLICATION STATE
     // ============================================================
     var _currentUser = null;
+    function isSuperAdminRole(role) {
+      var r = (role || "").toLowerCase().trim().replace(/[\s_-]+/g, "");
+      return r === "superadmin";
+    }
+    function isAdminOrSuperRole(role) {
+      var r = (role || "").toLowerCase().trim().replace(/[\s_-]+/g, "");
+      return r === "admin" || r === "superadmin";
+    }
+
     var _activeTab = "telemetry";
     var _allSubmissions = [];
     var _filteredSubmissions = [];
@@ -2600,7 +2612,7 @@
       if (!user) return ["tasks"];
       var role = (user.role || "qt").toLowerCase().trim();
       // Super Admin ALWAYS has access to all pages
-      if (role === "admin") {
+      if (isAdminOrSuperRole(role)) {
         return ["tasks", "queues", "qtc", "users", "overview", "analysis", "queues_analysis", "gm_report", "shift_comparison", "performance", "qtcfloor", "daily"];
       }
       if (user.allowed_pages && typeof user.allowed_pages === "string" && user.allowed_pages.trim() && user.allowed_pages !== "undefined" && user.allowed_pages !== "null") {
@@ -2622,7 +2634,7 @@
     function isPageAllowed(key) {
       if (!_currentUser) return false;
       var role = (_currentUser.role || "qt").toLowerCase();
-      if (key === "users" && role !== "admin") return false;
+      if (key === "users" && !isAdminOrSuperRole(role)) return false;
       var allowed = getUserAllowedPages(_currentUser);
       return allowed.indexOf(key) > -1;
     }
@@ -2707,7 +2719,7 @@
 
       if (tabName === "queues") loadLiveQueuesAdmin();
       if (tabName === "qtc") loadLiveQTCAdmin();
-      if (tabName === "users" && (_currentUser && _currentUser.role === "admin")) loadUsersList();
+      if (tabName === "users" && (_currentUser && isAdminOrSuperRole(_currentUser.role))) loadUsersList();
 
       if (cfg.isAnalytics) {
         if (typeof window.switchAnalyticsWorkspace === "function") {
@@ -2782,7 +2794,7 @@
 
         var thAction = document.getElementById("thTaskAction");
         if (thAction) {
-          thAction.style.display = (role === "admin") ? "table-cell" : "none";
+          thAction.style.display = isAdminOrSuperRole(role) ? "table-cell" : "none";
         }
 
         try { applyUserPermissions(); } catch(e){ console.error("applyUserPermissions:", e); }
@@ -3479,7 +3491,7 @@
         dbStatus.textContent = "Loaded " + loadedInMemStr + " of " + totalInDbStr + " records";
       }
 
-      var isAdmin = _currentUser && (_currentUser.role === "admin");
+      var isAdmin = _currentUser && isAdminOrSuperRole(_currentUser.role);
       var thAction = document.getElementById("thTaskAction");
       if (thAction) {
         thAction.style.display = isAdmin ? "table-cell" : "none";
@@ -3595,7 +3607,7 @@
     }
 
     function deleteSubmission(id) {
-      if (!_currentUser || _currentUser.role !== "admin") {
+      if (!_currentUser || !isAdminOrSuperRole(_currentUser.role)) {
         alert("Only Admins can delete tasks.");
         return;
       }
@@ -3613,7 +3625,7 @@
 
     var _editingTaskId = null;
     function openEditTaskModal(id) {
-      if (!_currentUser || _currentUser.role !== "admin") {
+      if (!_currentUser || !isAdminOrSuperRole(_currentUser.role)) {
         alert("Only Admins can edit tasks.");
         return;
       }
@@ -3943,6 +3955,10 @@
     var _editingPermissionsUserId = null;
 
     function loadUsersList() {
+      var optSuper = document.getElementById("optSuperAdmin");
+      if (optSuper) {
+        optSuper.style.display = (_currentUser && isSuperAdminRole(_currentUser.role)) ? "block" : "none";
+      }
       var tbody = document.getElementById("usersTableBody");
       tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:14px; color:var(--text-muted);">Loading users...</td></tr>';
 
@@ -4003,9 +4019,15 @@
 
           var permBtn = '<button class="btn-action" style="padding:3px 7px; font-size:0.72rem; margin-right:4px;" onclick="openPermissionsModal(' + uId + ')">⚙️ Perms</button>';
           var resetBtn = '<button class="btn-action secondary" style="padding:3px 7px; font-size:0.72rem; margin-right:4px;" title="Reset PIN / Account" onclick="reissueUserPin(' + uId + ', \'' + uName + '\')">🔄 Reset PIN</button>';
-          var delBtn = isMe
-            ? '<span style="font-size:0.7rem; color:var(--text-muted);">(Current)</span>'
-            : '<button class="btn-action secondary" style="padding:3px 7px; font-size:0.72rem; color:var(--error); border-color:var(--error);" onclick="deleteUser(' + uId + ', \'' + uName + '\')">🗑️</button>';
+          var isSuper = isSuperAdminRole(role);
+          var delBtn = "";
+          if (isSuper) {
+            delBtn = '<span style="font-size:0.7rem; color:#4338ca; font-weight:800; background:rgba(99,102,241,0.12); padding:2px 6px; border-radius:4px;" title="Super Admin accounts are permanently protected and cannot be deleted by anyone">🔒 Protected</span>';
+          } else if (isMe) {
+            delBtn = '<span style="font-size:0.7rem; color:var(--text-muted);">(Current)</span>';
+          } else {
+            delBtn = '<button class="btn-action secondary" style="padding:3px 7px; font-size:0.72rem; color:var(--error); border-color:var(--error);" onclick="deleteUser(' + uId + ', \'' + uName + '\')">🗑️</button>';
+          }
 
           var roleBadgeClass = "role-badge role-badge-" + (role.replace(/\s+/g, '').toLowerCase() || "qt");
           var statusHtml = "";
@@ -4208,6 +4230,11 @@
     }
 
     function reissueUserPin(id, username) {
+      var target = (_usersCache || []).find(function(u){ return u.id == id; });
+      if (target && isSuperAdminRole(target.role) && !isSuperAdminRole(_currentUser.role)) {
+        alert("Regular Admins cannot reset a Super Admin account.");
+        return;
+      }
       var newPin = String(Math.floor(1000 + Math.random() * 9000));
       if (!confirm("Re-issue PIN and reset status for @" + username + "?\nNew PIN will be: " + newPin + "\nThis allows the user to re-register their password if forgotten.")) return;
 
@@ -4438,6 +4465,11 @@
     }
 
     function deleteUser(id, username) {
+      var target = (_usersCache || []).find(function(u){ return u.id == id; });
+      if (target && isSuperAdminRole(target.role)) {
+        alert("Super Admin accounts are permanently protected and cannot be deleted by anyone.");
+        return;
+      }
       if (!confirm("Are you sure you want to delete user: " + username + "?")) return;
       apiFetch("/api/users/" + id, { method: "DELETE" })
         .then(function(r) { return r.json(); })
