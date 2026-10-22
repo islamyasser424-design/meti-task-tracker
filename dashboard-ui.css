@@ -1424,3 +1424,26 @@ html[data-theme="dark"] #meegGlobalTooltip .tip-chip {
   font-weight: 700;
   font-family: var(--mono);
 }
+
+/* ============================================================
+   GM REPORT & SHIFT COMPARISON STYLES
+   ============================================================ */
+.gm-report-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.gm-report-table th, .gm-report-table td {
+  border: 1px solid var(--border);
+  padding: 8px 12px;
+}
+.gm-report-table th {
+  background: #3b82f6;
+  color: #fff;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  user-select: none;
+}
+.gm-report-table tbody tr:hover {
+  background: var(--accent-light);
+}

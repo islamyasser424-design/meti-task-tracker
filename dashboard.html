@@ -1584,6 +1584,14 @@
           <span class="side-nav-icon">☷</span>
           <span class="side-nav-label">Queues Analysis</span>
         </button>
+        <button class="side-nav-btn" id="navBtn_gm_report" onclick="switchMainTab('gm_report')">
+          <span class="side-nav-icon">📊</span>
+          <span class="side-nav-label">GM Report</span>
+        </button>
+        <button class="side-nav-btn" id="navBtn_shift_comparison" onclick="switchMainTab('shift_comparison')">
+          <span class="side-nav-icon">⚖️</span>
+          <span class="side-nav-label">Shift Comparison</span>
+        </button>
         <button class="side-nav-btn" id="navBtn_performance" onclick="switchMainTab('performance')">
           <span class="side-nav-icon">▤</span>
           <span class="side-nav-label">Performance per Labelers</span>
@@ -2180,6 +2188,14 @@
             <span>◷ <strong>Queues Analysis</strong> (Deep queue breakdown across shifts & rooms)</span>
           </label>
           <label class="perm-check-label" style="display:flex; align-items:center; gap:10px; padding:8px 12px; border:1px solid var(--border); border-radius:8px; font-size:0.82rem; cursor:pointer;">
+            <input type="checkbox" id="permCheck_gm_report" value="gm_report" style="accent-color:var(--primary); width:16px; height:16px;">
+            <span>📊 <strong>GM Report</strong> (Queue tracking, FP/QA submissions & labelers)</span>
+          </label>
+          <label class="perm-check-label" style="display:flex; align-items:center; gap:10px; padding:8px 12px; border:1px solid var(--border); border-radius:8px; font-size:0.82rem; cursor:pointer;">
+            <input type="checkbox" id="permCheck_shift_comparison" value="shift_comparison" style="accent-color:var(--primary); width:16px; height:16px;">
+            <span>⚖️ <strong>Shift Comparison</strong> (Detailed breakdown by Floor/Unit, QTC, Labeler)</span>
+          </label>
+          <label class="perm-check-label" style="display:flex; align-items:center; gap:10px; padding:8px 12px; border:1px solid var(--border); border-radius:8px; font-size:0.82rem; cursor:pointer;">
             <input type="checkbox" id="permCheck_performance" value="performance" style="accent-color:var(--primary); width:16px; height:16px;">
             <span>▥ <strong>Performance per Labelers</strong> (Productivity ranking & metrics)</span>
           </label>
@@ -2573,6 +2589,8 @@
       { key: "overview", label: "Overview", title: "▦ Executive Overview", sub: "High-level KPIs, sparklines, categories, and submission targets", isAnalytics: true, hash: "#dashboard" },
       { key: "analysis", label: "Analysis", title: "◈ Modality & Attribute Analysis", sub: "Deep dive across modalities, pass rates, and attribute metrics", isAnalytics: true, hash: "#analysis-overview" },
       { key: "queues_analysis", label: "Queues Analysis", title: "☷ Queues Analysis", sub: "Submission volume, shifts, floors, and QTC distribution per queue", isAnalytics: true, hash: "#queues-analysis" },
+      { key: "gm_report", label: "GM Report", title: "📊 GM Report — Queues & Passes", sub: "Operational queue tracking, FP/QA submission counts and active labelers", isAnalytics: true, hash: "#gm-report" },
+      { key: "shift_comparison", label: "Shift Comparison", title: "⚖️ Detailed Shift Comparison", sub: "Comparative analysis across shifts by Floor (Unit), QTC, and Labeler", isAnalytics: true, hash: "#shift-comparison" },
       { key: "performance", label: "Performance per Labelers", title: "▤ Performance per Labelers", sub: "Labeler productivity, ranking, task counts, and velocity", isAnalytics: true, hash: "#performance-labelers" },
       { key: "qtcfloor", label: "Performance per QTC & Floor", title: "🏢 Performance per QTC & Floor", sub: "Throughput and active shifts broken down by QC & Floor rooms", isAnalytics: true, hash: "#performance-qtc-floor" },
       { key: "daily", label: "Daily Report", title: "▦ Daily Performance Report", sub: "Daily submission breakdowns, weekly trends, and period comparisons", isAnalytics: true, hash: "#daily-report" }
@@ -2583,20 +2601,20 @@
       var role = (user.role || "qt").toLowerCase().trim();
       // Super Admin ALWAYS has access to all pages
       if (role === "admin") {
-        return ["tasks", "queues", "qtc", "users", "overview", "analysis", "queues_analysis", "performance", "qtcfloor", "daily"];
+        return ["tasks", "queues", "qtc", "users", "overview", "analysis", "queues_analysis", "gm_report", "shift_comparison", "performance", "qtcfloor", "daily"];
       }
       if (user.allowed_pages && typeof user.allowed_pages === "string" && user.allowed_pages.trim() && user.allowed_pages !== "undefined" && user.allowed_pages !== "null") {
         var list = user.allowed_pages.split(",").map(function(s){ return s.trim().toLowerCase(); }).filter(Boolean);
         if (list.length > 0) return list;
       }
       if (role === "sv" || role === "wla" || role === "shift sv" || role === "floor sv") {
-        return ["tasks", "queues", "qtc", "overview", "analysis", "queues_analysis", "performance", "qtcfloor", "daily"];
+        return ["tasks", "queues", "qtc", "overview", "analysis", "queues_analysis", "gm_report", "shift_comparison", "performance", "qtcfloor", "daily"];
       }
       if (role === "traning sv" || role === "training sv") {
-        return ["tasks", "overview", "analysis", "performance", "daily"];
+        return ["tasks", "overview", "analysis", "gm_report", "shift_comparison", "performance", "daily"];
       }
       if (role === "qtc") {
-        return ["tasks", "queues", "overview", "queues_analysis", "performance", "daily"];
+        return ["tasks", "queues", "overview", "queues_analysis", "gm_report", "shift_comparison", "performance", "daily"];
       }
       return ["tasks"];
     }

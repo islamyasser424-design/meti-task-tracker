@@ -325,15 +325,8 @@ window.addEventListener('keydown', e => {
 // ============================================================
 
 function deriveFloor(unit) {
-  if (!unit) return 'Floor 01';
-  const u = String(unit).trim();
-  const lower = u.toLowerCase();
-  if (lower.includes('4th') || lower.includes('fourth') || lower.includes('floor 4') || lower.includes('floor 04') || lower.includes('room 4') || /4\d\d/.test(u)) return 'Floor 04';
-  if (lower.includes('3rd') || lower.includes('third') || lower.includes('floor 3') || lower.includes('floor 03') || lower.includes('room 3') || /3\d\d/.test(u)) return 'Floor 03';
-  if (lower.includes('2nd') || lower.includes('second') || lower.includes('floor 2') || lower.includes('floor 02') || lower.includes('room 2') || /2\d\d/.test(u)) return 'Floor 02';
-  if (lower.includes('1st') || lower.includes('first') || lower.includes('floor 1') || lower.includes('floor 01') || lower.includes('room 1') || /1\d\d/.test(u)) return 'Floor 01';
-  if (lower.includes('floor')) return u;
-  return 'Floor 01';
+  if (!unit) return 'Unknown';
+  return String(unit).trim() || 'Unknown';
 }
 
 function maskEmployeeId(rawId, pcOrName) {
@@ -497,6 +490,10 @@ let dailyReportDateA = '';
 let dailyReportDateB = '';
 let dailyReportCompareMode = false;
 
+const analysisFilters={from:'',to:'',modality:'all',shift:'',unit:'',qtc:'',category:'',chartCategory:'all'};
+const perfFilters={from:'',to:'',day:'',week:'',category:'',query:'',person:'',page:0};
+const gmReportFilters = { query: '', shift: '', floor: '', modality: 'all', from: '', to: '', sortCol: 'id', sortAsc: true };
+const shiftCompFilters = { shiftA: 'all', shiftB: 'all', floor: '', modality: 'all', from: '', to: '', subTab: 'floor', query: '' };
 const queuesFilters={query:'',shift:'',floor:'',category:'',sortCol:'totalSubmit',sortAsc:false,page:0,pageSize:25};
 const queuesChartFilters={queue:'all',stage:'all',from:'',to:'',day:''};
 const qtcFloorFilters={query:'',qtc:'',floor:'',shift:'',category:'',sortCol:'totalSubmit',sortAsc:false,page:0,pageSize:25};
@@ -553,9 +550,23 @@ qtcFloorPage.hidden=true;
 qtcFloorPage.style.display='none';
 targetContainer.appendChild(qtcFloorPage);
 
+const gmReportPage=document.createElement('section');
+gmReportPage.id='uxGmReport';
+gmReportPage.className='ux-workspace-page';
+gmReportPage.hidden=true;
+gmReportPage.style.display='none';
+targetContainer.appendChild(gmReportPage);
+
+const shiftComparisonPage=document.createElement('section');
+shiftComparisonPage.id='uxShiftComparison';
+shiftComparisonPage.className='ux-workspace-page';
+shiftComparisonPage.hidden=true;
+shiftComparisonPage.style.display='none';
+targetContainer.appendChild(shiftComparisonPage);
+
 const root=overview;
 
-const aside=document.createElement('aside');aside.className='ux-sidebar';aside.setAttribute('aria-label','Main navigation');aside.innerHTML='<div class="ux-brand"><div class="brand-logo-card"><img src="logo.jpg" alt="MEEG - Micro Engineering Egypt" class="brand-img"></div><span class="brand-workspace-tag">PRODUCTIVITY WORKSPACE</span></div><small>WORKSPACE</small><button class="ux-nav active" data-page="dashboard">▦ &nbsp; Overview</button><button class="ux-nav" data-page="analysis">◈ &nbsp; Analysis</button><button class="ux-nav" data-page="queues">☷ &nbsp; Queues Analysis</button><button class="ux-nav" data-page="performance">▤ &nbsp; Performance per Labelers</button><button class="ux-nav" data-page="qtcfloor">🏢 &nbsp; Performance per QTC & Floor</button><button class="ux-nav" data-page="daily">▦ &nbsp; Daily Report</button><footer>Connected to your existing data<br><span style="display:block;margin-top:8px">MEEG · Internal Dashboard</span></footer>';
+const aside=document.createElement('aside');aside.className='ux-sidebar';aside.setAttribute('aria-label','Main navigation');aside.innerHTML='<div class="ux-brand"><div class="brand-logo-card"><img src="logo.jpg" alt="MEEG - Micro Engineering Egypt" class="brand-img"></div><span class="brand-workspace-tag">PRODUCTIVITY WORKSPACE</span></div><small>WORKSPACE</small><button class="ux-nav active" data-page="dashboard">▦ &nbsp; Overview</button><button class="ux-nav" data-page="analysis">◈ &nbsp; Analysis</button><button class="ux-nav" data-page="queues">☷ &nbsp; Queues Analysis</button><button class="ux-nav" data-page="gm_report">📊 &nbsp; GM Report</button><button class="ux-nav" data-page="shift_comparison">⚖️ &nbsp; Shift Comparison</button><button class="ux-nav" data-page="performance">▤ &nbsp; Performance per Labelers</button><button class="ux-nav" data-page="qtcfloor">🏢 &nbsp; Performance per QTC & Floor</button><button class="ux-nav" data-page="daily">▦ &nbsp; Daily Report</button><footer>Connected to your existing data<br><span style="display:block;margin-top:8px">MEEG · Internal Dashboard</span></footer>';
 if (isUnified) {
   aside.style.display = 'none';
 }
@@ -583,6 +594,8 @@ function route(){
   const hash = location.hash || '#dashboard';
   const current = hash === '#analysis-overview' ? 'analysis'
                 : hash === '#queues-analysis' ? 'queues'
+                : hash === '#gm-report' ? 'gm_report'
+                : hash === '#shift-comparison' ? 'shift_comparison'
                 : hash === '#performance-labelers' ? 'performance'
                 : hash === '#performance-qtc-floor' ? 'qtcfloor'
                 : hash === '#daily-report' ? 'daily'
@@ -596,6 +609,12 @@ function route(){
 
   queuesPage.hidden = (current !== 'queues');
   queuesPage.style.display = (current === 'queues') ? 'block' : 'none';
+
+  gmReportPage.hidden = (current !== 'gm_report');
+  gmReportPage.style.display = (current === 'gm_report') ? 'block' : 'none';
+
+  shiftComparisonPage.hidden = (current !== 'shift_comparison');
+  shiftComparisonPage.style.display = (current === 'shift_comparison') ? 'block' : 'none';
 
   performance.hidden = (current !== 'performance');
   performance.style.display = (current === 'performance') ? 'block' : 'none';
@@ -619,6 +638,8 @@ function route(){
   }
   closeNav();
   if(current==='queues'&&typeof renderQueuesAnalysis==='function')renderQueuesAnalysis();
+  else if(current==='gm_report'&&typeof renderGmReport==='function')renderGmReport();
+  else if(current==='shift_comparison'&&typeof renderShiftComparison==='function')renderShiftComparison();
   else if(current==='analysis'&&typeof renderAnalysis==='function')renderAnalysis();
   else if(current==='performance'&&typeof renderPerformance==='function')renderPerformance();
   else if(current==='qtcfloor'&&typeof renderQtcFloorPerformance==='function')renderQtcFloorPerformance();
@@ -635,8 +656,9 @@ window.switchAnalyticsWorkspace = function(hash) {
   route();
 };
 
-aside.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>{location.hash=b.dataset.page==='analysis'?'analysis-overview':b.dataset.page==='queues'?'queues-analysis':b.dataset.page==='performance'?'performance-labelers':b.dataset.page==='qtcfloor'?'performance-qtc-floor':b.dataset.page==='daily'?'daily-report':'dashboard';});
-$('uxBack').onclick=()=>{ if(typeof switchTab==='function') switchTab('overview'); else location.hash='dashboard'; };$('uxSideRefresh')?.addEventListener('click',()=>loadData());$('uxSideTheme')?.addEventListener('click',()=>toggleDark());window.addEventListener('hashchange',route);route();
+aside.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>{location.hash=b.dataset.page==='analysis'?'analysis-overview':b.dataset.page==='queues'?'queues-analysis':b.dataset.page==='gm_report'?'gm-report':b.dataset.page==='shift_comparison'?'shift-comparison':b.dataset.page==='performance'?'performance-labelers':b.dataset.page==='qtcfloor'?'performance-qtc-floor':b.dataset.page==='daily'?'daily-report':'dashboard';});
+const uxBackEl = $('uxBack'); if (uxBackEl) uxBackEl.onclick = () => { if (typeof switchTab === 'function') switchTab('overview'); else location.hash = 'dashboard'; };
+$('uxSideRefresh')?.addEventListener('click',()=>loadData());$('uxSideTheme')?.addEventListener('click',()=>toggleDark());window.addEventListener('hashchange',route);
 function rowsInView(){return activeLoc&& !activeLoc.startsWith('__')&&locColIdx>=0?fcache.filter(r=>String(r[locColIdx]||'').trim()===activeLoc):fcache;}
 function uniq(rows,name){const i=hdrs.findIndex(h=>h.toLowerCase()===name.toLowerCase());return i<0?null:new Set(rows.map(r=>String(r[i]||'').trim()).filter(Boolean)).size;}
 function daily(rows){const map=new Map();rows.forEach(r=>{const d=rDate(r);if(d)map.set(d,(map.get(d)||0)+1);});return [...map].sort(([a],[b])=>a.localeCompare(b));}
@@ -1085,17 +1107,17 @@ function renderOverview(){
       + '<h3>🏢 Floor Productivity Comparison</h3>'
       + '<p>Throughput by floor based on operational room mapping.</p>'
       + '<div style="display:flex; flex-direction:column; gap:8px; margin-top:12px;">'
-        + (['Floor 01', 'Floor 02', 'Floor 03', 'Floor 04'].map(fl => {
+        + (([...floorMap.keys()].sort().map(fl => {
           const cnt = floorMap.get(fl) || 0;
           const maxF = Math.max(1, ...floorMap.values());
           const pct = totalSubmissions ? ((cnt / totalSubmissions) * 100).toFixed(1) : 0;
           return '<div>'
-            + '<div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:3px;"><span>' + fl + '</span><b>' + cnt.toLocaleString() + ' (' + pct + '%)</b></div>'
+            + '<div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:3px;"><span>' + esc(fl) + '</span><b>' + cnt.toLocaleString() + ' (' + pct + '%)</b></div>'
             + '<div style="height:8px; border-radius:4px; background:var(--border); overflow:hidden;">'
               + '<div style="height:100%; width:' + ((cnt/maxF)*100) + '%; background:#df8b24;"></div>'
             + '</div>'
           + '</div>';
-        }).join(''))
+        }).join('')) || '<div class="ux-empty">No floor/unit records available.</div>')
       + '</div>'
     + '</div>'
   + '</div>'
@@ -1245,7 +1267,6 @@ function renderOverview(){
 }
 function progress(count){const pct=target?count/target*100:0;$('uxProgress').innerHTML=target?'<div class="ux-track" role="progressbar" aria-label="Submission target" aria-valuenow="'+Math.min(100,Math.round(pct))+'" aria-valuemin="0" aria-valuemax="100"><div class="ux-fill" style="width:'+Math.min(100,pct)+'%"></div></div><b>'+Math.round(pct)+'%</b><p>'+count.toLocaleString()+' of '+target.toLocaleString()+' submissions</p>':'<p style="margin-top:18px">Set a target to see your progress.</p>';}
 function exportCSV(){const rows=rowsInView();if(!rows.length){showToast('No matching rows to export.');return;}const cell=v=>'"'+String(v??'').replace(/^[=+@\-\t\r]/,"'$&").replace(/"/g,'""')+'"';const csv=[hdrs,...rows].map(r=>r.map(cell).join(',')).join('\r\n');downloadBlob(new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'}),'MEEG_filtered_'+cairoToday()+'.csv');}
-const analysisFilters={from:'',to:'',modality:'all',shift:'',unit:'',qtc:'',category:'',chartCategory:'all'};
 function labelerSubmissionMetrics(rows){
  const idx=name=>hdrs.findIndex(h=>String(h).trim().toLowerCase()===name);
  const ni=idx('national id'),mi=idx('modality'),pi=idx('pass');
@@ -1744,7 +1765,6 @@ filterButton.onclick=()=>{renderDrawerAnalysis();renderBookmarkList();filterDraw
 function renderDrawerAnalysis(){const box=$('uxDrawerAnalysis');box.replaceChildren(createListSlicers());}
 
 document.addEventListener('click',e=>{if(!e.target.closest('.an-slicer-dropdown'))document.querySelectorAll('.an-slicer-dropdown[open]').forEach(el=>{el.open=false;slicerDropdownOpen[el.dataset.slicerKey]=false;});});
-const perfFilters={from:'',to:'',day:'',week:'',category:'',query:'',person:'',page:0};
 function performanceWeek(date){
  if(!/^\d{4}-\d{2}-\d{2}$/.test(date||''))return null;const d=new Date(date+'T00:00:00Z');if(!Number.isFinite(d.getTime()))return null;d.setUTCDate(d.getUTCDate()-(d.getUTCDay()+1)%7);const start=d.toISOString().slice(0,10);d.setUTCDate(d.getUTCDate()+6);return {start,end:d.toISOString().slice(0,10)};
 }
@@ -2027,7 +2047,7 @@ function renderPerformance(){
                 + '<td><button class="perf-person" data-person-key="' + esc(p.key) + '" style="background:none; border:none; color:var(--primary); font-weight:700; cursor:pointer; text-decoration:underline;">' + esc(p.name) + '</button></td>'
                 + '<td><span class="q-badge" style="background:var(--bg-3); border:1px solid var(--border); font-family:var(--mono);">' + esc(p.maskedId) + '</span></td>'
                 + '<td>' + ([...p.shifts].slice(0,2).map(s=>'<span class="q-badge q-shift">' + esc(s) + '</span>').join('') || '—') + '</td>'
-                + '<td>' + ([...p.floors].join(', ') || 'Floor 01') + '</td>'
+                + '<td>' + ([...p.floors].map(esc).join(', ') || '—') + '</td>'
                 + '<td>' + ([...p.qtcs].slice(0,2).join(', ') || '—') + '</td>'
                 + '<td><strong style="color:var(--primary); font-size:14px;">' + p.total.toLocaleString() + '</strong></td>'
                 + '<td>' + p.lidarFP.toLocaleString() + '</td>'
@@ -2521,7 +2541,7 @@ function renderDailyReport(){
           + '<h3>2. Floor Breakdown</h3>'
           + '<div class="perf-table" style="margin-top:10px;">'
             + '<table><thead><tr><th>Floor</th><th>Submissions</th><th>Share %</th></tr></thead><tbody>'
-              + (['Floor 01','Floor 02','Floor 03','Floor 04'].map(fl=>{ const c = floorDaily.get(fl)||0; return '<tr><td><b>' + fl + '</b></td><td>' + c.toLocaleString() + '</td><td>' + (statsA.tot ? ((c/statsA.tot)*100).toFixed(1) : 0) + '%</td></tr>'; }).join(''))
+              + (([...floorDaily.keys()].sort().map(fl=>{ const c = floorDaily.get(fl)||0; return '<tr><td><b>' + esc(fl) + '</b></td><td>' + c.toLocaleString() + '</td><td>' + (statsA.tot ? ((c/statsA.tot)*100).toFixed(1) : 0) + '%</td></tr>'; }).join('')) || '<tr><td colspan="3" class="ux-empty">No floor data</td></tr>')
             + '</tbody></table>'
           + '</div>'
         + '</div>'
@@ -3456,6 +3476,701 @@ function renderQueueTrendChart(containerId, rows){
  }
 }
 
+
+// ============================================================
+// PAGE: GM REPORT (Queue Operations Table matching user sheet)
+// ============================================================
+function renderGmReport(){
+  const page = $('uxGmReport');
+  if(!page || page.hidden) return;
+
+  const baseRows = rowsInView();
+  const idx = name => hdrs.findIndex(h => h.trim().toLowerCase() === name.toLowerCase());
+  const qi = idx('queue name');
+  const si = idx('shift');
+  const fi = hdrs.findIndex(h => ['floor', 'unit'].includes(h.trim().toLowerCase()));
+  const mi = idx('modality');
+  const li = idx('labeler name');
+
+  // Filter rows
+  const filteredRows = baseRows.filter(r => {
+    const shift = si >= 0 ? String(r[si] || '').trim() : '';
+    const floor = fi >= 0 ? deriveFloor(r[fi]) : 'Unknown';
+    const mod = mi < 0 ? '' : String(r[mi] || '').toLowerCase().replace(/[\s_-]+/g, '');
+    const d = rDate(r);
+
+    if (gmReportFilters.shift && shift !== gmReportFilters.shift) return false;
+    if (gmReportFilters.floor && floor !== gmReportFilters.floor) return false;
+    if (gmReportFilters.modality && gmReportFilters.modality !== 'all') {
+      const isLidar = mod === 'lidar';
+      const isLane = mod === 'laneline' || mod === 'lane';
+      if (gmReportFilters.modality === 'lidar' && !isLidar) return false;
+      if (gmReportFilters.modality === 'laneline' && !isLane) return false;
+    }
+    if (gmReportFilters.from && d && d < gmReportFilters.from) return false;
+    if (gmReportFilters.to && d && d > gmReportFilters.to) return false;
+    return true;
+  });
+
+  // Master queue list
+  const masterQueueSet = new Set();
+  if (Array.isArray(window.liveQueuesList)) {
+    window.liveQueuesList.forEach(q => {
+      const qn = String(q.name || q.queue_name || q || '').trim();
+      if (qn) masterQueueSet.add(qn);
+    });
+  }
+  rawRows.forEach(r => {
+    const qn = qi >= 0 ? String(r[qi] || '').trim() : '';
+    if (qn) masterQueueSet.add(qn);
+  });
+  filteredRows.forEach(r => {
+    const qn = qi >= 0 ? String(r[qi] || '').trim() : '';
+    if (qn) masterQueueSet.add(qn);
+  });
+
+  const allQueuesList = [...masterQueueSet].sort();
+
+  // Aggregate stats per queue
+  const queueStatsList = [];
+  let grandTotalFpTasks = 0;
+  let grandTotalQaTasks = 0;
+  const grandFpLabelers = new Set();
+  const grandQaLabelers = new Set();
+
+  allQueuesList.forEach((qName, i) => {
+    const qRows = filteredRows.filter(r => qi >= 0 && String(r[qi] || '').trim() === qName);
+    const fpRows = qRows.filter(r => isModPass(r, 'any', 'FP'));
+    const qaRows = qRows.filter(r => isModPass(r, 'any', 'QA'));
+
+    const fpLabSet = new Set();
+    fpRows.forEach(r => {
+      const lab = li >= 0 ? String(r[li] || '').trim() : '';
+      if (lab) { fpLabSet.add(lab); grandFpLabelers.add(lab); }
+    });
+    const fpLabCount = fpLabSet.size;
+    const fpTaskCount = fpRows.length;
+    grandTotalFpTasks += fpTaskCount;
+
+    const qaLabSet = new Set();
+    qaRows.forEach(r => {
+      const lab = li >= 0 ? String(r[li] || '').trim() : '';
+      if (lab) { qaLabSet.add(lab); grandQaLabelers.add(lab); }
+    });
+    const qaLabCount = qaLabSet.size;
+    const qaTaskCount = qaRows.length;
+    grandTotalQaTasks += qaTaskCount;
+
+    const totalTasks = fpTaskCount + qaTaskCount;
+
+    queueStatsList.push({
+      index: i + 1,
+      queue: qName,
+      fpLabelers: fpLabCount,
+      fpTasks: fpTaskCount,
+      qaLabelers: qaLabCount,
+      qaTasks: qaTaskCount,
+      totalTasks: totalTasks
+    });
+  });
+
+  // Search filter
+  const qSearch = (gmReportFilters.query || '').toLowerCase().trim();
+  let displayedQueues = queueStatsList;
+  if (qSearch) {
+    displayedQueues = displayedQueues.filter(item => item.queue.toLowerCase().includes(qSearch));
+  }
+
+  // Sort
+  displayedQueues.sort((a, b) => {
+    const col = gmReportFilters.sortCol || 'id';
+    let va = col === 'id' ? a.index : col === 'queue' ? a.queue : a[col];
+    let vb = col === 'id' ? b.index : col === 'queue' ? b.queue : b[col];
+    if (typeof va === 'string') return gmReportFilters.sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
+    va = Number(va) || 0; vb = Number(vb) || 0;
+    return gmReportFilters.sortAsc ? (va - vb) : (vb - va);
+  });
+
+  const distinctShifts = [...new Set(baseRows.map(r => si >= 0 ? String(r[si] || '').trim() : '').filter(Boolean))].sort();
+  const distinctFloors = [...new Set(baseRows.map(r => fi >= 0 ? deriveFloor(r[fi]) : '').filter(Boolean))].sort();
+  const activeQueuesCount = queueStatsList.filter(q => q.totalTasks > 0).length;
+
+  page.innerHTML = `
+    <div class="ux-overview">
+      <div class="ux-heading">
+        <div>
+          <div class="ux-eyebrow">Operational Queue Sheet Tracking</div>
+          <h2>📊 GM Report — Queues &amp; Passes</h2>
+          <p>Submission counts and distinct labelers broken down by First Pass (FP) and QA Review per queue.</p>
+        </div>
+        ${renderHeaderControlsHTML('gm')}
+      </div>
+
+      <!-- KPI Summary Cards -->
+      <div class="ux-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 20px;">
+        <div class="kpi-mini-card" style="--tone: #3b82f6;">
+          <div class="kpi-title"><span>Total Queues Listed</span><span style="color:#3b82f6;">●</span></div>
+          <div class="kpi-val">${allQueuesList.length.toLocaleString()}</div>
+          <div class="kpi-sub">${activeQueuesCount} active with submissions</div>
+        </div>
+        <div class="kpi-mini-card" style="--tone: #10b981;">
+          <div class="kpi-title"><span>FP Submitted Tasks</span><span style="color:#10b981;">●</span></div>
+          <div class="kpi-val">${grandTotalFpTasks.toLocaleString()}</div>
+          <div class="kpi-sub">${grandFpLabelers.size} unique FP labelers</div>
+        </div>
+        <div class="kpi-mini-card" style="--tone: #8b5cf6;">
+          <div class="kpi-title"><span>QA Submitted Tasks</span><span style="color:#8b5cf6;">●</span></div>
+          <div class="kpi-val">${grandTotalQaTasks.toLocaleString()}</div>
+          <div class="kpi-sub">${grandQaLabelers.size} unique QA labelers</div>
+        </div>
+        <div class="kpi-mini-card" style="--tone: #df8b24;">
+          <div class="kpi-title"><span>Total Submissions</span><span style="color:#df8b24;">●</span></div>
+          <div class="kpi-val">${(grandTotalFpTasks + grandTotalQaTasks).toLocaleString()}</div>
+          <div class="kpi-sub">FP + QA combined production</div>
+        </div>
+      </div>
+
+      <!-- Filter Bar -->
+      <div class="ux-panel" style="margin-bottom: 18px; padding: 14px 18px;">
+        <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end;">
+          <div style="flex: 2; min-width: 220px;">
+            <label style="font-size: 11px; font-weight: 600; color: var(--text-soft); display: block; margin-bottom: 4px;">🔍 Search Queue Name</label>
+            <input type="text" id="gmSearchInput" placeholder="Filter by queue name..." value="${esc(gmReportFilters.query)}" style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-3); color: var(--text); font-size: 12px;">
+          </div>
+          <div style="min-width: 140px;">
+            <label style="font-size: 11px; font-weight: 600; color: var(--text-soft); display: block; margin-bottom: 4px;">Shift</label>
+            <select id="gmShiftSelect" style="width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-3); color: var(--text); font-size: 12px;">
+              <option value="">All Shifts</option>
+              ${distinctShifts.map(s => `<option value="${esc(s)}" ${gmReportFilters.shift === s ? 'selected' : ''}>${esc(s)}</option>`).join('')}
+            </select>
+          </div>
+          <div style="min-width: 150px;">
+            <label style="font-size: 11px; font-weight: 600; color: var(--text-soft); display: block; margin-bottom: 4px;">Floor (Unit)</label>
+            <select id="gmFloorSelect" style="width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-3); color: var(--text); font-size: 12px;">
+              <option value="">All Floors</option>
+              ${distinctFloors.map(f => `<option value="${esc(f)}" ${gmReportFilters.floor === f ? 'selected' : ''}>${esc(f)}</option>`).join('')}
+            </select>
+          </div>
+          <div style="min-width: 130px;">
+            <label style="font-size: 11px; font-weight: 600; color: var(--text-soft); display: block; margin-bottom: 4px;">Modality</label>
+            <select id="gmModSelect" style="width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-3); color: var(--text); font-size: 12px;">
+              <option value="all" ${gmReportFilters.modality === 'all' ? 'selected' : ''}>All Modalities</option>
+              <option value="lidar" ${gmReportFilters.modality === 'lidar' ? 'selected' : ''}>Lidar</option>
+              <option value="laneline" ${gmReportFilters.modality === 'laneline' ? 'selected' : ''}>Lane Line</option>
+            </select>
+          </div>
+          <div style="display: flex; gap: 8px; align-items: center; margin-left: auto;">
+            <button class="btn btn-c" id="gmExportCsvBtn" style="padding: 8px 14px; font-size: 12px; font-weight: 600;">↓ Export CSV</button>
+            <button class="btn" id="gmResetBtn" style="padding: 8px 12px; font-size: 12px;">✕ Reset</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Main GM Report Table (Styled strictly matching Image 4) -->
+      <div class="ux-panel" style="padding: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow);">
+        <div style="overflow-x: auto; max-height: 70vh;">
+          <table class="gm-report-table" style="width: 100%; border-collapse: collapse; font-size: 12px; text-align: left;">
+            <thead>
+              <tr style="background: #4a90e2; color: #ffffff; border-bottom: 2px solid #2563eb; position: sticky; top: 0; z-index: 2;">
+                <th style="padding: 10px 8px; width: 50px; text-align: center; border-right: 1px solid rgba(255,255,255,0.2); cursor: pointer;" data-sort="id">#</th>
+                <th style="padding: 10px 14px; min-width: 380px; border-right: 1px solid rgba(255,255,255,0.2); cursor: pointer;" data-sort="queue">Queue</th>
+                <th style="padding: 10px 12px; width: 160px; text-align: center; border-right: 1px solid rgba(255,255,255,0.2); cursor: pointer;" data-sort="fpLabelers">Num Of Labeler (FP)</th>
+                <th style="padding: 10px 12px; width: 190px; text-align: center; border-right: 1px solid rgba(255,255,255,0.2); cursor: pointer;" data-sort="fpTasks">Num of Submitted Tasks (FP)</th>
+                <th style="padding: 10px 12px; width: 160px; text-align: center; border-right: 1px solid rgba(255,255,255,0.2); cursor: pointer;" data-sort="qaLabelers">Num Of Labeler (QA)</th>
+                <th style="padding: 10px 12px; width: 190px; text-align: center; cursor: pointer;" data-sort="qaTasks">Num of Submitted Tasks (QA)</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${displayedQueues.map(item => {
+                const isActive = item.totalTasks > 0;
+                const idxStyle = isActive
+                  ? 'background: #00e676; color: #000000; font-weight: 800;'
+                  : 'background: var(--bg-3); color: var(--text-soft);';
+                return `
+                  <tr style="border-bottom: 1px solid var(--border); transition: background 0.15s;" onmouseover="this.style.background='var(--accent-light)'" onmouseout="this.style.background='transparent'">
+                    <td style="padding: 7px 8px; text-align: center; border-right: 1px solid var(--border); ${idxStyle}">${item.index}</td>
+                    <td style="padding: 7px 14px; font-weight: 600; border-right: 1px solid var(--border); font-family: var(--font); color: var(--text);">${esc(item.queue)}</td>
+                    <td style="padding: 7px 12px; text-align: center; font-weight: 700; border-right: 1px solid var(--border); ${item.fpLabelers > 0 ? 'color: #10b981;' : 'color: var(--muted);'}">${item.fpLabelers.toLocaleString()}</td>
+                    <td style="padding: 7px 12px; text-align: center; font-weight: 700; border-right: 1px solid var(--border); ${item.fpTasks > 0 ? 'color: var(--primary);' : 'color: var(--muted);'}">${item.fpTasks.toLocaleString()}</td>
+                    <td style="padding: 7px 12px; text-align: center; font-weight: 700; border-right: 1px solid var(--border); ${item.qaLabelers > 0 ? 'color: #8b5cf6;' : 'color: var(--muted);'}">${item.qaLabelers.toLocaleString()}</td>
+                    <td style="padding: 7px 12px; text-align: center; font-weight: 700; ${item.qaTasks > 0 ? 'color: #ec4899;' : 'color: var(--muted);'}">${item.qaTasks.toLocaleString()}</td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+            <tfoot>
+              <tr style="background: var(--bg-2); font-weight: 800; border-top: 2px solid var(--border); position: sticky; bottom: 0; z-index: 2;">
+                <td colspan="2" style="padding: 10px 14px; text-align: right; border-right: 1px solid var(--border); letter-spacing: 1px; color: var(--accent);">TOTAL:</td>
+                <td style="padding: 10px 12px; text-align: center; border-right: 1px solid var(--border); color: #10b981; font-size: 13px;">${grandFpLabelers.size.toLocaleString()}</td>
+                <td style="padding: 10px 12px; text-align: center; border-right: 1px solid var(--border); color: var(--primary); font-size: 13px;">${grandTotalFpTasks.toLocaleString()}</td>
+                <td style="padding: 10px 12px; text-align: center; border-right: 1px solid var(--border); color: #8b5cf6; font-size: 13px;">${grandQaLabelers.size.toLocaleString()}</td>
+                <td style="padding: 10px 12px; text-align: center; color: #ec4899; font-size: 13px;">${grandTotalQaTasks.toLocaleString()}</td>
+              </tr>
+            </tfoot>
+          </table>
+          ${!displayedQueues.length ? '<div class="ux-empty" style="padding: 30px; text-align: center;">No queues found matching your filter criteria.</div>' : ''}
+        </div>
+      </div>
+    </div>
+  `;
+
+  bindHeaderControls(page, 'gm');
+
+  const searchInp = page.querySelector('#gmSearchInput');
+  if (searchInp) {
+    searchInp.oninput = (e) => {
+      gmReportFilters.query = e.target.value;
+      renderGmReport();
+      const inp = page.querySelector('#gmSearchInput');
+      if (inp) { inp.focus(); inp.selectionStart = inp.selectionEnd = inp.value.length; }
+    };
+  }
+
+  const shiftSel = page.querySelector('#gmShiftSelect');
+  if (shiftSel) {
+    shiftSel.onchange = (e) => { gmReportFilters.shift = e.target.value; renderGmReport(); };
+  }
+
+  const floorSel = page.querySelector('#gmFloorSelect');
+  if (floorSel) {
+    floorSel.onchange = (e) => { gmReportFilters.floor = e.target.value; renderGmReport(); };
+  }
+
+  const modSel = page.querySelector('#gmModSelect');
+  if (modSel) {
+    modSel.onchange = (e) => { gmReportFilters.modality = e.target.value; renderGmReport(); };
+  }
+
+  const resetBtn = page.querySelector('#gmResetBtn');
+  if (resetBtn) {
+    resetBtn.onclick = () => {
+      Object.assign(gmReportFilters, { query: '', shift: '', floor: '', modality: 'all', from: '', to: '' });
+      renderGmReport();
+    };
+  }
+
+  const exportBtn = page.querySelector('#gmExportCsvBtn');
+  if (exportBtn) {
+    exportBtn.onclick = () => {
+      const headers = ['#', 'Queue', 'Num Of Labeler (FP)', 'Num of Submitted Tasks (FP)', 'Num Of Labeler (QA)', 'Num of Submitted Tasks (QA)'];
+      const rows = displayedQueues.map(q => [q.index, q.queue, q.fpLabelers, q.fpTasks, q.qaLabelers, q.qaTasks]);
+      rows.push(['TOTAL', '', grandFpLabelers.size, grandTotalFpTasks, grandQaLabelers.size, grandTotalQaTasks]);
+      const csv = [headers, ...rows].map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\r\n');
+      downloadBlob(new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' }), 'GM_Report_Queues_' + cairoToday() + '.csv');
+    };
+  }
+
+  page.querySelectorAll('th[data-sort]').forEach(th => {
+    th.onclick = () => {
+      const col = th.dataset.sort;
+      if (gmReportFilters.sortCol === col) gmReportFilters.sortAsc = !gmReportFilters.sortAsc;
+      else { gmReportFilters.sortCol = col; gmReportFilters.sortAsc = true; }
+      renderGmReport();
+    };
+  });
+}
+
+// ============================================================
+// PAGE: SHIFT COMPARISON (Detailed across Floors, QTCs, Labelers)
+// ============================================================
+function renderShiftComparison(){
+  const page = $('uxShiftComparison');
+  if(!page || page.hidden) return;
+
+  const baseRows = rowsInView();
+  const idx = name => hdrs.findIndex(h => h.trim().toLowerCase() === name.toLowerCase());
+  const si = idx('shift');
+  const fi = hdrs.findIndex(h => ['floor', 'unit'].includes(h.trim().toLowerCase()));
+  const qi = idx('qtc name');
+  const li = idx('labeler name');
+  const ni = idx('national id');
+  const mi = idx('modality');
+
+  // Filter base rows
+  const filteredRows = baseRows.filter(r => {
+    const floor = fi >= 0 ? deriveFloor(r[fi]) : 'Unknown';
+    const mod = mi < 0 ? '' : String(r[mi] || '').toLowerCase().replace(/[\s_-]+/g, '');
+    const d = rDate(r);
+
+    if (shiftCompFilters.floor && floor !== shiftCompFilters.floor) return false;
+    if (shiftCompFilters.modality && shiftCompFilters.modality !== 'all') {
+      const isLidar = mod === 'lidar';
+      const isLane = mod === 'laneline' || mod === 'lane';
+      if (shiftCompFilters.modality === 'lidar' && !isLidar) return false;
+      if (shiftCompFilters.modality === 'laneline' && !isLane) return false;
+    }
+    if (shiftCompFilters.from && d && d < shiftCompFilters.from) return false;
+    if (shiftCompFilters.to && d && d > shiftCompFilters.to) return false;
+    return true;
+  });
+
+  const distinctShifts = [...new Set(baseRows.map(r => si >= 0 ? String(r[si] || '').trim() : '').filter(Boolean))].sort();
+  const distinctFloors = [...new Set(baseRows.map(r => fi >= 0 ? deriveFloor(r[fi]) : '').filter(Boolean))].sort();
+
+  // Shift-by-Shift Aggregations
+  const shiftAggs = {};
+  distinctShifts.forEach(sh => {
+    const shRows = filteredRows.filter(r => si >= 0 && String(r[si] || '').trim() === sh);
+    const labSet = new Set();
+    const qtcSet = new Set();
+    let fp = 0, qa = 0;
+    shRows.forEach(r => {
+      const lab = li >= 0 ? String(r[li] || '').trim() : '';
+      if (lab) labSet.add(lab);
+      const qtc = qi >= 0 ? String(r[qi] || '').trim() : '';
+      if (qtc) qtcSet.add(qtc);
+      if (isModPass(r, 'any', 'FP')) fp++;
+      if (isModPass(r, 'any', 'QA')) qa++;
+    });
+    shiftAggs[sh] = {
+      shift: sh,
+      total: shRows.length,
+      fp,
+      qa,
+      labelers: labSet.size,
+      qtcs: qtcSet.size,
+      avgPerLabeler: labSet.size > 0 ? (shRows.length / labSet.size).toFixed(1) : '0'
+    };
+  });
+
+  const activeSubTab = shiftCompFilters.subTab || 'floor';
+  const totalSubmissions = filteredRows.length;
+
+  // TAB 1: Floor (= Unit) Matrix
+  const floorMatrix = [];
+  distinctFloors.forEach(fl => {
+    const flRows = filteredRows.filter(r => fi >= 0 && deriveFloor(r[fi]) === fl);
+    const flTotal = flRows.length;
+    const flLabelers = uniq(flRows, 'Labeler Name') || 0;
+    const flQtcs = uniq(flRows, 'Qtc Name') || 0;
+    const perShift = {};
+    distinctShifts.forEach(sh => {
+      const cellRows = flRows.filter(r => si >= 0 && String(r[si] || '').trim() === sh);
+      perShift[sh] = {
+        total: cellRows.length,
+        labelers: uniq(cellRows, 'Labeler Name') || 0,
+        qtcs: uniq(cellRows, 'Qtc Name') || 0
+      };
+    });
+    floorMatrix.push({
+      floor: fl,
+      total: flTotal,
+      labelers: flLabelers,
+      qtcs: flQtcs,
+      perShift
+    });
+  });
+  floorMatrix.sort((a,b) => b.total - a.total);
+
+  // TAB 2: QTC Supervisor Breakdown
+  const qtcMap = new Map();
+  filteredRows.forEach(r => {
+    const qtc = qi >= 0 ? String(r[qi] || '').normalize('NFC').trim().replace(/\s+/gu, ' ') : '';
+    if (!qtc) return;
+    const sh = si >= 0 ? String(r[si] || '').trim() : 'Unknown';
+    const fl = fi >= 0 ? deriveFloor(r[fi]) : 'Unknown';
+    const key = qtc + '__' + sh;
+    if (!qtcMap.has(key)) {
+      qtcMap.set(key, { qtc, shift: sh, floor: fl, total: 0, fp: 0, qa: 0, labSet: new Set(), queueSet: new Set() });
+    }
+    const item = qtcMap.get(key);
+    item.total++;
+    if (isModPass(r, 'any', 'FP')) item.fp++;
+    if (isModPass(r, 'any', 'QA')) item.qa++;
+    const lab = li >= 0 ? String(r[li] || '').trim() : '';
+    if (lab) item.labSet.add(lab);
+    const qn = idx('queue name') >= 0 ? String(r[idx('queue name')] || '').trim() : '';
+    if (qn) item.queueSet.add(qn);
+  });
+  const qtcRows = [...qtcMap.values()].sort((a,b) => b.total - a.total);
+
+  // TAB 3: Labelers Breakdown
+  const labMap = new Map();
+  filteredRows.forEach(r => {
+    const lab = li >= 0 ? String(r[li] || '').trim() : '';
+    if (!lab) return;
+    const rawId = ni >= 0 ? String(r[ni] || '').trim() : '';
+    const sh = si >= 0 ? String(r[si] || '').trim() : 'Unknown';
+    const fl = fi >= 0 ? deriveFloor(r[fi]) : 'Unknown';
+    const qtc = qi >= 0 ? String(r[qi] || '').trim() : 'Unknown';
+    const d = rDate(r);
+    const key = lab + '__' + sh;
+    if (!labMap.has(key)) {
+      labMap.set(key, { name: lab, rawId, maskedId: maskEmployeeId(rawId, lab), shift: sh, floor: fl, qtc, total: 0, fp: 0, qa: 0, dates: new Set() });
+    }
+    const item = labMap.get(key);
+    item.total++;
+    if (isModPass(r, 'any', 'FP')) item.fp++;
+    if (isModPass(r, 'any', 'QA')) item.qa++;
+    if (d) item.dates.add(d);
+  });
+  const labelerRows = [...labMap.values()].sort((a,b) => b.total - a.total);
+
+  page.innerHTML = `
+    <div class="ux-overview">
+      <div class="ux-heading">
+        <div>
+          <div class="ux-eyebrow">Workforce &amp; Facility Shift Diagnostics</div>
+          <h2>⚖️ Detailed Shift Comparison</h2>
+          <p>Multi-dimensional operational comparison across shifts by Facility Floor (= Unit), QTC Supervisors, and Labelers.</p>
+        </div>
+        ${renderHeaderControlsHTML('sc')}
+      </div>
+
+      <!-- Shift Summary KPI Cards -->
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin-bottom: 20px;">
+        ${distinctShifts.map((sh, idx) => {
+          const sData = shiftAggs[sh] || { total: 0, fp: 0, qa: 0, labelers: 0, qtcs: 0, avgPerLabeler: '0' };
+          const share = totalSubmissions > 0 ? ((sData.total / totalSubmissions) * 100).toFixed(1) : 0;
+          const colors = ['#0d9488', '#ed9a35', '#3b82f6', '#8b5cf6', '#ec4899', '#10b981'];
+          const tone = colors[idx % colors.length];
+          return `
+            <div class="ux-panel" style="border-top: 4px solid ${tone}; padding: 16px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
+                <h3 style="margin:0; font-size: 15px; color:${tone};">⏱️ ${esc(sh)}</h3>
+                <span class="q-badge" style="background:${tone}22; color:${tone}; font-weight:700;">${share}% share</span>
+              </div>
+              <div style="font-size: 24px; font-weight: 800; color: var(--text); margin-bottom: 6px;">${sData.total.toLocaleString()} <span style="font-size:12px; font-weight:500; color:var(--text-soft);">tasks</span></div>
+              <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 11px; color: var(--text-soft); background: var(--bg-2); padding: 8px; border-radius: 8px;">
+                <div><b>FP:</b> ${sData.fp.toLocaleString()}</div>
+                <div><b>QA:</b> ${sData.qa.toLocaleString()}</div>
+                <div><b>Labelers:</b> ${sData.labelers}</div>
+                <div><b>QTCs:</b> ${sData.qtcs}</div>
+              </div>
+              <div style="margin-top: 8px; font-size: 11px; color: var(--muted); text-align: right;">Avg: <b>${sData.avgPerLabeler}</b> tasks/labeler</div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+
+      <!-- Navigation Sub-Tabs & Filter Bar -->
+      <div class="ux-panel" style="padding: 14px 18px; margin-bottom: 18px;">
+        <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px;">
+          <!-- Tabs -->
+          <div style="display: flex; gap: 6px; background: var(--bg-2); padding: 4px; border-radius: 10px; border: 1px solid var(--border);">
+            <button class="btn ${activeSubTab === 'floor' ? 'btn-c' : ''}" id="scTabFloor" style="padding: 6px 14px; font-size: 12px; font-weight: 600;">🏢 Floor (= Unit) Breakdown</button>
+            <button class="btn ${activeSubTab === 'qtc' ? 'btn-c' : ''}" id="scTabQtc" style="padding: 6px 14px; font-size: 12px; font-weight: 600;">👥 QTC Supervisors</button>
+            <button class="btn ${activeSubTab === 'labelers' ? 'btn-c' : ''}" id="scTabLabelers" style="padding: 6px 14px; font-size: 12px; font-weight: 600;">👤 Labelers Breakdown</button>
+            <button class="btn ${activeSubTab === 'chart' ? 'btn-c' : ''}" id="scTabChart" style="padding: 6px 14px; font-size: 12px; font-weight: 600;">📊 Shift Volume Chart</button>
+          </div>
+          <!-- Quick filters & export -->
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <select id="scFloorSelect" style="padding: 7px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-3); color: var(--text); font-size: 12px;">
+              <option value="">All Floors (Units)</option>
+              ${distinctFloors.map(f => `<option value="${esc(f)}" ${shiftCompFilters.floor === f ? 'selected' : ''}>${esc(f)}</option>`).join('')}
+            </select>
+            <button class="btn btn-c" id="scExportBtn" style="padding: 7px 14px; font-size: 12px; font-weight: 600;">↓ Export CSV</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- SUB-TAB CONTENT -->
+      ${activeSubTab === 'floor' ? `
+        <!-- TAB 1: Floor Comparison Matrix -->
+        <div class="ux-panel" style="padding: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 12px;">
+          <div style="padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+            <h3 style="margin:0;">🏢 Floor (= Unit) Production by Shift</h3>
+            <span class="ux-note">Direct comparison of operational units across shifts</span>
+          </div>
+          <div style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 12px; text-align: left;">
+              <thead>
+                <tr style="background: var(--bg-2); border-bottom: 1px solid var(--border);">
+                  <th style="padding: 10px 14px;">Floor / Unit</th>
+                  ${distinctShifts.map(sh => `<th style="padding: 10px 12px; text-align: center;">${esc(sh)} Tasks</th><th style="padding: 10px 12px; text-align: center; color: var(--text-soft); font-size: 11px;">Labelers</th>`).join('')}
+                  <th style="padding: 10px 14px; text-align: center;">Total Submits</th>
+                  <th style="padding: 10px 14px; text-align: center;">Floor Share %</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${floorMatrix.map(item => {
+                  const pct = totalSubmissions > 0 ? ((item.total / totalSubmissions) * 100).toFixed(1) : 0;
+                  return `
+                    <tr style="border-bottom: 1px solid var(--border);" onmouseover="this.style.background='var(--accent-light)'" onmouseout="this.style.background='transparent'">
+                      <td style="padding: 10px 14px; font-weight: 700; color: var(--accent);"><span style="display:flex; align-items:center; gap:6px;">🏢 ${esc(item.floor)}</span></td>
+                      ${distinctShifts.map(sh => {
+                        const cell = item.perShift[sh] || { total: 0, labelers: 0 };
+                        return `
+                          <td style="padding: 10px 12px; text-align: center; font-weight: 700; ${cell.total > 0 ? 'color: var(--primary);' : 'color: var(--muted);'}">${cell.total.toLocaleString()}</td>
+                          <td style="padding: 10px 12px; text-align: center; color: var(--text-soft); font-size: 11px;">${cell.labelers}</td>
+                        `;
+                      }).join('')}
+                      <td style="padding: 10px 14px; text-align: center; font-weight: 800; color: var(--text);">${item.total.toLocaleString()}</td>
+                      <td style="padding: 10px 14px; text-align: center;">
+                        <div style="display:flex; align-items:center; justify-content:center; gap:6px;">
+                          <div style="width: 50px; height: 6px; border-radius: 3px; background: var(--border); overflow:hidden;">
+                            <div style="width:${pct}%; height:100%; background: var(--primary);"></div>
+                          </div>
+                          <b>${pct}%</b>
+                        </div>
+                      </td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+            ${!floorMatrix.length ? '<div class="ux-empty" style="padding: 24px; text-align:center;">No floor records found.</div>' : ''}
+          </div>
+        </div>
+      ` : activeSubTab === 'qtc' ? `
+        <!-- TAB 2: QTC Supervisors Comparison -->
+        <div class="ux-panel" style="padding: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 12px;">
+          <div style="padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+            <h3 style="margin:0;">👥 QTC Supervisor Performance Across Shifts</h3>
+            <span class="ux-note">Team sizes, queue coverage, and volume per shift</span>
+          </div>
+          <div style="overflow-x: auto; max-height: 60vh;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 12px; text-align: left;">
+              <thead>
+                <tr style="background: var(--bg-2); border-bottom: 1px solid var(--border); position: sticky; top:0; z-index:1;">
+                  <th style="padding: 10px 14px;">QTC Supervisor</th>
+                  <th style="padding: 10px 12px;">Shift</th>
+                  <th style="padding: 10px 12px;">Floor (Unit)</th>
+                  <th style="padding: 10px 12px; text-align: center;">Team Size (Labelers)</th>
+                  <th style="padding: 10px 12px; text-align: center;">Queues Covered</th>
+                  <th style="padding: 10px 12px; text-align: center;">FP Tasks</th>
+                  <th style="padding: 10px 12px; text-align: center;">QA Tasks</th>
+                  <th style="padding: 10px 14px; text-align: center;">Total Submits</th>
+                  <th style="padding: 10px 12px; text-align: center;">Avg / Labeler</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${qtcRows.map(item => {
+                  const avg = item.labSet.size > 0 ? (item.total / item.labSet.size).toFixed(1) : '0';
+                  return `
+                    <tr style="border-bottom: 1px solid var(--border);" onmouseover="this.style.background='var(--accent-light)'" onmouseout="this.style.background='transparent'">
+                      <td style="padding: 9px 14px; font-weight: 700; color: var(--primary);">👤 ${esc(item.qtc)}</td>
+                      <td style="padding: 9px 12px;"><span class="q-badge q-shift">${esc(item.shift)}</span></td>
+                      <td style="padding: 9px 12px;">${esc(item.floor)}</td>
+                      <td style="padding: 9px 12px; text-align: center; font-weight: 700;">${item.labSet.size}</td>
+                      <td style="padding: 9px 12px; text-align: center;">${item.queueSet.size}</td>
+                      <td style="padding: 9px 12px; text-align: center; color: #10b981;">${item.fp.toLocaleString()}</td>
+                      <td style="padding: 9px 12px; text-align: center; color: #8b5cf6;">${item.qa.toLocaleString()}</td>
+                      <td style="padding: 9px 14px; text-align: center; font-weight: 800; font-size: 13px; color: var(--text);">${item.total.toLocaleString()}</td>
+                      <td style="padding: 9px 12px; text-align: center; font-weight: 600;">${avg}</td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+            ${!qtcRows.length ? '<div class="ux-empty" style="padding: 24px; text-align:center;">No supervisor records found.</div>' : ''}
+          </div>
+        </div>
+      ` : activeSubTab === 'labelers' ? `
+        <!-- TAB 3: Labelers Breakdown -->
+        <div class="ux-panel" style="padding: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 12px;">
+          <div style="padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+            <h3 style="margin:0;">👤 Individual Labeler Output by Shift</h3>
+            <span class="ux-note">Showing ${labelerRows.length.toLocaleString()} active labelers across shifts</span>
+          </div>
+          <div style="overflow-x: auto; max-height: 60vh;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 12px; text-align: left;">
+              <thead>
+                <tr style="background: var(--bg-2); border-bottom: 1px solid var(--border); position: sticky; top:0; z-index:1;">
+                  <th style="padding: 10px 14px;">Labeler Name</th>
+                  <th style="padding: 10px 12px;">ID</th>
+                  <th style="padding: 10px 12px;">Shift</th>
+                  <th style="padding: 10px 12px;">Floor (Unit)</th>
+                  <th style="padding: 10px 12px;">QTC Supervisor</th>
+                  <th style="padding: 10px 12px; text-align: center;">FP Tasks</th>
+                  <th style="padding: 10px 12px; text-align: center;">QA Tasks</th>
+                  <th style="padding: 10px 14px; text-align: center;">Total Tasks</th>
+                  <th style="padding: 10px 12px; text-align: center;">Active Days</th>
+                  <th style="padding: 10px 12px; text-align: center;">Avg / Day</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${labelerRows.slice(0, 100).map(item => {
+                  const avg = item.dates.size > 0 ? (item.total / item.dates.size).toFixed(1) : item.total;
+                  return `
+                    <tr style="border-bottom: 1px solid var(--border);" onmouseover="this.style.background='var(--accent-light)'" onmouseout="this.style.background='transparent'">
+                      <td style="padding: 8px 14px; font-weight: 700; color: var(--text);">${esc(item.name)}</td>
+                      <td style="padding: 8px 12px;"><span class="q-badge" style="font-family:var(--mono);">${esc(item.maskedId)}</span></td>
+                      <td style="padding: 8px 12px;"><span class="q-badge q-shift">${esc(item.shift)}</span></td>
+                      <td style="padding: 8px 12px;">${esc(item.floor)}</td>
+                      <td style="padding: 8px 12px; color: var(--text-soft);">${esc(item.qtc)}</td>
+                      <td style="padding: 8px 12px; text-align: center; color: #10b981;">${item.fp.toLocaleString()}</td>
+                      <td style="padding: 8px 12px; text-align: center; color: #8b5cf6;">${item.qa.toLocaleString()}</td>
+                      <td style="padding: 8px 14px; text-align: center; font-weight: 800; color: var(--primary);">${item.total.toLocaleString()}</td>
+                      <td style="padding: 8px 12px; text-align: center;">${item.dates.size}</td>
+                      <td style="padding: 8px 12px; text-align: center; font-weight: 600;">${avg}</td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+            ${labelerRows.length > 100 ? `<div style="padding: 10px 18px; text-align: center; color: var(--muted); font-size: 11px;">Showing top 100 labelers of ${labelerRows.length.toLocaleString()}. Use CSV export for full dataset.</div>` : ''}
+            ${!labelerRows.length ? '<div class="ux-empty" style="padding: 24px; text-align:center;">No labeler records found.</div>' : ''}
+          </div>
+        </div>
+      ` : `
+        <!-- TAB 4: Shift Comparison Chart -->
+        <div class="ux-panel" style="padding: 20px;">
+          <h3 style="margin-top:0;">📊 Shift Productivity Distribution by Floor (Unit)</h3>
+          <p>Visual comparison of shift throughput across operational floors.</p>
+          <div style="display: flex; flex-direction: column; gap: 14px; margin-top: 20px;">
+            ${floorMatrix.map(flItem => {
+              return `
+                <div style="background: var(--bg-2); padding: 12px 16px; border-radius: 10px; border: 1px solid var(--border);">
+                  <div style="display:flex; justify-content:space-between; margin-bottom: 8px; font-weight: 700;">
+                    <span>🏢 ${esc(flItem.floor)}</span>
+                    <span>${flItem.total.toLocaleString()} tasks</span>
+                  </div>
+                  <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    ${distinctShifts.map((sh, sIdx) => {
+                      const count = flItem.perShift[sh]?.total || 0;
+                      const colors = ['#0d9488', '#ed9a35', '#3b82f6', '#8b5cf6', '#ec4899', '#10b981'];
+                      const c = colors[sIdx % colors.length];
+                      const pct = flItem.total > 0 ? ((count / flItem.total) * 100).toFixed(0) : 0;
+                      return `
+                        <div style="flex: 1; min-width: 110px; background: var(--bg-3); padding: 8px 10px; border-radius: 8px; border-left: 3px solid ${c};">
+                          <div style="font-size: 11px; color: var(--text-soft);">${esc(sh)}</div>
+                          <div style="font-size: 14px; font-weight: 800; color: ${c}; margin-top: 2px;">${count.toLocaleString()} <span style="font-size:10px; color:var(--muted);">(${pct}%)</span></div>
+                        </div>
+                      `;
+                    }).join('')}
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      `}
+    </div>
+  `;
+
+  bindHeaderControls(page, 'sc');
+
+  page.querySelector('#scTabFloor')?.addEventListener('click', () => { shiftCompFilters.subTab = 'floor'; renderShiftComparison(); });
+  page.querySelector('#scTabQtc')?.addEventListener('click', () => { shiftCompFilters.subTab = 'qtc'; renderShiftComparison(); });
+  page.querySelector('#scTabLabelers')?.addEventListener('click', () => { shiftCompFilters.subTab = 'labelers'; renderShiftComparison(); });
+  page.querySelector('#scTabChart')?.addEventListener('click', () => { shiftCompFilters.subTab = 'chart'; renderShiftComparison(); });
+
+  const floorSel = page.querySelector('#scFloorSelect');
+  if (floorSel) {
+    floorSel.onchange = (e) => { shiftCompFilters.floor = e.target.value; renderShiftComparison(); };
+  }
+
+  const expBtn = page.querySelector('#scExportBtn');
+  if (expBtn) {
+    expBtn.onclick = () => {
+      let headers = [], dataRows = [];
+      if (activeSubTab === 'floor') {
+        headers = ['Floor', ...distinctShifts.map(s => s + ' Tasks'), 'Total Submissions'];
+        dataRows = floorMatrix.map(f => [f.floor, ...distinctShifts.map(s => f.perShift[s]?.total || 0), f.total]);
+      } else if (activeSubTab === 'qtc') {
+        headers = ['QTC Supervisor', 'Shift', 'Floor', 'Team Size', 'Queues Covered', 'FP Tasks', 'QA Tasks', 'Total Submissions'];
+        dataRows = qtcRows.map(q => [q.qtc, q.shift, q.floor, q.labSet.size, q.queueSet.size, q.fp, q.qa, q.total]);
+      } else {
+        headers = ['Labeler Name', 'Employee ID', 'Shift', 'Floor', 'QTC Supervisor', 'FP Tasks', 'QA Tasks', 'Total Tasks', 'Active Days'];
+        dataRows = labelerRows.map(l => [l.name, l.maskedId, l.shift, l.floor, l.qtc, l.fp, l.qa, l.total, l.dates.size]);
+      }
+      const csv = [headers, ...dataRows].map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\r\n');
+      downloadBlob(new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' }), `Shift_Comparison_${activeSubTab}_${cairoToday()}.csv`);
+    };
+  }
+}
+
 function qtcFloorAggregateData(rows){
  const idx=name=>hdrs.findIndex(h=>h.trim().toLowerCase()===name.toLowerCase());
  const qi=idx('qtc name'), fi=hdrs.findIndex(h=>['floor','unit'].includes(h.trim().toLowerCase()));
@@ -3661,7 +4376,7 @@ function renderQtcFloorPerformance(){
   const pi = idx('pass');
 
   const distinctQtcs = [...new Set(baseRows.map(r => qi >= 0 ? String(r[qi] || '').normalize('NFC').trim().replace(/\s+/gu, ' ') : '').filter(Boolean))].sort();
-  const distinctFloors = ['Floor 01', 'Floor 02', 'Floor 03', 'Floor 04'];
+  const distinctFloors = [...new Set(baseRows.map(r => fi >= 0 ? deriveFloor(r[fi]) : '').filter(Boolean))].sort();
   const distinctShifts = [...new Set(baseRows.map(r => si >= 0 ? String(r[si] || '').trim() : '').filter(Boolean))].sort();
 
   // Filter baseRows by page filters
@@ -3721,16 +4436,16 @@ function renderQtcFloorPerformance(){
   const avgSubmitsPerQtcTeam = totalActiveQtcs > 0 ? (totalSubmissions / totalActiveQtcs).toFixed(1) : '0';
   const avgLabelersPerQtc = totalActiveQtcs > 0 ? (totalActiveLabelers / totalActiveQtcs).toFixed(1) : '0';
   const totalQaReviewVolume = filteredRows.filter(r => isModPass(r, 'lidar', 'QA') || isModPass(r, 'laneline', 'QA')).length;
-  const avgFloorProductivity = (totalSubmissions / 4).toFixed(0);
+  const avgFloorProductivity = totalFloorsCount > 0 ? (totalSubmissions / totalFloorsCount).toFixed(0) : '0';
 
-  // Heatmap Matrix: Floor (Floor 01-04) x Shift
+  // Heatmap Matrix: Floor (Unit) x Shift
   const heatmapData = {};
   distinctFloors.forEach(fl => {
     heatmapData[fl] = {};
     distinctShifts.forEach(sh => { heatmapData[fl][sh] = 0; });
   });
   filteredRows.forEach(r => {
-    const fl = fi >= 0 ? deriveFloor(r[fi]) : 'Floor 01';
+    const fl = fi >= 0 ? deriveFloor(r[fi]) : 'Unknown';
     const sh = si >= 0 ? String(r[si] || '').trim() : '';
     if (heatmapData[fl] && sh) {
       heatmapData[fl][sh] = (heatmapData[fl][sh] || 0) + 1;
@@ -3741,7 +4456,7 @@ function renderQtcFloorPerformance(){
   const kpi8 = [
     { title: 'Total Active QTCs', val: totalActiveQtcs.toLocaleString(), sub: 'Supervising reviewers', tone: '#df8b24' },
     { title: 'Total Active Labelers', val: totalActiveLabelers.toLocaleString(), sub: 'Supervised workforce', tone: '#0a9d8c' },
-    { title: 'Operational Floors', val: '4 Floors', sub: 'Floor 01, 02, 03, 04', tone: '#3b82f6' },
+    { title: 'Operational Floors (Units)', val: totalFloorsCount + ' Units', sub: distinctFloors.slice(0, 2).join(', ') + (distinctFloors.length > 2 ? '...' : ''), tone: '#3b82f6' },
     { title: 'Total Submissions', val: totalSubmissions.toLocaleString(), sub: 'Workforce output', tone: '#0d9488' },
     { title: 'Avg Submissions / QTC Team', val: avgSubmitsPerQtcTeam, sub: 'Team throughput', tone: '#8b5cf6' },
     { title: 'Avg Labelers / QTC', val: avgLabelersPerQtc, sub: 'Team capacity', tone: '#10b981' },
@@ -3872,7 +4587,7 @@ function renderQtcFloorPerformance(){
     // TABLE 2: FLOOR PERFORMANCE TABLE
     + '<section class="ux-panel" style="margin-top:20px;">'
       + '<div class="ux-heading" style="margin-bottom:12px;">'
-        + '<div><h3>Floor Performance Analysis (Floor 01 – Floor 04)</h3><p>Production, capacity, and workforce distribution per facility floor.</p></div>'
+        + '<div><h3>Floor Performance Analysis (Units)</h3><p>Production, capacity, and workforce distribution per operational floor unit.</p></div>'
         + '<button class="btn btn-c" id="floorExportCSV">↓ Export Floor CSV</button>'
       + '</div>'
       + '<div class="perf-table">'
@@ -4021,6 +4736,8 @@ renderAllSections=function(){
   renderOverview();
   renderAnalysis();
   renderQueuesAnalysis();
+  renderGmReport();
+  renderShiftComparison();
   renderPerformance();
   renderQtcFloorPerformance();
   renderDailyReport();
@@ -4056,13 +4773,8 @@ try{
 
 
 
-renderOverview();
+route();
 renderSharedPeriods();
-if(location.hash==='#queues-analysis'&&typeof renderQueuesAnalysis==='function')renderQueuesAnalysis();
-else if(location.hash==='#analysis-overview'&&typeof renderAnalysis==='function')renderAnalysis();
-else if(location.hash==='#performance-labelers'&&typeof renderPerformance==='function')renderPerformance();
-else if(location.hash==='#performance-qtc-floor'&&typeof renderQtcFloorPerformance==='function')renderQtcFloorPerformance();
-else if(location.hash==='#daily-report'&&typeof renderDailyReport==='function')renderDailyReport();
 })();
 
 
