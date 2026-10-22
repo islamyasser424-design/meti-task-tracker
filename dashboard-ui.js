@@ -3989,14 +3989,36 @@ function renderGmReport(){
     });
 
     let totalFp = 0, totalQa = 0, missing = 0;
+    let lidarFp = 0, lidarQa = 0;
+    let laneFp = 0, laneQa = 0;
+    let relabelFp = 0, relabelQa = 0;
     const fpIds = new Set(), qaIds = new Set();
+
     groups.forEach(g => {
       totalFp += g.fp;
       totalQa += g.qa;
       g.fpIds.forEach(id => fpIds.add(id));
       g.qaIds.forEach(id => qaIds.add(id));
       missing += g.missing;
+
+      const mLower = String(g.mod || '').toLowerCase().replace(/[\s_-]+/g, '');
+      if (mLower === 'lidar') {
+        lidarFp += g.fp;
+        lidarQa += g.qa;
+      } else if (mLower === 'laneline' || mLower === 'lane') {
+        laneFp += g.fp;
+        laneQa += g.qa;
+      }
+
+      if (g.isRelabel) {
+        relabelFp += g.fp;
+        relabelQa += g.qa;
+      }
     });
+
+    const lidarTotal = lidarFp + lidarQa;
+    const laneTotal = laneFp + laneQa;
+    const relabelTotal = relabelFp + relabelQa;
 
     return {
       meta,
@@ -4007,6 +4029,15 @@ function renderGmReport(){
       totalSubmits: totalFp + totalQa,
       uniqueFp: fpIds.size,
       uniqueQa: qaIds.size,
+      lidarFp,
+      lidarQa,
+      lidarTotal,
+      laneFp,
+      laneQa,
+      laneTotal,
+      relabelFp,
+      relabelQa,
+      relabelTotal,
       missing
     };
   });
@@ -4059,18 +4090,61 @@ function renderGmReport(){
           ${shiftReports.map(rep => {
             const share = grand24hSubmits > 0 ? ((rep.totalSubmits / grand24hSubmits) * 100).toFixed(1) : 0;
             return `
-              <div class="ux-panel" style="padding:12px 16px; border-left:4px solid ${rep.meta.tone}; background:var(--bg-2);">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                  <span style="font-size:13px; font-weight:700; color:${rep.meta.tone};">${rep.meta.icon} ${rep.meta.name}</span>
-                  <span class="q-badge" style="background:${rep.meta.tone}22; color:${rep.meta.tone}; font-weight:700;">${share}% share</span>
+              <div class="ux-panel" style="padding:14px 18px; border-left:4px solid ${rep.meta.tone}; background:var(--bg-2); display:flex; flex-direction:column; justify-content:space-between;">
+                <div>
+                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                    <span style="font-size:13px; font-weight:700; color:${rep.meta.tone};">${rep.meta.icon} ${rep.meta.name}</span>
+                    <span class="q-badge" style="background:${rep.meta.tone}22; color:${rep.meta.tone}; font-weight:700;">${share}% share</span>
+                  </div>
+                  <div style="font-size:22px; font-weight:800; color:var(--text); margin-bottom:4px;">
+                    ${rep.totalSubmits.toLocaleString()} <span style="font-size:11px; font-weight:500; color:var(--text-soft);">tasks</span>
+                  </div>
+                  <div style="font-size:11px; color:var(--text-soft); display:flex; justify-content:space-between; margin-bottom:10px;">
+                    <span>FP: <b class="highlight-fp">${rep.totalFp.toLocaleString()}</b></span>
+                    <span>QA: <b class="highlight-qa">${rep.totalQa.toLocaleString()}</b></span>
+                    <span>Queues: <b>${rep.groups.length}</b></span>
+                  </div>
                 </div>
-                <div style="font-size:20px; font-weight:800; color:var(--text); margin-bottom:4px;">
-                  ${rep.totalSubmits.toLocaleString()} <span style="font-size:11px; font-weight:500; color:var(--text-soft);">tasks</span>
-                </div>
-                <div style="font-size:11px; color:var(--text-soft); display:flex; justify-content:space-between;">
-                  <span>FP: <b>${rep.totalFp.toLocaleString()}</b></span>
-                  <span>QA: <b>${rep.totalQa.toLocaleString()}</b></span>
-                  <span>Queues: <b>${rep.groups.length}</b></span>
+
+                <!-- Modality Breakdown (Lidar FP/QA, Lane Line FP/QA, Relabeling FP/QA) -->
+                <div class="gm-shift-mod-breakdown">
+                  <div class="gm-mod-breakdown-row">
+                    <span class="gm-mod-pill-tag">
+                      <span class="daily-mod daily-lidar">📡 Lidar</span>
+                      <span class="gm-mod-mini-tot">(${rep.lidarTotal.toLocaleString()})</span>
+                    </span>
+                    <span class="gm-mod-stat-values">
+                      <span class="stat-fp">FP: <b>${rep.lidarFp.toLocaleString()}</b></span>
+                      <span class="stat-sep">|</span>
+                      <span class="stat-qa">QA: <b>${rep.lidarQa.toLocaleString()}</b></span>
+                    </span>
+                  </div>
+
+                  <div class="gm-mod-breakdown-row">
+                    <span class="gm-mod-pill-tag">
+                      <span class="daily-mod daily-lane">🛣️ Lane Line</span>
+                      <span class="gm-mod-mini-tot">(${rep.laneTotal.toLocaleString()})</span>
+                    </span>
+                    <span class="gm-mod-stat-values">
+                      <span class="stat-fp">FP: <b>${rep.laneFp.toLocaleString()}</b></span>
+                      <span class="stat-sep">|</span>
+                      <span class="stat-qa">QA: <b>${rep.laneQa.toLocaleString()}</b></span>
+                    </span>
+                  </div>
+
+                  ${rep.relabelTotal > 0 ? `
+                  <div class="gm-mod-breakdown-row" style="background:rgba(245, 158, 11, 0.08); border-color:rgba(245, 158, 11, 0.25);">
+                    <span class="gm-mod-pill-tag">
+                      <span class="daily-mod daily-relabel">🔄 Relabeling</span>
+                      <span class="gm-mod-mini-tot">(${rep.relabelTotal.toLocaleString()})</span>
+                    </span>
+                    <span class="gm-mod-stat-values">
+                      <span class="stat-fp">FP: <b>${rep.relabelFp.toLocaleString()}</b></span>
+                      <span class="stat-sep">|</span>
+                      <span class="stat-qa">QA: <b>${rep.relabelQa.toLocaleString()}</b></span>
+                    </span>
+                  </div>
+                  ` : ''}
                 </div>
               </div>
             `;
@@ -4179,7 +4253,12 @@ function renderGmReport(){
                 <tfoot>
                   <tr class="daily-total-row">
                     <td style="padding:14px 18px; font-weight:800; color:var(--text);">
-                      TOTAL ${rep.meta.name} (${rep.groups.length} active queues):
+                      <div>TOTAL ${rep.meta.name} (${rep.groups.length} active queues):</div>
+                      <div style="font-size:11px; font-weight:600; color:var(--text-soft); margin-top:4px; display:flex; flex-wrap:wrap; gap:12px;">
+                        <span>📡 Lidar: <b style="color:#38bdf8;">FP ${rep.lidarFp.toLocaleString()}</b> | <b style="color:#34d399;">QA ${rep.lidarQa.toLocaleString()}</b></span>
+                        <span>🛣️ Lane Line: <b style="color:#38bdf8;">FP ${rep.laneFp.toLocaleString()}</b> | <b style="color:#34d399;">QA ${rep.laneQa.toLocaleString()}</b></span>
+                        ${rep.relabelTotal > 0 ? `<span>🔄 Relabeling: <b style="color:#38bdf8;">FP ${rep.relabelFp.toLocaleString()}</b> | <b style="color:#34d399;">QA ${rep.relabelQa.toLocaleString()}</b></span>` : ''}
+                      </div>
                     </td>
                     <td class="daily-num-cell"><b>${rep.uniqueFp.toLocaleString()}</b></td>
                     <td class="daily-num-cell highlight-fp"><b>${rep.totalFp.toLocaleString()}</b></td>
