@@ -7,6 +7,27 @@ let protectedOptions=null;
 const escHtml = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const esc = window.esc || escHtml;
 
+function cairoToday() {
+  if (typeof window.cairoToday === 'function') return window.cairoToday();
+  try {
+    return new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Cairo' });
+  } catch(e) {
+    const n = new Date();
+    return n.getFullYear() + '-' + String(n.getMonth()+1).padStart(2,'0') + '-' + String(n.getDate()).padStart(2,'0');
+  }
+}
+
+function _addDays(d, n) {
+  if (typeof window._addDays === 'function') return window._addDays(d, n);
+  try {
+    const dt = new Date(d + 'T12:00:00');
+    dt.setDate(dt.getDate() + n);
+    return dt.toISOString().substring(0, 10);
+  } catch(e) {
+    return d;
+  }
+}
+
 const MeegTooltip = (function(){
  let el = null;
  function init(){
@@ -486,31 +507,53 @@ const isUnified=!!document.getElementById('mainSidebar');
 const panelAnalytics=document.getElementById('panelAnalytics');
 const targetContainer=panelAnalytics || document.body;
 
-const root=document.createElement('div');root.id='uxDashboard';
-const start=document.querySelector('.hdr') || (panelAnalytics ? panelAnalytics.querySelector('#syncBar') : $('syncBar'));
-const end=$('mainContent');
-if(start && end){
-  let n=start;
-  while(n){
-    const next=n.nextSibling;
-    root.appendChild(n);
-    if(n===end)break;
-    n=next;
-  }
-}
-targetContainer.appendChild(root);
+// Hide legacy DOM elements completely from view
+document.querySelectorAll('#shiftBanner, #fstrip, .pills-row, #locTabs, #mainContent, #cmpBar').forEach(el => {
+  el.style.setProperty('display', 'none', 'important');
+  el.classList.add('legacy-analytics-hidden');
+});
 
-const overview=document.createElement('section');overview.className='ux-overview';overview.id='uxOverview';
-if($('syncBar')) $('syncBar').after(overview);
-else root.prepend(overview);
+const overview=document.createElement('section');
+overview.className='ux-overview ux-workspace-page';
+overview.id='uxOverview';
+targetContainer.appendChild(overview);
 
-const analysis=document.createElement('section');analysis.id='uxAnalysis';analysis.hidden=true;analysis.innerHTML='<div class="ux-placeholder"><span class="ux-symbol" aria-hidden="true">◈</span><div class="ux-eyebrow" style="margin-top:24px">Your next workspace</div><h1>Analysis</h1><p>This space is ready for your analysis.<br>Metrics, charts and workflows will be added once you define them.</p><button class="btn btn-c" id="uxBack" style="margin-top:24px">Back to dashboard →</button></div>';
+const analysis=document.createElement('section');
+analysis.id='uxAnalysis';
+analysis.className='ux-workspace-page';
+analysis.hidden=true;
+analysis.style.display='none';
 targetContainer.appendChild(analysis);
 
-const performance=document.createElement('section');performance.id='uxPerformance';performance.hidden=true;targetContainer.appendChild(performance);
-const dailyPage=document.createElement('section');dailyPage.id='uxDaily';dailyPage.hidden=true;targetContainer.appendChild(dailyPage);
-const queuesPage=document.createElement('section');queuesPage.id='uxQueues';queuesPage.hidden=true;targetContainer.appendChild(queuesPage);
-const qtcFloorPage=document.createElement('section');qtcFloorPage.id='uxQtcFloor';qtcFloorPage.hidden=true;targetContainer.appendChild(qtcFloorPage);
+const performance=document.createElement('section');
+performance.id='uxPerformance';
+performance.className='ux-workspace-page';
+performance.hidden=true;
+performance.style.display='none';
+targetContainer.appendChild(performance);
+
+const dailyPage=document.createElement('section');
+dailyPage.id='uxDaily';
+dailyPage.className='ux-workspace-page';
+dailyPage.hidden=true;
+dailyPage.style.display='none';
+targetContainer.appendChild(dailyPage);
+
+const queuesPage=document.createElement('section');
+queuesPage.id='uxQueues';
+queuesPage.className='ux-workspace-page';
+queuesPage.hidden=true;
+queuesPage.style.display='none';
+targetContainer.appendChild(queuesPage);
+
+const qtcFloorPage=document.createElement('section');
+qtcFloorPage.id='uxQtcFloor';
+qtcFloorPage.className='ux-workspace-page';
+qtcFloorPage.hidden=true;
+qtcFloorPage.style.display='none';
+targetContainer.appendChild(qtcFloorPage);
+
+const root=overview;
 
 const aside=document.createElement('aside');aside.className='ux-sidebar';aside.setAttribute('aria-label','Main navigation');aside.innerHTML='<div class="ux-brand"><div class="brand-logo-card"><img src="logo.jpg" alt="MEEG - Micro Engineering Egypt" class="brand-img"></div><span class="brand-workspace-tag">PRODUCTIVITY WORKSPACE</span></div><small>WORKSPACE</small><button class="ux-nav active" data-page="dashboard">▦ &nbsp; Overview</button><button class="ux-nav" data-page="analysis">◈ &nbsp; Analysis</button><button class="ux-nav" data-page="queues">☷ &nbsp; Queues Analysis</button><button class="ux-nav" data-page="performance">▤ &nbsp; Performance per Labelers</button><button class="ux-nav" data-page="qtcfloor">🏢 &nbsp; Performance per QTC & Floor</button><button class="ux-nav" data-page="daily">▦ &nbsp; Daily Report</button><footer>Connected to your existing data<br><span style="display:block;margin-top:8px">MEEG · Internal Dashboard</span></footer>';
 if (isUnified) {
@@ -519,25 +562,54 @@ if (isUnified) {
 document.body.appendChild(aside);
 
 const menu=document.createElement('button');menu.className='btn ux-mobile';menu.textContent='☰ Menu';menu.setAttribute('aria-expanded','false');menu.setAttribute('aria-label','Open navigation');
-if (isUnified) menu.style.display = 'none';
-document.body.insertBefore(menu,root);
+if (isUnified) {
+  menu.style.display = 'none';
+} else {
+  document.body.prepend(menu);
+}
 
 const backdrop=document.createElement('button');backdrop.className='ux-backdrop';backdrop.setAttribute('aria-label','Close navigation');
-if (isUnified) backdrop.style.display = 'none';
-document.body.appendChild(backdrop);
+if (isUnified) {
+  backdrop.style.display = 'none';
+} else {
+  document.body.appendChild(backdrop);
+}
 
 function closeNav(){document.body.classList.remove('ux-sidebar-open');menu.setAttribute('aria-expanded','false');}
 menu.onclick=()=>{const open=document.body.classList.toggle('ux-sidebar-open');menu.setAttribute('aria-expanded',String(open));if(open)aside.querySelector('button').focus();};backdrop.onclick=closeNav;
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeNav();menu.focus();}});
 
 function route(){
-  const current=location.hash==='#analysis-overview'?'analysis':location.hash==='#queues-analysis'?'queues':location.hash==='#performance-labelers'?'performance':location.hash==='#performance-qtc-floor'?'qtcfloor':location.hash==='#daily-report'?'daily':'dashboard';
-  root.hidden=current!=='dashboard';
-  analysis.hidden=current!=='analysis';
-  queuesPage.hidden=current!=='queues';
-  performance.hidden=current!=='performance';
-  qtcFloorPage.hidden=current!=='qtcfloor';
-  dailyPage.hidden=current!=='daily';
+  const hash = location.hash || '#dashboard';
+  const current = hash === '#analysis-overview' ? 'analysis'
+                : hash === '#queues-analysis' ? 'queues'
+                : hash === '#performance-labelers' ? 'performance'
+                : hash === '#performance-qtc-floor' ? 'qtcfloor'
+                : hash === '#daily-report' ? 'daily'
+                : 'dashboard';
+
+  overview.hidden = (current !== 'dashboard');
+  overview.style.display = (current === 'dashboard') ? 'block' : 'none';
+
+  analysis.hidden = (current !== 'analysis');
+  analysis.style.display = (current === 'analysis') ? 'block' : 'none';
+
+  queuesPage.hidden = (current !== 'queues');
+  queuesPage.style.display = (current === 'queues') ? 'block' : 'none';
+
+  performance.hidden = (current !== 'performance');
+  performance.style.display = (current === 'performance') ? 'block' : 'none';
+
+  qtcFloorPage.hidden = (current !== 'qtcfloor');
+  qtcFloorPage.style.display = (current === 'qtcfloor') ? 'block' : 'none';
+
+  dailyPage.hidden = (current !== 'daily');
+  dailyPage.style.display = (current === 'daily') ? 'block' : 'none';
+
+  document.querySelectorAll('#shiftBanner, #fstrip, .pills-row, #locTabs, #mainContent, #cmpBar').forEach(el => {
+    el.style.setProperty('display', 'none', 'important');
+  });
+
   if(aside){
     aside.querySelectorAll('[data-page]').forEach(b=>{
       const active=b.dataset.page===current;
@@ -552,7 +624,10 @@ function route(){
   else if(current==='qtcfloor'&&typeof renderQtcFloorPerformance==='function')renderQtcFloorPerformance();
   else if(current==='daily'&&typeof renderDailyReport==='function')renderDailyReport();
   else if(typeof renderOverview==='function')renderOverview();
-  queueMicrotask(()=>{renderAllSections();if(!root.hidden&&!rawRows.length&&getAuthToken())loadData();});
+
+  if(!window.rawRows || !window.rawRows.length){
+    if(typeof loadData==='function' && typeof getAuthToken==='function' && getAuthToken()) loadData();
+  }
 }
 
 window.switchAnalyticsWorkspace = function(hash) {
@@ -1637,24 +1712,33 @@ function applyBookmark(state){
  closeAll();buildStrip();applyAll();location.hash=['analysis-overview','queues-analysis','performance-labelers','performance-qtc-floor','daily-report'].includes(state.page)?state.page:'dashboard';route();
 }
 const bookmarks=document.createElement('section');bookmarks.className='ux-bookmarks';bookmarks.setAttribute('aria-label','Saved filter bookmarks');bookmarks.innerHTML='<span class="ux-bookmark-icon" aria-hidden="true">☆</span><label for="uxBookmarkList">Filter bookmarks</label><select id="uxBookmarkList" aria-label="Saved filter bookmark"><option value="">Choose a bookmark…</option></select><button class="btn" id="uxBookmarkApply">Apply</button><button class="btn" id="uxBookmarkDelete">Delete</button><form id="uxBookmarkForm"><input id="uxBookmarkName" aria-label="New bookmark name" placeholder="Name this filter selection…" maxlength="60" required><button class="btn btn-c" type="submit">☆ Save bookmark</button></form><span class="ux-note">Saved on this browser</span>';
-document.body.insertBefore(bookmarks,root);
-function renderBookmarkList(selected){const list=$('uxBookmarkList'),items=readBookmarks();list.replaceChildren(new Option(items.length?'Choose a bookmark…':'No saved bookmarks yet',''));items.forEach(b=>list.add(new Option(b.name,b.id)));if(selected&&items.some(b=>b.id===selected))list.value=selected;const disabled=!list.value;$('uxBookmarkApply').disabled=disabled;$('uxBookmarkDelete').disabled=disabled;}
-$('uxBookmarkList').onchange=()=>{const disabled=!$('uxBookmarkList').value;$('uxBookmarkApply').disabled=disabled;$('uxBookmarkDelete').disabled=disabled;};
-$('uxBookmarkForm').onsubmit=e=>{e.preventDefault();const name=$('uxBookmarkName').value.trim();if(!name){$('uxBookmarkName').focus();return;}const items=readBookmarks();if(items.some(b=>b.name.toLowerCase()===name.toLowerCase())){showToast('This name already exists. Choose another bookmark name.');return;}const id=typeof crypto.randomUUID==='function'?crypto.randomUUID():Date.now().toString(36)+'-'+Math.random().toString(36).slice(2);items.push({id,name,state:captureBookmark(),createdAt:new Date().toISOString()});if(writeBookmarks(items)){renderBookmarkList(id);$('uxBookmarkName').value='';showToast('Filter bookmark saved: '+name);}};
-$('uxBookmarkApply').onclick=()=>{if(!window._firstDataReady){showToast('Wait for dashboard data to load before applying a bookmark.');return;}const item=readBookmarks().find(b=>b.id===$('uxBookmarkList').value);if(!item)return;applyBookmark(item.state);showToast('Bookmark applied: '+item.name);};
-$('uxBookmarkDelete').onclick=()=>{const items=readBookmarks(),id=$('uxBookmarkList').value,item=items.find(b=>b.id===id);if(!item)return;if(writeBookmarks(items.filter(b=>b.id!==id))){renderBookmarkList();showToastUndo('Bookmark deleted: '+item.name,'Undo',()=>{const latest=readBookmarks();if(!latest.some(b=>b.id===item.id)){latest.push(item);if(writeBookmarks(latest))renderBookmarkList(item.id);}});}};
-let bookmarkAccount=bookmarkKey();const bookmarkUserObserver=new MutationObserver(()=>{const key=bookmarkKey();if(key!==bookmarkAccount){bookmarkAccount=key;renderBookmarkList();}});if($('userName'))bookmarkUserObserver.observe($('userName'),{childList:true,subtree:true});window.addEventListener('storage',e=>{if(e.key===bookmarkKey())renderBookmarkList();});renderBookmarkList();
+if (!isUnified) document.body.appendChild(bookmarks);
+function renderBookmarkList(selected){const list=$('uxBookmarkList'),items=readBookmarks();if(!list)return;list.replaceChildren(new Option(items.length?'Choose a bookmark…':'No saved bookmarks yet',''));items.forEach(b=>list.add(new Option(b.name,b.id)));if(selected&&items.some(b=>b.id===selected))list.value=selected;const disabled=!list.value;if($('uxBookmarkApply'))$('uxBookmarkApply').disabled=disabled;if($('uxBookmarkDelete'))$('uxBookmarkDelete').disabled=disabled;}
+if($('uxBookmarkList')) $('uxBookmarkList').onchange=()=>{const disabled=!$('uxBookmarkList').value;if($('uxBookmarkApply'))$('uxBookmarkApply').disabled=disabled;if($('uxBookmarkDelete'))$('uxBookmarkDelete').disabled=disabled;};
+if($('uxBookmarkForm')) $('uxBookmarkForm').onsubmit=e=>{e.preventDefault();const name=$('uxBookmarkName')?.value.trim();if(!name){$('uxBookmarkName')?.focus();return;}const items=readBookmarks();if(items.some(b=>b.name.toLowerCase()===name.toLowerCase())){showToast('This name already exists. Choose another bookmark name.');return;}const id=typeof crypto.randomUUID==='function'?crypto.randomUUID():Date.now().toString(36)+'-'+Math.random().toString(36).slice(2);items.push({id,name,state:captureBookmark(),createdAt:new Date().toISOString()});if(writeBookmarks(items)){renderBookmarkList(id);if($('uxBookmarkName'))$('uxBookmarkName').value='';showToast('Filter bookmark saved: '+name);}};
+if($('uxBookmarkApply')) $('uxBookmarkApply').onclick=()=>{if(!window._firstDataReady){showToast('Wait for dashboard data to load before applying a bookmark.');return;}const item=readBookmarks().find(b=>b.id===$('uxBookmarkList')?.value);if(!item)return;applyBookmark(item.state);showToast('Bookmark applied: '+item.name);};
+if($('uxBookmarkDelete')) $('uxBookmarkDelete').onclick=()=>{const items=readBookmarks(),id=$('uxBookmarkList')?.value,item=items.find(b=>b.id===id);if(!item)return;if(writeBookmarks(items.filter(b=>b.id!==id))){renderBookmarkList();showToastUndo('Bookmark deleted: '+item.name,'Undo',()=>{const latest=readBookmarks();if(!latest.some(b=>b.id===item.id)){latest.push(item);if(writeBookmarks(latest))renderBookmarkList(item.id);}});}};
+let bookmarkAccount=bookmarkKey();const bookmarkUserObserver=typeof MutationObserver!=='undefined'?new MutationObserver(()=>{const key=bookmarkKey();if(key!==bookmarkAccount){bookmarkAccount=key;renderBookmarkList();}}):null;if($('userName')&&bookmarkUserObserver)bookmarkUserObserver.observe($('userName'),{childList:true,subtree:true});window.addEventListener('storage',e=>{if(e.key===bookmarkKey())renderBookmarkList();});renderBookmarkList();
 
 /* A single filter drawer shared by every page. */
 const filterButton=document.createElement('button');filterButton.className='ux-nav';filterButton.id='uxOpenFilters';filterButton.textContent='☆  Bookmark / Filters';filterButton.setAttribute('aria-expanded','false');filterButton.setAttribute('aria-controls','uxFilterDrawer');aside.insertBefore(filterButton,aside.querySelector('footer'));
 const filterDrawer=document.createElement('section');filterDrawer.hidden=true;filterDrawer.open=false;filterDrawer.id='uxFilterDrawer';filterDrawer.setAttribute('aria-labelledby','uxDrawerTitle');filterDrawer.innerHTML='<div class="ux-drawer-head"><div><div class="ux-eyebrow">Saved views & selection</div><h2 id="uxDrawerTitle">Bookmarks & filters</h2></div><div style="display:flex;align-items:center;gap:6px"><button class="btn btn-c" id="uxDrawerApplyFilters" style="padding:6px 14px;font-weight:700">✓ Apply</button><button class="btn" id="uxCloseFilters" aria-label="Close filters">✕ Close</button></div></div><div class="ux-drawer-body"><div class="ux-drawer-apply-banner"><div><strong>Pending filter selections?</strong><div class="ux-note">Click Apply to push all filters and bookmarks to the dashboard</div></div><button class="btn btn-c" id="uxDrawerApplyBanner" style="padding:6px 14px;font-weight:700">✓ Apply Filters</button></div><h3>Saved bookmarks</h3><div id="uxDrawerBookmarks"></div><h3>Dashboard filters</h3><div id="uxDrawerGlobal"></div><h3>Analysis Overview filters</h3><div id="uxDrawerAnalysis"></div></div>';
-aside.appendChild(filterDrawer);$('uxDrawerBookmarks').appendChild(bookmarks);
+aside.appendChild(filterDrawer);if($('uxDrawerBookmarks'))$('uxDrawerBookmarks').appendChild(bookmarks);
 const onDrawerApply=()=>{applyAll();renderAllSections();showToast('✓ Filters applied successfully');closeSidebarFilters();};
 $('uxDrawerApplyFilters')?.addEventListener('click',onDrawerApply);
 $('uxDrawerApplyBanner')?.addEventListener('click',onDrawerApply);
-$('uxDrawerGlobal').hidden=true;$('uxDrawerGlobal').previousElementSibling.hidden=true;$('uxDrawerAnalysis').previousElementSibling.textContent='List slicers · apply immediately';
-const globalFilters=$('uxDrawerGlobal');['.shift-banner','#fstrip','.pills-row','#locTabs'].forEach(selector=>{const el=root.querySelector(selector);if(el)globalFilters.appendChild(el);});
-function closeSidebarFilters(){filterDrawer.hidden=true;filterDrawer.open=false;aside.classList.remove('ux-filters-mode');[...aside.children].forEach(el=>{if(el!==filterDrawer)el.inert=false;});filterButton.setAttribute('aria-expanded','false');if($('uxSidebarPeriods')?.contains(sharedPeriods))document.body.insertBefore(sharedPeriods,root);filterButton.focus();}
+if($('uxDrawerGlobal')) {
+  $('uxDrawerGlobal').hidden=true;
+  if($('uxDrawerGlobal').previousElementSibling) $('uxDrawerGlobal').previousElementSibling.hidden=true;
+}
+if($('uxDrawerAnalysis') && $('uxDrawerAnalysis').previousElementSibling) {
+  $('uxDrawerAnalysis').previousElementSibling.textContent='List slicers · apply immediately';
+}
+const globalFilters=$('uxDrawerGlobal');
+if(globalFilters) {
+  ['.shift-banner','#fstrip','.pills-row','#locTabs'].forEach(selector=>{const el=document.querySelector(selector);if(el)globalFilters.appendChild(el);});
+}
+function closeSidebarFilters(){filterDrawer.hidden=true;filterDrawer.open=false;aside.classList.remove('ux-filters-mode');[...aside.children].forEach(el=>{if(el!==filterDrawer)el.inert=false;});filterButton.setAttribute('aria-expanded','false');filterButton.focus();}
 filterButton.onclick=()=>{renderDrawerAnalysis();renderBookmarkList();filterDrawer.hidden=false;filterDrawer.open=true;aside.classList.add('ux-filters-mode');[...aside.children].forEach(el=>{if(el!==filterDrawer&&!el.classList.contains('ux-brand'))el.inert=true;});filterButton.setAttribute('aria-expanded','true');let periodSlot=$('uxSidebarPeriods');if(!periodSlot){periodSlot=document.createElement('div');periodSlot.id='uxSidebarPeriods';filterDrawer.querySelector('.ux-drawer-body').prepend(periodSlot);}periodSlot.appendChild(sharedPeriods);$('uxCloseFilters').focus();};$('uxCloseFilters').textContent='← Pages';$('uxCloseFilters').setAttribute('aria-label','Return to page navigation');$('uxCloseFilters').onclick=closeSidebarFilters;filterDrawer.addEventListener('keydown',e=>{if(e.key==='Escape'){e.stopPropagation();closeSidebarFilters();}});
 
 function renderDrawerAnalysis(){const box=$('uxDrawerAnalysis');box.replaceChildren(createListSlicers());}
@@ -2077,7 +2161,7 @@ function renderPerformance(){
 }
 
 function rankQcGroups(groups,category,lower){return groups.filter(g=>g.totals[category]>0).sort((a,b)=>(lower?a.totals[category]-b.totals[category]:b.totals[category]-a.totals[category])||a.name.localeCompare(b.name)).slice(0,15);}
-const sharedPeriods=document.createElement('section');sharedPeriods.className='ux-shared-periods';sharedPeriods.setAttribute('aria-label','Date filters for all pages');document.body.insertBefore(sharedPeriods,root);
+const sharedPeriods=document.createElement('section');sharedPeriods.className='ux-shared-periods';sharedPeriods.setAttribute('aria-label','Date filters for all pages');if(!isUnified && root && root.parentNode) root.parentNode.insertBefore(sharedPeriods,root);
 function renderSharedPeriods(){
  const dates=protectedOptions?[...(protectedOptions.day||[])].sort().reverse():[...new Set(rawRows.map(r=>rDate(r)).filter(Boolean))].sort().reverse();const weeks=[...new Set(dates.map(d=>performanceWeek(d)?.start).filter(Boolean))].sort().reverse();
  sharedPeriods.replaceChildren();
@@ -3930,21 +4014,16 @@ function renderQtcFloorPerformance(){
 }
 
 renderAllSections=function(){
-
- if(!root.hidden)oldRender.apply(this,arguments);
-
- renderSharedPeriods();
-
- renderOverview();
-
- renderAnalysis();
- renderQueuesAnalysis();
-
- renderPerformance();
- renderQtcFloorPerformance();
-
- renderDailyReport();
-
+  document.querySelectorAll('#shiftBanner, #fstrip, .pills-row, #locTabs, #mainContent, #cmpBar').forEach(el => {
+    el.style.setProperty('display', 'none', 'important');
+  });
+  renderSharedPeriods();
+  renderOverview();
+  renderAnalysis();
+  renderQueuesAnalysis();
+  renderPerformance();
+  renderQtcFloorPerformance();
+  renderDailyReport();
 };
 
 
