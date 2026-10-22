@@ -456,9 +456,6 @@ td a{color:var(--info);text-decoration:none;font-weight:700;}
   .cgrid{grid-template-columns:1fr 1fr;}
   .cmp-side{flex-direction:column;align-items:flex-start;}
 }
-#loginScreen{position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;background:#050a10;background-image:linear-gradient(rgba(0,229,212,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(0,229,212,.05) 1px,transparent 1px);background-size:34px 34px;padding:20px;}
-#loginScreen.hidden{display:none;}
-.login-card{width:100%;max-width:380px;background:rgba(8,16,26,.7);border:1px solid rgba(0,229,212,.25);border-radius:var(--radius-lg);padding:34px 28px;backdrop-filter:blur(18px);box-shadow:0 0 40px rgba(0,229,212,.06),0 12px 40px rgba(0,0,0,.5);text-align:center;position:relative;overflow:hidden;}
 .login-logo{width:56px;height:56px;margin:0 auto 14px;border-radius:var(--radius);background:rgba(0,229,212,.08);border:1px solid #5cf3e2;display:flex;align-items:center;justify-content:center;}
 .login-title{font-family:var(--display);font-size:1.3rem;font-weight:700;color:#eafcfb;letter-spacing:2px;margin-bottom:2px;}
 .login-sub{font-family:var(--mono);font-size:.6rem;color:#7fd8f0;letter-spacing:2px;text-transform:uppercase;margin-bottom:22px;}
@@ -603,8 +600,6 @@ td a{color:var(--info);text-decoration:none;font-weight:700;}
   .arcs-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}
 
   /* ---------- LOGIN: stays reachable when the keyboard is open ---------- */
-  #loginScreen{overflow-y:auto;padding:16px}
-  .login-card{margin:auto;padding:28px 20px}
 }
 @media(max-width:360px){
   .meeg-wordmark .brand{font-size:1rem}
@@ -837,243 +832,109 @@ html[data-theme="dark"] #fg___date .calendar-panel{background:#fff;color:#202124
 <div class="content" id="mainContent"><div class="loader"><div class="spin"></div><span class="ltxt">Loading data…</span></div></div>
 <button class="scroll-top-car" id="scrollTopBtn" onclick="shootWebScrollTop()" title="Back to top">▲</button>
 <script>
-/* ============ AUTH GATE & RBAC (Integrated with METI Central Dashboard) ============ */
-const AUTH_KEY='meeg_auth_email';
-const AUTH_VER=(document.querySelector('meta[name="app-version"]')||{}).content||'v2';
-const AUTH_VER_KEY='meeg_auth_ver';
+/* ============ AUTH GATE & RBAC (Integrated with METI Central Dashboard & Secure Backend) ============ */
+const API_BASE = window.MEEG_API_URL || localStorage.getItem("meeg_api_url") || "";
 
-function isValidEmailFormat(e){return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);}
+function getAuthToken() {
+  return sessionStorage.getItem("meeg_auth_token") || "";
+}
 
-const TURSO_URL = "https://meti-tasks-islamyasser424-design.aws-eu-west-1.turso.io/v2/pipeline";
-const TURSO_TOKEN = "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3OTI1NjMzNDUsImlkIjoiMDFhMTVkMTctNWIwMS03ZGIyLWE5NDItN2Q1NDA1NWZhNjE1Iiwia2lkIjoid3ZJZENGejZKbkhZV3k4cGJWUkQ4bFVSZjNsOURtdjczY0ZiTGVKYmVXdyIsInJpZCI6IjE4NTk2YzM5LTFjZDgtNDk3Ny1hMmEwLTE4ODVlOWU3Yjg4MSJ9.6DYE3efGgX6Hiw_GptXugwhY3DGBlnsIVDWO9vCLgouLJ6ck7hwDaIyzkuv6CpZcIvLNlTNVK54bruXDYJ0UBA";
+async function apiFetch(endpoint, options = {}) {
+  const url = (endpoint.startsWith("http") ? endpoint : (API_BASE + endpoint));
+  const headers = Object.assign({
+    "Content-Type": "application/json"
+  }, options.headers || {});
 
-let usersMap={};
-let usersLoaded=false,_usersPromise=null;
+  const token = getAuthToken();
+  if (token && !headers["Authorization"]) {
+    headers["Authorization"] = "Bearer " + token;
+  }
 
-function isAllowedEmail(e){ return true; }
-function loadUsers(force){
+  const res = await fetch(url, Object.assign({}, options, {
+    headers,
+    credentials: "include"
+  }));
+
+  if (res.status === 401) {
+    sessionStorage.removeItem("meti_dash_user");
+    sessionStorage.removeItem("meeg_auth_token");
+    if (window.top && window.top !== window) {
+      window.top.location.href = "dashboard.html";
+    } else {
+      window.location.href = "dashboard.html";
+    }
+  }
+  return res;
+}
+
+let usersMap = {};
+let usersLoaded = false, _usersPromise = null;
+
+function getLoggedInUser() {
   try {
     const raw = sessionStorage.getItem("meti_dash_user");
-    if (raw) {
-      const u = JSON.parse(raw);
-      if (u && (u.role || '').toLowerCase() === 'admin') {
-        const em = (u.username || 'admin').toLowerCase() + '@meti.internal';
-        usersMap[em] = { name: u.full_name || 'Admin', role: 'Executive Admin' };
-        usersLoaded = true;
-      }
-    }
-  } catch(e){}
-  return Promise.resolve(usersMap);
+    if (raw) return JSON.parse(raw);
+  } catch(e) {}
+  return null;
 }
 
-function checkUsersAccess(){ /* Handled by central dashboard */ }
-function startUsersWatch(){ /* Handled by central dashboard */ }
-
-const AUTH_API_URL='';
-const AUTH_TOKEN_KEY='meeg_auth_token';
-function getAuthToken(){ return 'local-turso-token'; }
-function authCall(body){ return Promise.resolve({ ok: true }); }
-function clearSession(){
-  try{ sessionStorage.removeItem("meti_dash_user"); }catch(e){}
-}
-function getLoggedInEmail(){
-  try{
-    const raw = sessionStorage.getItem("meti_dash_user");
-    if(raw){
-      const u = JSON.parse(raw);
-      if(u && u.id && u.username && ['admin','sv','wla','shift sv','floor sv','training sv','traning sv','qtc'].includes(String(u.role||'').toLowerCase())){
-        return (u.username || 'admin').toLowerCase() + '@meti.internal';
-      }
-    }
-  }catch(e){}
+function getLoggedInEmail() {
+  const u = getLoggedInUser();
+  if (u && u.username) {
+    return u.username.toLowerCase() + '@meti.internal';
+  }
   return '';
 }
 
-let _loginStep='email',_loginBusy=false;
-function goLoginStep(step,msg){
-  _loginStep=step;
-  const $=id=>document.getElementById(id);
-  const eIn=$('loginEmailInput'),pIn=$('loginPassInput'),p2In=$('loginPass2Input'),btn=$('loginSubmitBtn'),hint=$('loginHint'),back=$('loginBackLink');
-  [eIn,pIn,p2In].forEach(x=>x.classList.remove('err'));
-  $('loginErrMsg').textContent=msg||'';
-  const isEmail=step==='email';
-  eIn.readOnly=!isEmail;
-  pIn.style.display=isEmail?'none':'';
-  p2In.style.display=step==='setup'?'':'none';
-  back.style.display=isEmail?'none':'';
-  const h=step==='setup'?'First time here — create your own password (at least 8 characters).':(step==='login'?'Enter your password.':'');
-  hint.textContent=h;hint.style.display=h?'':'none';
-  btn.textContent=isEmail?'Continue →':(step==='setup'?'Create password →':'Login →');
-  pIn.autocomplete=step==='setup'?'new-password':'current-password';
-  pIn.value='';p2In.value='';
-  pIn.type='password';p2In.type='password';
-  const sp=$('loginShowPass');sp.textContent='👁 Show password';sp.style.display=isEmail?'none':'';
-  setTimeout(()=>(isEmail?eIn:pIn).focus(),50);
-}
-function toggleLoginPass(){
-  const pIn=document.getElementById('loginPassInput'),p2In=document.getElementById('loginPass2Input'),sp=document.getElementById('loginShowPass');
-  const show=pIn.type==='password';
-  pIn.type=p2In.type=show?'text':'password';
-  sp.textContent=show?'🙈 Hide password':'👁 Show password';
-  pIn.focus();
+function getUserRole(email) {
+  const u = getLoggedInUser();
+  return u && u.role ? u.role.toUpperCase() : 'USER';
 }
 
-async function attemptLogin(){
-  if(_loginBusy)return;
-  const eIn=document.getElementById('loginEmailInput'),pIn=document.getElementById('loginPassInput'),p2In=document.getElementById('loginPass2Input');
-  const errEl=document.getElementById('loginErrMsg'),btn=document.getElementById('loginSubmitBtn');
-  const raw=(eIn.value||'').trim().toLowerCase();
-  [eIn,pIn,p2In].forEach(x=>x.classList.remove('err'));
-  const fail=(m,el)=>{errEl.textContent=m;if(el){el.classList.add('err');el.focus();}};
-  if(!raw)return fail('Please enter your email',eIn);
-  if(!isValidEmailFormat(raw))return fail('Invalid email format',eIn);
-  if(!AUTH_API_URL)return fail('Sign-in server is not configured yet');
-  _loginBusy=true;btn.disabled=true;
-  try{
-    /* ---- step 1: is this email allowed, and does it already have a password? ---- */
-    if(_loginStep==='email'){
-      errEl.textContent='Checking…';
-      let r;
-      try{r=await authCall({action:'status',email:raw});}catch(e){return fail('Could not reach the server — check your connection and try again');}
-      if(!r||!r.ok)return fail('Something went wrong — try again');
-      if(!r.allowed)return fail('You Are Not Allowed 🚫',eIn);
-      goLoginStep(r.hasPassword?'login':'setup');
-      return;
-    }
-    /* ---- step 2: password (create or enter) ---- */
-    const pass=pIn.value;
-    if(!pass)return fail('Please enter your password',pIn);
-    if(_loginStep==='setup'){
-      if(pass.length<8)return fail('Password must be at least 8 characters',pIn);
-      if(pass!==p2In.value)return fail('Passwords do not match',p2In);
-    }
-    errEl.textContent=_loginStep==='setup'?'Creating password…':'Signing in…';
-    let r;
-    try{r=await authCall({action:_loginStep,email:raw,password:pass});}catch(e){return fail('Could not reach the server — check your connection and try again');}
-    if(!r||!r.ok){
-      const er=r&&r.error;
-      if(er==='bad_password')return fail('Wrong password',pIn);
-      if(er==='locked')return fail('Too many wrong attempts — try again in 10 minutes');
-      if(er==='not_allowed')return fail('You Are Not Allowed 🚫');
-      if(er==='already_set')return goLoginStep('login','A password already exists for this email — enter it to sign in');
-      if(er==='no_password')return goLoginStep('setup');
-      if(er==='weak')return fail('Password must be at least 8 characters',pIn);
-      return fail('Something went wrong — try again');
-    }
-    try{
-      localStorage.setItem(AUTH_KEY,raw);
-      localStorage.setItem(AUTH_VER_KEY,AUTH_VER);
-      localStorage.setItem(AUTH_TOKEN_KEY,r.token);
-    }catch(e){}
-    pIn.value='';p2In.value='';errEl.textContent='';
-    try{await loadUsers(true);}catch(e){} // names / roles for the header chip (non-blocking on failure)
-    document.getElementById('loginScreen').classList.add('hidden');
-    startApp();
-  }finally{_loginBusy=false;btn.disabled=false;}
+function getDisplayName(email) {
+  const u = getLoggedInUser();
+  return u && u.full_name ? u.full_name : (u && u.username ? u.username : 'User');
 }
 
-
-/* ============ LOGGED-IN USER DISPLAY ============ */
-/* الاسم والـ Role بييجوا من تاب Users في الشيت (Display Name | Role | Email) */
-function getUserRole(email){const u=usersMap[String(email||'').trim().toLowerCase()];return u?String(u.role||'').trim():'';}
-function getDisplayName(email){
-  if(!email)return '';
-  const _u=usersMap[String(email||'').trim().toLowerCase()];const custom=_u?String(_u.name||'').trim():'';
-  if(custom)return custom;
-  const local=email.split('@')[0].replace(/\d+/g,' ').replace(/[._-]+/g,' ').trim()||email.split('@')[0];
-  return local.split(/\s+/).map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ');
-}
-function renderUserChip(welcome){
-  const email=getLoggedInEmail();
-  const chip=document.getElementById('userChip');
-  if(!email||!chip)return;
-  const name=getDisplayName(email);
-  document.getElementById('userName').textContent=name;
-  const lbl=getUserRole(email);
-  document.getElementById('userLabel').textContent=lbl;
-  document.getElementById('userAv').textContent=(name.charAt(0)||'?').toUpperCase();
-  chip.title=lbl?name+' · '+lbl+' · '+email:email;
-  chip.style.display='inline-flex';
-  if(welcome&&typeof showToast==='function')setTimeout(()=>showToast('👋 Welcome, '+name),600);
+function renderUserChip(welcome) {
+  const u = getLoggedInUser();
+  const chip = document.getElementById('userChip');
+  if (!u || !chip) return;
+  const name = u.full_name || u.username || 'User';
+  const role = (u.role || '').toUpperCase();
+  const nameEl = document.getElementById('userName');
+  if (nameEl) nameEl.textContent = name;
+  const lblEl = document.getElementById('userLabel');
+  if (lblEl) lblEl.textContent = role;
+  const avEl = document.getElementById('userAv');
+  if (avEl) avEl.textContent = (name.charAt(0) || '?').toUpperCase();
+  chip.title = `${name} · ${role}`;
+  chip.style.display = 'inline-flex';
+  if (welcome && typeof showToast === 'function') setTimeout(() => showToast('👋 Welcome, ' + name), 600);
 }
 
-function logoutUser(){
-  try{idbClear();}catch(e){}
-  clearSession();
-  window.location.reload();
-}
-
-function checkAuthOnLoad(){
-  if(getLoggedInEmail()){
-    document.getElementById('loginScreen').classList.add('hidden');
-    return true;
-  }
-  document.getElementById('loginScreen').classList.remove('hidden');
-  setTimeout(()=>{const i=document.getElementById('loginEmailInput');if(i)i.focus();},80);
-  return false;
-}
-
-/* if the session was invalidated (logout from another tab / new auth version) — show the login screen immediately */
-function enforceAuthLive(){
-  if(getLoggedInEmail())return;
-  if(typeof autoRefreshTimer!=='undefined'&&autoRefreshTimer){clearInterval(autoRefreshTimer);autoRefreshTimer=null;}
-  if(typeof _versionCheckTimer!=='undefined'&&_versionCheckTimer){clearInterval(_versionCheckTimer);_versionCheckTimer=null;}
-  const ls=document.getElementById('loginScreen');
-  if(ls)ls.classList.remove('hidden');
-}
-document.addEventListener('visibilitychange',()=>{
-  if(document.visibilityState==='visible')enforceAuthLive();
-});
-window.addEventListener('storage',e=>{
-  if(e.key===AUTH_KEY||e.key===AUTH_VER_KEY||e.key===null)enforceAuthLive();
-});
-
-/* ============ LOGIN BUTTON DODGE (roams only inside the login card frame) ============ */
-function initLoginDodge(){
-  const btn=document.getElementById('loginSubmitBtn');
-  const zone=document.getElementById('loginBtnZone');
-  const card=document.getElementById('loginCard');
-  const input=document.getElementById('loginEmailInput');
-  if(!btn||!zone||!card||!input)return;
-  let dodging=false;
-  function resetBtn(){
-    dodging=false;
-    btn.classList.remove('dodging');
-    btn.style.left='';btn.style.top='';btn.style.width='';btn.style.position='';
-  }
-  document.addEventListener('mousemove',(e)=>{
-    if(input.value.trim().length>0){ if(dodging)resetBtn(); return; }
-    const btnRect=btn.getBoundingClientRect();
-    const cardRect=card.getBoundingClientRect();
-    const btnCx=btnRect.left+btnRect.width/2;
-    const btnCy=btnRect.top+btnRect.height/2;
-    const mx=e.clientX, my=e.clientY;
-    const dist=Math.hypot(mx-btnCx,my-btnCy);
-    if(dist<95){
-      dodging=true;
-      btn.classList.add('dodging');
-      btn.style.position='absolute';
-      const bw=Math.min(150,cardRect.width-2*14),bh=btnRect.height||46;
-      const pad=14;
-      const minLeft=cardRect.left+pad;
-      const maxLeft=Math.max(minLeft,cardRect.right-bw-pad);
-      const minTop=cardRect.top+pad;
-      const maxTop=Math.max(minTop,cardRect.bottom-bh-pad);
-      let newLeft,newTop,tries=0;
-      do{
-        newLeft=minLeft+Math.random()*(maxLeft-minLeft);
-        newTop=minTop+Math.random()*(maxTop-minTop);
-        tries++;
-      }while(Math.hypot(newLeft+bw/2-mx,newTop+bh/2-my)<90 && tries<12);
-      // the card uses backdrop-filter, which makes it the reference box for position:fixed/absolute children,
-      // so the coordinates must be relative to the button's zone (not the viewport) or the button escapes the frame
-      const zr=zone.getBoundingClientRect();
-      btn.style.width=bw+'px';
-      btn.style.left=(newLeft-zr.left)+'px';
-      btn.style.top=(newTop-zr.top)+'px';
+function logoutUser() {
+  try { sessionStorage.removeItem("meti_dash_user"); sessionStorage.removeItem("meeg_auth_token"); } catch(e){}
+  apiFetch("/api/auth/logout", { method: "POST" }).finally(() => {
+    if (window.top && window.top !== window) {
+      window.top.location.href = "dashboard.html";
+    } else {
+      window.location.href = "dashboard.html";
     }
   });
-  input.addEventListener('input',()=>{ if(input.value.trim().length>0)resetBtn(); });
+}
+
+function checkAuthOnLoad() {
+  const u = getLoggedInUser();
+  if (u && u.id && u.username) {
+    return true;
+  }
+  if (window.top && window.top !== window) {
+    window.top.location.href = "dashboard.html";
+  } else {
+    window.location.href = "dashboard.html";
+  }
+  return false;
 }
 /* ============ END AUTH GATE ============ */
 
@@ -2322,62 +2183,47 @@ function loadData(){
     mc.innerHTML=`<div class="loader"><div class="spin"></div><span class="ltxt">Connecting to Turso Database…</span></div>`;
   }
 
-  const reqBody = {
-    requests: [
-      {
-        type: "execute",
-        stmt: {
-          sql: "SELECT timestamp, shift, unit, qtc_name, yubikey_email, labeler_name, national_id, pc_no, modality, queue_name, task_link, id, object_count, pass, stage, created_at FROM task_submissions ORDER BY id DESC LIMIT 25000;"
-        }
-      }
-    ]
-  };
-
-  fetch(TURSO_URL, {
-    method: "POST",
-    headers: {
-      "Authorization": "Bearer " + TURSO_TOKEN,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(reqBody)
+  apiFetch("/api/analytics/dataset?limit=25000")
+  .then(r => {
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.json();
   })
-  .then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.json();})
-  .then(data=>{
-    if(!data.results || !data.results[0] || data.results[0].type === "error"){
-      throw new Error((data.results && data.results[0] && data.results[0].error && data.results[0].error.message) || "Empty response from Turso");
+  .then(data => {
+    if (!data.ok || !Array.isArray(data.rows)) {
+      throw new Error((data && data.message) || "Empty response from API");
     }
-    const dbRows = (data.results[0].response && data.results[0].response.result && data.results[0].response.result.rows) || [];
+    const dbRows = data.rows;
     const headers = ['Timestamp', 'Shift', 'Unit', 'Qtc Name', 'Yubikey Email', 'Labeler Name', 'National ID', 'Pc No', 'Modality', 'Queue Name', 'Task Link', 'Id', 'Object Count', 'Pass', 'Stage', 'Created At'];
     const table = [headers];
     for (let i = 0; i < dbRows.length; i++) {
       const row = dbRows[i];
       table.push([
-        row[0] && row[0].value != null ? String(row[0].value) : '',
-        row[1] && row[1].value != null ? String(row[1].value) : '',
-        row[2] && row[2].value != null ? String(row[2].value) : '',
-        row[3] && row[3].value != null ? String(row[3].value) : '',
-        row[4] && row[4].value != null ? String(row[4].value) : '',
-        row[5] && row[5].value != null ? String(row[5].value) : '',
-        row[6] && row[6].value != null ? String(row[6].value) : '',
-        row[7] && row[7].value != null ? String(row[7].value) : '',
-        row[8] && row[8].value != null ? String(row[8].value) : '',
-        row[9] && row[9].value != null ? String(row[9].value) : '',
-        row[10] && row[10].value != null ? String(row[10].value) : '',
-        row[11] && row[11].value != null ? String(row[11].value) : '',
-        row[12] && row[12].value != null ? String(row[12].value) : '0',
-        row[13] && row[13].value != null ? String(row[13].value) : '',
-        row[14] && row[14].value != null ? String(row[14].value) : '',
-        row[15] && row[15].value != null ? String(row[15].value) : ''
+        row.timestamp != null ? String(row.timestamp) : '',
+        row.shift != null ? String(row.shift) : '',
+        row.unit != null ? String(row.unit) : '',
+        row.qtc_name != null ? String(row.qtc_name) : '',
+        row.yubikey_email != null ? String(row.yubikey_email) : '',
+        row.labeler_name != null ? String(row.labeler_name) : '',
+        row.national_id != null ? String(row.national_id) : '',
+        row.pc_no != null ? String(row.pc_no) : '',
+        row.modality != null ? String(row.modality) : '',
+        row.queue_name != null ? String(row.queue_name) : '',
+        row.task_link != null ? String(row.task_link) : '',
+        row.id != null ? String(row.id) : '',
+        row.object_count != null ? String(row.object_count) : '0',
+        row.pass != null ? String(row.pass) : '',
+        row.stage != null ? String(row.stage) : '',
+        row.created_at != null ? String(row.created_at) : ''
       ]);
     }
     setSyncActive(false);
     if(b)b.disabled=false;
     onCsvTable(table);
   })
-  .catch(e=>{
+  .catch(e => {
     setSyncActive(false);setTrafficLight('red');if(b)b.disabled=false;
     if(rawRows.length>0){showToast('⚠️ Could not refresh — showing the last loaded data');}
-    else showErr('Failed to load data from Turso: '+e.message);
+    else showErr('Failed to load data: '+e.message);
   });
 }
 function onCsvData(text,fromCache){
@@ -2978,52 +2824,56 @@ function startApp(){renderUserChip(false);
   const savedTheme = isEmbedded ? 'light' : (localStorage.getItem('meeg_theme') || 'light');
   document.documentElement.setAttribute('data-theme', savedTheme);const btn=document.getElementById('darkBtn');if(btn){btn.classList.toggle('active',savedTheme==='dark');btn.innerHTML=savedTheme==='dark'?'🌙 Dark':'☀️ Light';}applyAutoRefreshUI();hideSplash();loadData();startVersionPolling();fetchQualityData(true);startUsersWatch();
 }
-window.addEventListener('load',()=>{
-  // Analytics inherits the dashboard session; no second login form.
-  const splash=document.getElementById('splash');
-  
-  let user = null;
-  try {
-    const raw = sessionStorage.getItem("meti_dash_user");
-    user = raw ? JSON.parse(raw) : null;
-  } catch(e){}
+window.addEventListener('load', async () => {
+  const splash = document.getElementById('splash');
 
-  const isEmbedded = (window !== window.top || location.search.includes('embedded=1'));
-  const userRole = (user && user.role ? user.role : '').toLowerCase();
-  const isAllowedRole = ['admin', 'sv', 'wla', 'shift sv', 'floor sv', 'training sv', 'traning sv', 'qtc'].includes(userRole);
-
-  // Strictly enforce RBAC (allow when embedded inside dashboard or for authorized roles)
-  if (!user || !user.id || !user.username || !isAllowedRole) {
+  function renderAccessDenied() {
     if (splash && splash.parentNode) splash.remove();
-    const ls = document.getElementById('loginScreen');
-    if (ls) ls.remove();
     document.body.innerHTML = `
       <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:100vh; background:#0f172a; color:#f8fafc; font-family:system-ui, -apple-system, sans-serif; text-align:center; padding:24px;">
         <div style="font-size:3.5rem; margin-bottom:16px;">🔒</div>
-        <h2 style="font-size:1.6rem; margin-bottom:10px; font-weight:700; color:#fff;">Access Restricted (Admin Only)</h2>
+        <h2 style="font-size:1.6rem; margin-bottom:10px; font-weight:700; color:#fff;">Access Restricted</h2>
         <p style="color:#94a3b8; max-width:440px; font-size:0.95rem; line-height:1.6; margin-bottom:24px;">
-          This executive intelligence workspace contains sensitive operational analytics and is restricted exclusively to Administrator accounts.
+          This intelligence workspace contains operational analytics and is restricted to authorized team members.
         </p>
         <a href="dashboard.html" style="background:#0d9488; color:#fff; padding:12px 28px; border-radius:8px; text-decoration:none; font-weight:600; font-size:0.95rem; box-shadow:0 4px 14px rgba(13,148,136,0.35); transition:all 0.2s;">
           ⬅ Return to Dashboard
         </a>
       </div>
     `;
-    return;
   }
 
-  // Pre-seed admin/user in usersMap
-  const adminEmail = ((user && user.username) ? user.username : 'admin').toLowerCase() + '@meti.internal';
-  usersMap[adminEmail] = {
-    name: (user && user.full_name) ? user.full_name : 'Admin',
-    role: (user && user.role) ? user.role.toUpperCase() : 'Executive Admin'
-  };
-  usersLoaded = true;
+  try {
+    const res = await apiFetch("/api/me");
+    if (!res.ok) {
+      renderAccessDenied();
+      return;
+    }
+    const data = await res.json();
+    if (!data.ok || !data.user) {
+      renderAccessDenied();
+      return;
+    }
+    const user = data.user;
+    sessionStorage.setItem("meti_dash_user", JSON.stringify(user));
 
-  const loginScreen = document.getElementById('loginScreen');
-  if (loginScreen) loginScreen.classList.add('hidden');
+    const userRole = (user.role || '').toLowerCase();
+    const isAllowedRole = ['admin', 'sv', 'wla', 'shift sv', 'floor sv', 'training sv', 'traning sv', 'qtc'].includes(userRole);
+    if (!isAllowedRole) {
+      renderAccessDenied();
+      return;
+    }
 
-  startApp();
+    const adminEmail = (user.username || 'admin').toLowerCase() + '@meti.internal';
+    usersMap[adminEmail] = {
+      name: user.full_name || user.username || 'Admin',
+      role: (user.role || '').toUpperCase()
+    };
+    usersLoaded = true;
+    startApp();
+  } catch(e) {
+    renderAccessDenied();
+  }
 });
 
 /* =====================================================================
@@ -3078,7 +2928,7 @@ function updPresets(){document.querySelectorAll('#fstrip .preset').forEach(el=>e
 /* ============ KEYBOARD SHORTCUTS ============ */
 document.addEventListener('keydown',e=>{
   if(e.ctrlKey||e.metaKey||e.altKey)return;
-  const login=document.getElementById('loginScreen');if(login&&!login.classList.contains('hidden'))return;
+  
   if(e.key==='Escape'){if(openK)closeAll();return;}
   const t=e.target,typing=t&&(t.tagName==='INPUT'||t.tagName==='TEXTAREA'||t.tagName==='SELECT'||t.isContentEditable);
   if(typing)return;
@@ -3224,4 +3074,3 @@ async function shotTopPerf(kind,btn){
 <script src="dashboard-ui.js?v=20261021-two-sources-v1"></script>
 </body>
 </html>
-

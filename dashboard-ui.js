@@ -1185,58 +1185,43 @@ loadData=function(){
  
 
  sheetLoadPromise=(async()=>{
-   let failure;
-   try{
-     const reqBody = {
-       requests: [
-         {
-           type: "execute",
-           stmt: {
-             sql: "SELECT timestamp, shift, unit, qtc_name, yubikey_email, labeler_name, national_id, pc_no, modality, queue_name, task_link, id, object_count, pass, stage, created_at FROM task_submissions ORDER BY id DESC LIMIT 25000;"
-           }
-         }
-       ]
-     };
-     const res = await fetch("https://meti-tasks-islamyasser424-design.aws-eu-west-1.turso.io/v2/pipeline", {
-       method: "POST",
-       headers: {
-         "Authorization": "Bearer eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3OTI1NjMzNDUsImlkIjoiMDFhMTVkMTctNWIwMS03ZGIyLWE5NDItN2Q1NDA1NWZhNjE1Iiwia2lkIjoid3ZJZENGejZKbkhZV3k4cGJWUkQ4bFVSZjNsOURtdjczY0ZiTGVKYmVXdyIsInJpZCI6IjE4NTk2YzM5LTFjZDgtNDk3Ny1hMmEwLTE4ODVlOWU3Yjg4MSJ9.6DYE3efGgX6Hiw_GptXugwhY3DGBlnsIVDWO9vCLgouLJ6ck7hwDaIyzkuv6CpZcIvLNlTNVK54bruXDYJ0UBA",
-         "Content-Type": "application/json"
-       },
-       body: JSON.stringify(reqBody)
-     });
-     if(!res.ok) throw new Error("HTTP " + res.status);
-     const data = await res.json();
-     if(!data.results || !data.results[0] || data.results[0].type === "error") {
-       throw new Error(data.results?.[0]?.error?.message || "Empty response from Turso database");
-     }
-     const dbRows = data.results[0].response?.result?.rows || [];
-     const headers = ['Timestamp', 'Shift', 'Unit', 'Qtc Name', 'Yubikey Email', 'Labeler Name', 'National ID', 'Pc No', 'Modality', 'Queue Name', 'Task Link', 'Id', 'Object Count', 'Pass', 'Stage', 'Created At'];
-     const table = [headers];
-     for (let i = 0; i < dbRows.length; i++) {
-       const row = dbRows[i];
-       table.push([
-         row[0]?.value != null ? String(row[0].value) : '',
-         row[1]?.value != null ? String(row[1].value) : '',
-         row[2]?.value != null ? String(row[2].value) : '',
-         row[3]?.value != null ? String(row[3].value) : '',
-         row[4]?.value != null ? String(row[4].value) : '',
-         row[5]?.value != null ? String(row[5].value) : '',
-         row[6]?.value != null ? String(row[6].value) : '',
-         row[7]?.value != null ? String(row[7].value) : '',
-         row[8]?.value != null ? String(row[8].value) : '',
-         row[9]?.value != null ? String(row[9].value) : '',
-         row[10]?.value != null ? String(row[10].value) : '',
-         row[11]?.value != null ? String(row[11].value) : '',
-         row[12]?.value != null ? String(row[12].value) : '0',
-         row[13]?.value != null ? String(row[13].value) : '',
-         row[14]?.value != null ? String(row[14].value) : '',
-         row[15]?.value != null ? String(row[15].value) : ''
-       ]);
-     }
-     onCsvTable(table);
-     setTrafficLight('green');
-     return;
+    let failure;
+    try{
+      const token = (typeof getAuthToken === "function" ? getAuthToken() : (sessionStorage.getItem("meeg_auth_token") || ""));
+      const apiBase = window.MEEG_API_URL || localStorage.getItem("meeg_api_url") || "";
+      const res = await (typeof apiFetch === "function" ? apiFetch("/api/analytics/dataset?limit=25000") : fetch(apiBase + "/api/analytics/dataset?limit=25000", {
+        headers: token ? { "Authorization": "Bearer " + token } : {},
+        credentials: "include"
+      }));
+      if(!res.ok) throw new Error("HTTP " + res.status);
+      const data = await res.json();
+      const dbRows = data.rows || [];
+      const headers = ['Timestamp', 'Shift', 'Unit', 'Qtc Name', 'Yubikey Email', 'Labeler Name', 'National ID', 'Pc No', 'Modality', 'Queue Name', 'Task Link', 'Id', 'Object Count', 'Pass', 'Stage', 'Created At'];
+      const table = [headers];
+      for (let i = 0; i < dbRows.length; i++) {
+        const row = dbRows[i];
+        table.push([
+          row.timestamp != null ? String(row.timestamp) : '',
+          row.shift != null ? String(row.shift) : '',
+          row.unit != null ? String(row.unit) : '',
+          row.qtc_name != null ? String(row.qtc_name) : '',
+          row.yubikey_email != null ? String(row.yubikey_email) : '',
+          row.labeler_name != null ? String(row.labeler_name) : '',
+          row.national_id != null ? String(row.national_id) : '',
+          row.pc_no != null ? String(row.pc_no) : '',
+          row.modality != null ? String(row.modality) : '',
+          row.queue_name != null ? String(row.queue_name) : '',
+          row.task_link != null ? String(row.task_link) : '',
+          row.id != null ? String(row.id) : '',
+          row.object_count != null ? String(row.object_count) : '0',
+          row.pass != null ? String(row.pass) : '',
+          row.stage != null ? String(row.stage) : '',
+          row.created_at != null ? String(row.created_at) : ''
+        ]);
+      }
+      onCsvTable(table);
+      setTrafficLight('green');
+      return;;
    }catch(e){failure=e;}
 
    if(!rawRows.length){
