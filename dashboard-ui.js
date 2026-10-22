@@ -143,6 +143,8 @@ window.renderPerformance = renderPerformance;
 window.renderDailyReport = renderDailyReport;
 window.renderOverview = renderOverview;
 window.renderAnalysis = renderAnalysis;
+window.renderGmReport = typeof renderGmReport !== "undefined" ? renderGmReport : null;
+window.renderShiftComparison = typeof renderShiftComparison !== "undefined" ? renderShiftComparison : null;
 
 const QUEUE_HEADER_EXPLANATIONS = {
  'name': { title: 'Queue Name', desc: 'اسم الكيو أو مسار العمل الخاص بالتاسكات', note: 'اضغط للترتيب أبجدياً' },
@@ -651,6 +653,7 @@ function route(){
   }
 }
 
+window.route = route;
 window.switchAnalyticsWorkspace = function(hash) {
   if (hash) location.hash = hash;
   route();
@@ -659,13 +662,291 @@ window.switchAnalyticsWorkspace = function(hash) {
 aside.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>{location.hash=b.dataset.page==='analysis'?'analysis-overview':b.dataset.page==='queues'?'queues-analysis':b.dataset.page==='gm_report'?'gm-report':b.dataset.page==='shift_comparison'?'shift-comparison':b.dataset.page==='performance'?'performance-labelers':b.dataset.page==='qtcfloor'?'performance-qtc-floor':b.dataset.page==='daily'?'daily-report':'dashboard';});
 const uxBackEl = $('uxBack'); if (uxBackEl) uxBackEl.onclick = () => { if (typeof switchTab === 'function') switchTab('overview'); else location.hash = 'dashboard'; };
 $('uxSideRefresh')?.addEventListener('click',()=>loadData());$('uxSideTheme')?.addEventListener('click',()=>toggleDark());window.addEventListener('hashchange',route);
-function rowsInView(){return activeLoc&& !activeLoc.startsWith('__')&&locColIdx>=0?fcache.filter(r=>String(r[locColIdx]||'').trim()===activeLoc):fcache;}
+
+// ============================================================
+// GLOBAL UNIFIED OPERATIONAL FILTERS (Across all 8 pages)
+// ============================================================
+const globalUnifiedFilters = {
+  date: '',    // YYYY-MM-DD for single day
+  from: '',    // YYYY-MM-DD
+  to: '',      // YYYY-MM-DD
+  floor: '',   // Unit / Floor
+  qtc: '',     // QTC Supervisor Name
+  shift: ''    // Shift Name
+};
+
+function getGlobalFilterOptions() {
+  const source = (typeof fcache !== 'undefined' && fcache && fcache.length) ? fcache : (typeof rawRows !== 'undefined' && rawRows ? rawRows : (window.rawRows || []));
+  const idx = name => hdrs ? hdrs.findIndex(h => h.trim().toLowerCase() === name.toLowerCase()) : -1;
+  const si = idx('shift');
+  const fi = hdrs ? hdrs.findIndex(h => ['floor', 'unit'].includes(h.trim().toLowerCase())) : -1;
+  const qi = hdrs ? hdrs.findIndex(h => ['qtc name', 'qtc', 'supervisor'].includes(h.trim().toLowerCase())) : -1;
+
+  const shifts = [...new Set(source.map(r => si >= 0 ? String(r[si] || '').trim() : '').filter(Boolean))].sort();
+  const floors = [...new Set(source.map(r => fi >= 0 ? deriveFloor(r[fi]) : '').filter(Boolean))].sort();
+  const qtcs = [...new Set(source.map(r => qi >= 0 ? String(r[qi] || '').trim() : '').filter(Boolean))].sort();
+  const dates = [...new Set(source.map(r => typeof rDate === 'function' ? rDate(r) : '').filter(Boolean))].sort();
+
+  return { shifts, floors, qtcs, dates, totalTasks: source.length };
+}
+
+function renderUniversalFilterBar(pageKey) {
+  const opts = getGlobalFilterOptions();
+  const filteredRows = rowsInView();
+  const filteredCount = filteredRows.length;
+  const totalCount = opts.totalTasks;
+  const pct = totalCount > 0 ? ((filteredCount / totalCount) * 100).toFixed(1) : '100';
+
+  const cToday = cairoToday();
+  const isToday = globalUnifiedFilters.date === cToday;
+  const isYesterday = globalUnifiedFilters.date === _addDays(cToday, -1);
+  const isAllDays = !globalUnifiedFilters.date && !globalUnifiedFilters.from && !globalUnifiedFilters.to;
+
+  const hasAnyFilter = Boolean(
+    globalUnifiedFilters.date || globalUnifiedFilters.from || globalUnifiedFilters.to ||
+    globalUnifiedFilters.floor || globalUnifiedFilters.qtc || globalUnifiedFilters.shift
+  );
+
+  let activeTagsHtml = '';
+  if (hasAnyFilter) {
+    activeTagsHtml = '<div class="uf-tags-strip">'
+      + '<span class="uf-tags-lbl">الفلاتر النشطة (Active):</span>'
+      + (globalUnifiedFilters.date ? '<span class="uf-tag">📅 يوم: <b>' + esc(globalUnifiedFilters.date) + '</b> <button type="button" class="uf-tag-del" data-clear="date">✕</button></span>' : '')
+      + (globalUnifiedFilters.from ? '<span class="uf-tag">من: <b>' + esc(globalUnifiedFilters.from) + '</b> <button type="button" class="uf-tag-del" data-clear="from">✕</button></span>' : '')
+      + (globalUnifiedFilters.to ? '<span class="uf-tag">إلى: <b>' + esc(globalUnifiedFilters.to) + '</b> <button type="button" class="uf-tag-del" data-clear="to">✕</button></span>' : '')
+      + (globalUnifiedFilters.floor ? '<span class="uf-tag">🏢 فلور: <b>' + esc(globalUnifiedFilters.floor) + '</b> <button type="button" class="uf-tag-del" data-clear="floor">✕</button></span>' : '')
+      + (globalUnifiedFilters.qtc ? '<span class="uf-tag">👤 مشرف: <b>' + esc(globalUnifiedFilters.qtc) + '</b> <button type="button" class="uf-tag-del" data-clear="qtc">✕</button></span>' : '')
+      + (globalUnifiedFilters.shift ? '<span class="uf-tag">⏱️ شيفت: <b>' + esc(globalUnifiedFilters.shift) + '</b> <button type="button" class="uf-tag-del" data-clear="shift">✕</button></span>' : '')
+      + '<button type="button" class="uf-clear-all-link" id="ufClearAllLink_' + pageKey + '">مسح كل الفلاتر</button>'
+      + '</div>';
+  }
+
+  return '<div class="universal-filter-panel" data-uf-page="' + pageKey + '">'
+    + '<div class="uf-header-row">'
+      + '<div class="uf-header-left">'
+        + '<span class="uf-header-badge">⚡ الفلاتر العامة الموحدة (Operational Filters)</span>'
+        + '<span class="uf-stats-badge ' + (hasAnyFilter ? 'active-filter-badge' : '') + '">'
+          + 'عرض <b>' + filteredCount.toLocaleString() + '</b> من <b>' + totalCount.toLocaleString() + '</b> مهمة (' + pct + '%)'
+        + '</span>'
+      + '</div>'
+      + '<div class="uf-header-right">'
+        + (hasAnyFilter ? '<button type="button" class="btn btn-sm btn-uf-reset" id="ufResetBtn_' + pageKey + '">↺ تفريغ الفلاتر (Reset All)</button>' : '')
+      + '</div>'
+    + '</div>'
+
+    + '<div class="uf-grid-controls">'
+      // 1. Date Picker (Any day) & Presets & Custom Range
+      + '<div class="uf-ctrl-box uf-ctrl-date">'
+        + '<label class="uf-ctrl-lbl" for="ufDate_' + pageKey + '">📅 التاريخ (أي يوم - Date):</label>'
+        + '<div class="uf-date-actions-wrap">'
+          + '<div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">'
+            + '<input type="date" class="uf-input-date" id="ufDate_' + pageKey + '" value="' + esc(globalUnifiedFilters.date) + '" title="اختر أي يوم لتصفية كل البيانات">'
+            + '<div class="uf-presets-group">'
+              + '<button type="button" class="uf-preset-btn ' + (isToday ? 'active' : '') + '" data-uf-date-preset="today">اليوم</button>'
+              + '<button type="button" class="uf-preset-btn ' + (isYesterday ? 'active' : '') + '" data-uf-date-preset="yesterday">أمس</button>'
+              + '<button type="button" class="uf-preset-btn ' + (isAllDays ? 'active' : '') + '" data-uf-date-preset="all">الكل</button>'
+            + '</div>'
+          + '</div>'
+          + '<div style="display:flex; gap:6px; align-items:center; margin-top:4px;">'
+            + '<span style="font-size:11px; color:var(--text-soft); white-space:nowrap;">أو فترة من:</span>'
+            + '<input type="date" class="uf-input-date-sm" id="ufFrom_' + pageKey + '" value="' + esc(globalUnifiedFilters.from) + '" title="من تاريخ">'
+            + '<span style="font-size:11px; color:var(--text-soft);">إلى:</span>'
+            + '<input type="date" class="uf-input-date-sm" id="ufTo_' + pageKey + '" value="' + esc(globalUnifiedFilters.to) + '" title="إلى تاريخ">'
+          + '</div>'
+        + '</div>'
+      + '</div>'
+
+      // 2. Floor (= Unit) Dropdown
+      + '<div class="uf-ctrl-box">'
+        + '<label class="uf-ctrl-lbl" for="ufFloor_' + pageKey + '">🏢 الفلور = Unit (Floor):</label>'
+        + '<select class="uf-input-select" id="ufFloor_' + pageKey + '">'
+          + '<option value="">🏢 كل الفلورات (All Floors / Units)</option>'
+          + opts.floors.map(f => '<option value="' + esc(f) + '" ' + (globalUnifiedFilters.floor === f ? 'selected' : '') + '>' + esc(f) + '</option>').join('')
+        + '</select>'
+      + '</div>'
+
+      // 3. QTC Supervisor Dropdown
+      + '<div class="uf-ctrl-box">'
+        + '<label class="uf-ctrl-lbl" for="ufQtc_' + pageKey + '">👤 المشرف (QTC Supervisor):</label>'
+        + '<select class="uf-input-select" id="ufQtc_' + pageKey + '">'
+          + '<option value="">👤 كل المشرفين (All QTCs)</option>'
+          + opts.qtcs.map(q => '<option value="' + esc(q) + '" ' + (globalUnifiedFilters.qtc === q ? 'selected' : '') + '>' + esc(q) + '</option>').join('')
+        + '</select>'
+      + '</div>'
+
+      // 4. Shift Dropdown
+      + '<div class="uf-ctrl-box">'
+        + '<label class="uf-ctrl-lbl" for="ufShift_' + pageKey + '">⏱️ الشيفت (Shift):</label>'
+        + '<select class="uf-input-select" id="ufShift_' + pageKey + '">'
+          + '<option value="">⏱️ كل الشيفتات (All Shifts)</option>'
+          + opts.shifts.map(s => '<option value="' + esc(s) + '" ' + (globalUnifiedFilters.shift === s ? 'selected' : '') + '>' + esc(s) + '</option>').join('')
+        + '</select>'
+      + '</div>'
+    + '</div>'
+
+    + activeTagsHtml
+  + '</div>';
+}
+
+function bindUniversalFilterBar(container, pageKey) {
+  if (!container) return;
+  const panel = container.querySelector('.universal-filter-panel[data-uf-page="' + pageKey + '"]');
+  if (!panel) return;
+
+  const dateInput = panel.querySelector('#ufDate_' + pageKey);
+  if (dateInput) {
+    dateInput.onchange = (e) => {
+      globalUnifiedFilters.date = e.target.value.trim();
+      globalUnifiedFilters.from = '';
+      globalUnifiedFilters.to = '';
+      applyGlobalFilters();
+    };
+  }
+
+  const fromInput = panel.querySelector('#ufFrom_' + pageKey);
+  if (fromInput) {
+    fromInput.onchange = (e) => {
+      globalUnifiedFilters.from = e.target.value.trim();
+      globalUnifiedFilters.date = '';
+      applyGlobalFilters();
+    };
+  }
+
+  const toInput = panel.querySelector('#ufTo_' + pageKey);
+  if (toInput) {
+    toInput.onchange = (e) => {
+      globalUnifiedFilters.to = e.target.value.trim();
+      globalUnifiedFilters.date = '';
+      applyGlobalFilters();
+    };
+  }
+
+  panel.querySelectorAll('[data-uf-date-preset]').forEach(btn => {
+    btn.onclick = () => {
+      const preset = btn.dataset.ufDatePreset;
+      if (preset === 'today') {
+        globalUnifiedFilters.date = cairoToday();
+      } else if (preset === 'yesterday') {
+        globalUnifiedFilters.date = _addDays(cairoToday(), -1);
+      } else if (preset === 'all') {
+        globalUnifiedFilters.date = '';
+      }
+      globalUnifiedFilters.from = '';
+      globalUnifiedFilters.to = '';
+      applyGlobalFilters();
+    };
+  });
+
+  const floorSelect = panel.querySelector('#ufFloor_' + pageKey);
+  if (floorSelect) {
+    floorSelect.onchange = (e) => {
+      globalUnifiedFilters.floor = e.target.value.trim();
+      applyGlobalFilters();
+    };
+  }
+
+  const qtcSelect = panel.querySelector('#ufQtc_' + pageKey);
+  if (qtcSelect) {
+    qtcSelect.onchange = (e) => {
+      globalUnifiedFilters.qtc = e.target.value.trim();
+      applyGlobalFilters();
+    };
+  }
+
+  const shiftSelect = panel.querySelector('#ufShift_' + pageKey);
+  if (shiftSelect) {
+    shiftSelect.onchange = (e) => {
+      globalUnifiedFilters.shift = e.target.value.trim();
+      applyGlobalFilters();
+    };
+  }
+
+  panel.querySelectorAll('.uf-tag-del[data-clear]').forEach(btn => {
+    btn.onclick = () => {
+      const k = btn.dataset.clear;
+      if (k in globalUnifiedFilters) {
+        globalUnifiedFilters[k] = '';
+      }
+      applyGlobalFilters();
+    };
+  });
+
+  const resetBtn = panel.querySelector('#ufResetBtn_' + pageKey);
+  if (resetBtn) {
+    resetBtn.onclick = () => resetUniversalFilters();
+  }
+  const clearLink = panel.querySelector('#ufClearAllLink_' + pageKey);
+  if (clearLink) {
+    clearLink.onclick = () => resetUniversalFilters();
+  }
+}
+
+function resetUniversalFilters() {
+  globalUnifiedFilters.date = '';
+  globalUnifiedFilters.from = '';
+  globalUnifiedFilters.to = '';
+  globalUnifiedFilters.floor = '';
+  globalUnifiedFilters.qtc = '';
+  globalUnifiedFilters.shift = '';
+  applyGlobalFilters();
+  if (typeof showToast === 'function') {
+    showToast('✓ تم تفريغ جميع الفلاتر الموحدة (Filters reset)');
+  }
+}
+
+function applyGlobalFilters() {
+  if (typeof route === 'function') {
+    route();
+  }
+}
+
+function rowsInView(){
+  const allData = (typeof fcache !== 'undefined' && fcache && fcache.length) ? fcache : (typeof rawRows !== 'undefined' && rawRows ? rawRows : (window.rawRows || []));
+  let rows = activeLoc && !activeLoc.startsWith('__') && locColIdx >= 0
+    ? allData.filter(r => String(r[locColIdx]||'').trim() === activeLoc)
+    : allData;
+
+  if (!rows || !rows.length) return [];
+
+  const idx = name => hdrs ? hdrs.findIndex(h => h.trim().toLowerCase() === name.toLowerCase()) : -1;
+  const si = idx('shift');
+  const fi = hdrs ? hdrs.findIndex(h => ['floor', 'unit'].includes(h.trim().toLowerCase())) : -1;
+  const qi = hdrs ? hdrs.findIndex(h => ['qtc name', 'qtc', 'supervisor'].includes(h.trim().toLowerCase())) : -1;
+
+  return rows.filter(r => {
+    const d = typeof rDate === 'function' ? rDate(r) : '';
+    // Date filter: exact date match if selected
+    if (globalUnifiedFilters.date) {
+      if (!d || d !== globalUnifiedFilters.date) return false;
+    } else {
+      if (globalUnifiedFilters.from && d && d < globalUnifiedFilters.from) return false;
+      if (globalUnifiedFilters.to && d && d > globalUnifiedFilters.to) return false;
+    }
+    // Shift filter
+    if (globalUnifiedFilters.shift && si >= 0 && String(r[si] || '').trim() !== globalUnifiedFilters.shift) return false;
+    // Floor filter (Floor == Unit)
+    if (globalUnifiedFilters.floor && fi >= 0 && deriveFloor(r[fi]) !== globalUnifiedFilters.floor) return false;
+    // QTC filter
+    if (globalUnifiedFilters.qtc && qi >= 0 && String(r[qi] || '').trim() !== globalUnifiedFilters.qtc) return false;
+
+    return true;
+  });
+}
+
+window.globalUnifiedFilters = globalUnifiedFilters;
+window.getGlobalFilterOptions = getGlobalFilterOptions;
+window.renderUniversalFilterBar = renderUniversalFilterBar;
+window.bindUniversalFilterBar = bindUniversalFilterBar;
+window.resetUniversalFilters = resetUniversalFilters;
+window.applyGlobalFilters = applyGlobalFilters;
+window.rowsInView = rowsInView;
 function uniq(rows,name){const i=hdrs.findIndex(h=>h.toLowerCase()===name.toLowerCase());return i<0?null:new Set(rows.map(r=>String(r[i]||'').trim()).filter(Boolean)).size;}
 function daily(rows){const map=new Map();rows.forEach(r=>{const d=rDate(r);if(d)map.set(d,(map.get(d)||0)+1);});return [...map].sort(([a],[b])=>a.localeCompare(b));}
 function spark(points){if(!points.length)return '';const max=Math.max(1,...points.map(p=>p[1]));return '<svg class="ux-spark" viewBox="0 0 200 32" preserveAspectRatio="none" aria-label="Daily submission trend"><polyline fill="none" stroke="currentColor" stroke-width="2.5" points="'+points.map((p,i)=>(points.length===1?100:i/(points.length-1)*200)+','+(30-p[1]/max*26)).join(' ')+'"/></svg>';}
 function animate(){overview.querySelectorAll('[data-count]').forEach(el=>{const value=Number(el.dataset.count);if(reduced()){el.textContent=value.toLocaleString();return;}const begin=performance.now();function tick(t){const p=Math.min(1,(t-begin)/650);el.textContent=Math.round(value*(1-Math.pow(1-p,3))).toLocaleString();if(p<1&&el.isConnected)requestAnimationFrame(tick);}requestAnimationFrame(tick);});}
 function applyView(){root.classList.toggle('ux-summary-hidden',view==='details');root.classList.toggle('ux-details-hidden',view==='summary');overview.querySelectorAll('[data-view]').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.view===view)));}
 function resetAllFilters(){
+ globalUnifiedFilters.date = ''; globalUnifiedFilters.from = ''; globalUnifiedFilters.to = ''; globalUnifiedFilters.floor = ''; globalUnifiedFilters.qtc = ''; globalUnifiedFilters.shift = '';
  selD.clear();selWeeks.clear();
  Object.keys(sel).forEach(k=>sel[k].clear());
  Object.assign(analysisFilters,{from:'',to:'',modality:'all',shift:'',unit:'',qtc:'',category:'',chartCategory:'all'});
@@ -991,6 +1272,8 @@ function renderOverview(){
     + '</div>'
   + '</div>'
 
+  + renderUniversalFilterBar('overview')
+
   // Freshness & Operational Comparison Banner
   + '<div class="ux-panel" style="margin-bottom:20px; padding:14px 20px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:14px; background:var(--bg-2); border-left:4px solid var(--primary);">'
     + '<div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">'
@@ -1264,6 +1547,7 @@ function renderOverview(){
 
   progress(rows.length);
   applyView();
+  bindUniversalFilterBar(overview, 'overview');
 }
 function progress(count){const pct=target?count/target*100:0;$('uxProgress').innerHTML=target?'<div class="ux-track" role="progressbar" aria-label="Submission target" aria-valuenow="'+Math.min(100,Math.round(pct))+'" aria-valuemin="0" aria-valuemax="100"><div class="ux-fill" style="width:'+Math.min(100,pct)+'%"></div></div><b>'+Math.round(pct)+'%</b><p>'+count.toLocaleString()+' of '+target.toLocaleString()+' submissions</p>':'<p style="margin-top:18px">Set a target to see your progress.</p>';}
 function exportCSV(){const rows=rowsInView();if(!rows.length){showToast('No matching rows to export.');return;}const cell=v=>'"'+String(v??'').replace(/^[=+@\-\t\r]/,"'$&").replace(/"/g,'""')+'"';const csv=[hdrs,...rows].map(r=>r.map(cell).join(',')).join('\r\n');downloadBlob(new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'}),'MEEG_filtered_'+cairoToday()+'.csv');}
@@ -1527,7 +1811,7 @@ function renderAnalysis(){
       + renderHeaderControlsHTML('an')
     + '</div>'
 
-    + '<div id="anSlicers"></div>'
+    + renderUniversalFilterBar('analysis')
 
     // 8 KPI Grid
     + '<div class="ux-grid-8" style="margin-top:16px;">'
@@ -1634,7 +1918,7 @@ function renderAnalysis(){
     + '</div>'
   + '</div>';
 
-  bindHeaderControls(analysis, 'an');
+  bindHeaderControls(analysis, 'an'); bindUniversalFilterBar(analysis, 'analysis');
   const slicerContainer = analysis.querySelector('#anSlicers');
   if (slicerContainer) slicerContainer.appendChild(createListSlicers());
 
@@ -1960,7 +2244,7 @@ function renderPerformance(){
       + renderHeaderControlsHTML('perf')
     + '</div>'
 
-    + '<div id="perfSlicers"></div>'
+    + renderUniversalFilterBar('performance')
 
     // Controls
     + '<div class="ux-panel perf-controls" style="margin-top:14px;">'
@@ -2073,7 +2357,7 @@ function renderPerformance(){
     + '</section>'
   + '</div>';
 
-  bindHeaderControls(page, 'perf');
+  bindHeaderControls(page, 'perf'); bindUniversalFilterBar(page, 'performance');
   const slicersEl = page.querySelector('#perfSlicers');
   if (slicersEl) slicersEl.appendChild(createListSlicers());
 
@@ -2356,6 +2640,8 @@ function renderDailyReport(){
       + renderHeaderControlsHTML('daily')
     + '</div>'
 
+    + renderUniversalFilterBar('daily')
+
     // Segmented Section Toggle
     + '<div class="section-switch-wrap">'
       + '<button class="section-switch-btn ' + (dailyReportSection==='quality'?'active':'') + '" id="btnSecQuality">⭐ Section A — Quality Analytics</button>'
@@ -2590,7 +2876,7 @@ function renderDailyReport(){
     + '</div>'
   + '</div>';
 
-  bindHeaderControls(page, 'daily');
+  bindHeaderControls(page, 'daily'); bindUniversalFilterBar(page, 'daily');
 
   // Toggle Section A / Section B
   $('btnSecQuality').onclick = () => { dailyReportSection = 'quality'; renderDailyReport(); };
@@ -3068,7 +3354,7 @@ function renderQueuesAnalysis(){
   if(!window._firstDataReady && !hdrs.length){
     const error = $('mainContent')?.querySelector('.errbox');
     page.innerHTML = '<div class="ux-overview"><div class="ux-heading"><div><div class="ux-eyebrow">Queue breakdown · Shifts & Floors & QTCs</div><h2>Queues Analysis</h2><p>Submission volume, shifts, floors, and QTC distribution per queue</p></div>' + renderHeaderControlsHTML('queues') + '</div><div class="ux-panel"><h3>' + (error ? 'Data could not be loaded' : 'Waiting for source data') + '</h3><p>' + esc(error ? error.textContent.replace('↻ Retry','').trim() : 'Queues analysis will appear once dashboard data is loaded.') + '</p><button class="btn btn-c" id="qRetry" style="margin-top:16px">↻ Retry data load</button></div></div>';
-    bindHeaderControls(page, 'queues');
+    bindHeaderControls(page, 'queues'); bindUniversalFilterBar(page, 'queues');
     $('qRetry')?.addEventListener('click', () => loadData());
     return;
   }
@@ -3155,6 +3441,8 @@ function renderQueuesAnalysis(){
       + '</div>'
       + renderHeaderControlsHTML('queues')
     + '</div>'
+
+    + renderUniversalFilterBar('queues')
 
     // 8 KPI Grid
     + '<div class="ux-grid-8">'
@@ -3606,6 +3894,8 @@ function renderGmReport(){
         ${renderHeaderControlsHTML('gm')}
       </div>
 
+      ${renderUniversalFilterBar('gm_report')}
+
       <!-- KPI Summary Cards -->
       <div class="ux-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 20px;">
         <div class="kpi-mini-card" style="--tone: #3b82f6;">
@@ -3714,7 +4004,7 @@ function renderGmReport(){
     </div>
   `;
 
-  bindHeaderControls(page, 'gm');
+  bindHeaderControls(page, 'gm'); bindUniversalFilterBar(page, 'gm_report');
 
   const searchInp = page.querySelector('#gmSearchInput');
   if (searchInp) {
@@ -3916,6 +4206,8 @@ function renderShiftComparison(){
         </div>
         ${renderHeaderControlsHTML('sc')}
       </div>
+
+      ${renderUniversalFilterBar('shift_comparison')}
 
       <!-- Shift Summary KPI Cards -->
       <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin-bottom: 20px;">
@@ -4139,7 +4431,7 @@ function renderShiftComparison(){
     </div>
   `;
 
-  bindHeaderControls(page, 'sc');
+  bindHeaderControls(page, 'sc'); bindUniversalFilterBar(page, 'shift_comparison');
 
   page.querySelector('#scTabFloor')?.addEventListener('click', () => { shiftCompFilters.subTab = 'floor'; renderShiftComparison(); });
   page.querySelector('#scTabQtc')?.addEventListener('click', () => { shiftCompFilters.subTab = 'qtc'; renderShiftComparison(); });
@@ -4474,6 +4766,8 @@ function renderQtcFloorPerformance(){
       + renderHeaderControlsHTML('qtcfloor')
     + '</div>'
 
+    + renderUniversalFilterBar('qtcfloor')
+
     // 8 KPI Grid
     + '<div class="ux-grid-8">'
       + kpi8.map(k => '<div class="kpi-mini-card" style="--tone:' + k.tone + '">'
@@ -4630,7 +4924,7 @@ function renderQtcFloorPerformance(){
     + '</section>'
   + '</div>';
 
-  bindHeaderControls(page, 'qtcfloor');
+  bindHeaderControls(page, 'qtcfloor'); bindUniversalFilterBar(page, 'qtcfloor');
 
   // Input & Dropdowns
   const qfSearch = page.querySelector('#qfQuery');
