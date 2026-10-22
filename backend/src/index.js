@@ -316,6 +316,179 @@ function maskNationalId(natId, role) {
 // ============================================================
 // MAIN ROUTER
 // ============================================================
+// ============================================================
+// GOOGLE SHEETS LIVE SYNCHRONIZATION ENGINE
+// ============================================================
+async function syncGoogleSheetsToTurso(env) {
+  const q1 = "select * order by A desc limit 300";
+  const url1 = "https://docs.google.com/spreadsheets/d/1g9mPKQMactJKC-BP0Ik3Cw72PLUXCb4VTKFbHYLjc5I/gviz/tq?tqx=responseHandler:cb1&tq=" + encodeURIComponent(q1);
+
+  const q2 = "select * order by A desc limit 100";
+  const url2 = "https://docs.google.com/spreadsheets/d/1vpsYtvoZSKLsUeKj-FTXVGJmyFygSSck8DUIODJha_A/gviz/tq?tqx=responseHandler:cb2&tq=" + encodeURIComponent(q2);
+
+  const stmts = [];
+  const newQueues = new Set();
+  const newQtcs = new Set();
+
+  function parseGViz(text, callbackName) {
+    const prefix = callbackName + "(";
+    const start = text.indexOf(prefix);
+    if (start === -1) return null;
+    const end = text.lastIndexOf(")");
+    if (end === -1) return null;
+    try {
+      return JSON.parse(text.slice(start + prefix.length, end));
+    } catch {
+      return null;
+    }
+  }
+
+  // 1. Fetch Sheet 1
+  try {
+    const res1 = await fetch(url1, { headers: { "User-Agent": "Mozilla/5.0" } });
+    const txt1 = await res1.text();
+    const obj1 = parseGViz(txt1, "cb1");
+    if (obj1 && obj1.table && obj1.table.rows) {
+      for (const row of obj1.table.rows) {
+        if (!row.c) continue;
+        const vals = row.c.map(cell => cell ? (cell.f || cell.v || "") : "");
+        if (vals.length < 15) continue;
+        const ts = String(vals[0] || "").trim();
+        const shift = String(vals[1] || "").trim();
+        const unit = String(vals[2] || "").trim();
+        const qtc_name = String(vals[3] || "").trim();
+        const yk_email = String(vals[4] || "").toLowerCase().trim();
+        const lab_name = String(vals[5] || "").trim();
+        const nat_id = String(vals[6] || "").trim();
+        const pc_no = String(vals[7] || "").trim();
+        const mod = String(vals[8] || "").trim();
+        const queue = String(vals[9] || "").trim();
+        const link = String(vals[10] || "").trim();
+        const tid = String(vals[11] || "").trim();
+        const obj_cnt = parseInt(vals[12] || 0, 10) || 0;
+        const pas = String(vals[13] || "").trim();
+        const stage = String(vals[14] || "").trim();
+        const created = String(vals[15] || ts).trim();
+        if (!tid) continue;
+
+        if (queue) newQueues.add(queue);
+        if (qtc_name) newQtcs.add(qtc_name);
+
+        stmts.push({
+          type: "execute",
+          stmt: {
+            sql: "INSERT OR IGNORE INTO task_submissions (timestamp, shift, unit, pc_no, labeler_name, national_id, qtc_shift, yubikey_email, qtc_name, stage, task_link, task_id, pass, modality, queue_name, object_count, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            args: [
+              { type: "text", value: ts },
+              { type: "text", value: shift },
+              { type: "text", value: unit },
+              { type: "text", value: pc_no },
+              { type: "text", value: lab_name },
+              { type: "text", value: nat_id },
+              { type: "text", value: shift },
+              { type: "text", value: yk_email },
+              { type: "text", value: qtc_name },
+              { type: "text", value: stage },
+              { type: "text", value: link },
+              { type: "text", value: tid },
+              { type: "text", value: pas },
+              { type: "text", value: mod },
+              { type: "text", value: queue },
+              { type: "integer", value: String(obj_cnt) },
+              { type: "text", value: created }
+            ]
+          }
+        });
+      }
+    }
+  } catch (e) {
+    console.warn("Sheet 1 sync error:", e);
+  }
+
+  // 2. Fetch Sheet 2
+  try {
+    const res2 = await fetch(url2, { headers: { "User-Agent": "Mozilla/5.0" } });
+    const txt2 = await res2.text();
+    const obj2 = parseGViz(txt2, "cb2");
+    if (obj2 && obj2.table && obj2.table.rows) {
+      for (const row of obj2.table.rows) {
+        if (!row.c) continue;
+        const vals = row.c.map(cell => cell ? (cell.f || cell.v || "") : "");
+        if (vals.length < 15) continue;
+        const ts = String(vals[0] || "").trim();
+        const shift = String(vals[1] || "").trim();
+        const unit = String(vals[2] || "").trim();
+        const qtc_name = String(vals[3] || "").trim();
+        const yk_email = String(vals[4] || "").toLowerCase().trim();
+        const lab_name = String(vals[5] || "").trim();
+        const nat_id = String(vals[6] || "").trim();
+        const pc_no = String(vals[7] || "").trim();
+        const mod = String(vals[8] || "").trim();
+        const queue = String(vals[9] || "").trim();
+        const link = String(vals[10] || "").trim();
+        const tid = String(vals[11] || "").trim();
+        const obj_cnt = parseInt(vals[12] || 0, 10) || 0;
+        const pas = String(vals[13] || "").trim();
+        const stage = String(vals[14] || "").trim();
+        if (!tid) continue;
+
+        if (queue) newQueues.add(queue);
+        if (qtc_name) newQtcs.add(qtc_name);
+
+        stmts.push({
+          type: "execute",
+          stmt: {
+            sql: "INSERT OR IGNORE INTO task_submissions (timestamp, shift, unit, pc_no, labeler_name, national_id, qtc_shift, yubikey_email, qtc_name, stage, task_link, task_id, pass, modality, queue_name, object_count, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            args: [
+              { type: "text", value: ts },
+              { type: "text", value: shift },
+              { type: "text", value: unit },
+              { type: "text", value: pc_no },
+              { type: "text", value: lab_name },
+              { type: "text", value: nat_id },
+              { type: "text", value: shift },
+              { type: "text", value: yk_email },
+              { type: "text", value: qtc_name },
+              { type: "text", value: stage },
+              { type: "text", value: link },
+              { type: "text", value: tid },
+              { type: "text", value: pas },
+              { type: "text", value: mod },
+              { type: "text", value: queue },
+              { type: "integer", value: String(obj_cnt) },
+              { type: "text", value: ts }
+            ]
+          }
+        });
+      }
+    }
+  } catch (e) {
+    console.warn("Sheet 2 sync error:", e);
+  }
+
+  // Execute statements in batches of 50
+  if (stmts.length > 0) {
+    for (let i = 0; i < stmts.length; i += 50) {
+      const batch = stmts.slice(i, i + 50);
+      await fetch(env.TURSO_URL, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${env.TURSO_TOKEN}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ requests: batch })
+      });
+    }
+  }
+
+  // Sync custom queues
+  for (const q of newQueues) {
+    await db(env, "INSERT OR IGNORE INTO custom_queues (queue_name, description) VALUES (?, 'Auto-synced from Google Sheets')", [q]).catch(() => {});
+  }
+
+  const countRes = await db(env, "SELECT count(*) as total FROM task_submissions");
+  const total = countRes[0]?.total || 0;
+
+  return { ok: true, synced_statements: stmts.length, total_submissions: total };
+}
+
 export default {
   async fetch(request, env) {
     const corsHeaders = getCorsHeaders(request, env);
@@ -615,6 +788,14 @@ export default {
         );
 
         return json({ ok: true, message: "Task submitted successfully" }, 201, corsHeaders);
+      }
+
+      // ------------------------------------------------------------
+      // 14. SYNC GOOGLE SHEETS LIVE DATA (/api/sync-sheets)
+      // ------------------------------------------------------------
+      if (pathname === "/api/sync-sheets" && (request.method === "POST" || request.method === "GET")) {
+        const result = await syncGoogleSheetsToTurso(env);
+        return json(result, 200, corsHeaders);
       }
 
       // ============================================================
@@ -939,28 +1120,6 @@ export default {
         return json({ ok: true, count: rows.length, rows }, 200, corsHeaders);
       }
 
-      // ------------------------------------------------------------
-      // 14. SAME-SITE REVERSE PROXY FOR FRONTEND ASSETS
-      // ------------------------------------------------------------
-      // When deployed, any non-API request proxies to GitHub Pages
-      // ensuring 100% same-site origin for cookies, session, and static files!
-      if (!pathname.startsWith("/api/")) {
-        const ghTarget = "https://islamyasser424-design.github.io/meti-task-tracker" + (pathname === "/" ? "/dashboard.html" : pathname);
-        const ghRes = await fetch(ghTarget, {
-          headers: { "User-Agent": "MEEG-Secure-Gateway/1.0" }
-        });
-
-        const contentType = ghRes.headers.get("Content-Type") || "text/html; charset=utf-8";
-        const newHeaders = new Headers(ghRes.headers);
-        newHeaders.set("X-Content-Type-Options", "nosniff");
-        newHeaders.set("X-Frame-Options", "SAMEORIGIN");
-        newHeaders.delete("Content-Security-Policy");
-
-        return new Response(ghRes.body, {
-          status: ghRes.status,
-          headers: newHeaders
-        });
-      }
 
       return json({ error: "not_found", message: "Endpoint not found" }, 404, corsHeaders);
     } catch (err) {

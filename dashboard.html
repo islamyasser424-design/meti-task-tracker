@@ -14,6 +14,8 @@
   <title>METI Operational Analytics & Admin Dashboard</title>
   <link rel="icon" type="image/x-icon" href="favicon.ico">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="analytics.css">
+  <link rel="stylesheet" href="dashboard-ui.css">
   <style>
     :root {
       --primary: #0d9488;
@@ -2085,11 +2087,39 @@
     <!-- ============================================================ -->
     <!-- TAB 5: EXECUTIVE INTELLIGENCE & DEEP ANALYTICS (ADMIN ONLY) -->
     <!-- ============================================================ -->
-    <div id="panelAnalytics" style="display:none; width:100%; height:100%;">
-          <div class="analytics-frame-wrap" style="border-radius:12px; border:1px solid var(--border); box-shadow:var(--shadow-sm); overflow:hidden;">
-            <iframe id="analyticsFrame" src="about:blank" style="width:100%; height:calc(100vh - 120px); min-height:850px; border:none; display:block;" title="Executive Analytics"></iframe>
-          </div>
+    <div id="panelAnalytics" style="display:none; width:100%;">
+      <!-- Analytics Status & Sync Bar -->
+      <div class="sync-bar" id="syncBar"><div class="sync-progress"></div></div>
+      <div class="cmp-bar" id="cmpBar" style="display:none;">
+        <div class="cmp-side"><span class="cmp-label cmp-label-a">A</span><select class="cmp-sel" id="cmpSelA"><option value="">— Select Period —</option></select></div>
+        <span class="cmp-vs">VS</span>
+        <div class="cmp-side"><span class="cmp-label cmp-label-b">B</span><select class="cmp-sel" id="cmpSelB"><option value="">— Select Period —</option></select></div>
+        <button class="cmp-run-btn" onclick="runCompare()">⚖️ Compare Now</button>
+      </div>
+
+      <!-- Quick Shift Filters Banner -->
+      <div class="shift-banner" id="shiftBanner">
+        <span class="shift-banner-label">📋 Shifts:</span>
+        <div class="opt-shifts-wrap" id="optShiftsWrap">
+          <button class="opt-shift-btn" id="btn_overnight" onclick="toggleShift('overnight',this)"><span class="dot">○</span> Over Night</button>
+          <button class="opt-shift-btn" id="btn_overnight12h" onclick="toggleShift('overnight12h',this)"><span class="dot">○</span> O.Night 12H</button>
+          <button class="opt-shift-btn" id="btn_morning12h" onclick="toggleShift('morning12h',this)"><span class="dot">○</span> Morning 12H</button>
+          <button class="opt-shift-btn" id="btn_night" onclick="toggleShift('night',this)"><span class="dot">○</span> Night</button>
+          <button class="opt-shift-btn" id="btn_morning" onclick="toggleShift('morning',this)"><span class="dot">○</span> Morning</button>
+          <button class="opt-shift-btn" id="btn_overmshift" onclick="toggleShift('overmshift',this)"><span class="dot">○</span> O.Shift(M)</button>
+          <button class="opt-shift-btn" id="btn_overnshift" onclick="toggleShift('overnshift',this)"><span class="dot">○</span> O.Shift(N)</button>
+          <button class="opt-shift-btn" id="btn_oversonshift" onclick="toggleShift('oversonshift',this)"><span class="dot">○</span> O.Shift(ON)</button>
         </div>
+      </div>
+
+      <!-- Slicers, Pills & Sub-tabs -->
+      <div class="fstrip" id="fstrip"><div style="display:flex;align-items:center;gap:6px"><div class="spin" style="width:16px;height:16px;border-width:3px"></div><span class="ltxt" style="font-size:.62rem">Loading…</span></div></div>
+      <div class="pills-row pills-wrap"><div id="pillsRow" class="pills-inner"><span class="pill pill-all">All Data — No Filters Active</span></div></div>
+      <div class="loc-tabs" id="locTabs"><div class="spin" style="width:14px;height:14px;border-width:3px;margin:9px 0"></div></div>
+
+      <!-- Analytics Main Dynamic Content Container -->
+      <div class="content" id="mainContent"><div class="loader"><div class="spin"></div><span class="ltxt">Loading data…</span></div></div>
+    </div>
 
       </div> <!-- end workspace-content-body -->
     </div> <!-- end main-workspace -->
@@ -2662,25 +2692,13 @@
       if (tabName === "users" && (_currentUser && _currentUser.role === "admin")) loadUsersList();
 
       if (cfg.isAnalytics) {
-        var frame = document.getElementById("analyticsFrame");
-        frame.onload = function() {
-          try {
-            var curTheme = document.documentElement.getAttribute('data-theme') || 'light';
-            if (frame.contentDocument && frame.contentDocument.documentElement) {
-              frame.contentDocument.documentElement.setAttribute('data-theme', curTheme);
-            }
-          } catch(e){}
-        };
-        var frame = document.getElementById("analyticsFrame");
-        var targetSrc = "analytics.html?embedded=1" + (cfg.hash || "#dashboard");
-        if (!frame.src || frame.src === "about:blank" || !frame.src.includes("analytics.html")) {
-          frame.src = targetSrc;
+        if (typeof window.switchAnalyticsWorkspace === "function") {
+          window.switchAnalyticsWorkspace(cfg.hash || "#dashboard");
         } else {
-          try {
-            if (frame.contentWindow) frame.contentWindow.location.hash = (cfg.hash || "#dashboard");
-          } catch(e) {
-            frame.src = targetSrc;
-          }
+          location.hash = cfg.hash || "#dashboard";
+        }
+        if (typeof loadData === "function" && (!window.rawRows || !window.rawRows.length)) {
+          loadData();
         }
       }
     }
@@ -2690,16 +2708,7 @@
       else if (_activeTab === "queues") loadLiveQueuesAdmin();
       else if (_activeTab === "qtc") loadLiveQTCAdmin();
       else if (_activeTab === "users") loadUsersList();
-      else reloadAnalyticsFrame();
-    }
-
-    function reloadAnalyticsFrame() {
-      var frame = document.getElementById("analyticsFrame");
-      if (frame) {
-        var cfg = PAGE_KEYS.find(function(p) { return p.key === _activeTab; });
-        var h = (cfg && cfg.hash) ? cfg.hash : "#dashboard";
-        frame.src = "analytics.html?embedded=1&_t=" + Date.now() + h;
-      }
+      else if (typeof loadData === "function") loadData();
     }
 
     function toggleMobileSidebar() {
@@ -2712,7 +2721,10 @@
     // ============================================================
     function initAuth() {
       var params = new URLSearchParams(window.location.search);
-      var targetTab = params.get("tab") || window.location.hash.replace("#", "") || "tasks";
+      var targetTab = params.get("tab") || "tasks";
+      var h = window.location.hash;
+      var matchingPage = PAGE_KEYS.find(function(p) { return p.key === targetTab || (p.hash && p.hash === h); });
+      if (matchingPage) targetTab = matchingPage.key;
 
       apiGetMe(function(err, data) {
         if (!err && data && data.user) {
@@ -4458,9 +4470,9 @@ async function syncGoogleSheetsClient(isAuto) {
   _isSyncingSheets = true;
 
   var btn = document.getElementById('btnSyncSheets');
-  var icon = document.getElementById('syncIcon');
-  var text = document.getElementById('syncText');
-  var syncPill = document.getElementById('syncStatus');
+  var icon = document.getElementById('btnSyncIcon');
+  var text = document.getElementById('btnSyncText');
+  var syncPill = document.getElementById('syncIndicator');
 
   if (!isAuto && btn) {
     btn.disabled = true;
@@ -4470,114 +4482,29 @@ async function syncGoogleSheetsClient(isAuto) {
   if (syncPill) syncPill.textContent = '⚡ Checking Google Sheets live submissions...';
 
   try {
-    // Sheet 1: Main/Active Sheet with 51k+ rows
-    var data1 = await fetchSheetGViz('1g9mPKQMactJKC-BP0Ik3Cw72PLUXCb4VTKFbHYLjc5I', 'select * order by A desc limit 35');
-    // Sheet 2: Daily Active Sheet
-    var data2 = await fetchSheetGViz('1vpsYtvoZSKLsUeKj-FTXVGJmyFygSSck8DUIODJha_A', 'select * order by A desc limit 25');
+    var res = await apiFetch("/api/sync-sheets", { method: "POST" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    var data = await res.json();
+    if (!data.ok) throw new Error(data.message || "Sync failed");
 
-    var stmts = [];
-
-    // Helper to format values
-    function toVal(v, typ) {
-      if (typ === 'integer') {
-        var num = parseInt(v || 0, 10);
-        return { type: 'integer', value: String(isNaN(num) ? 0 : num) };
-      }
-      return { type: 'text', value: String(v === null || v === undefined ? '' : v).trim() };
+    if (syncPill) {
+      syncPill.textContent = '⚡ Live Edge Synced (' + new Date().toLocaleTimeString() + ')';
     }
-
-    // Process Sheet 1 rows
-    if (data1 && data1.table && data1.table.rows) {
-      data1.table.rows.forEach(function(r) {
-        if (!r.c) return;
-        var vals = r.c.map(function(cell) { return cell ? (cell.f || cell.v || '') : ''; });
-        if (vals.length < 15) return;
-        var ts = vals[0] || '';
-        var shift = vals[1] || '';
-        var unit = vals[2] || '';
-        var qtc_name = vals[3] || '';
-        var yk_email = String(vals[4] || '').toLowerCase().trim();
-        var lab_name = vals[5] || '';
-        var nat_id = String(vals[6] || '').trim();
-        var pc_no = String(vals[7] || '').trim();
-        var mod = vals[8] || '';
-        var queue = vals[9] || '';
-        var link = vals[10] || '';
-        var tid = String(vals[11] || '').trim();
-        var obj_cnt = vals[12] || 0;
-        var pas = String(vals[13] || '').trim();
-        var stage = vals[14] || '';
-        var created = vals[15] || ts;
-
-        if (!tid) return;
-
-        var sql = "INSERT OR IGNORE INTO task_submissions (timestamp, shift, unit, pc_no, labeler_name, national_id, qtc_shift, yubikey_email, qtc_name, stage, task_link, task_id, pass, modality, queue_name, object_count, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-        var args = [
-          toVal(ts), toVal(shift), toVal(unit), toVal(pc_no), toVal(lab_name),
-          toVal(nat_id), toVal(shift), toVal(yk_email), toVal(qtc_name),
-          toVal(stage), toVal(link), toVal(tid), toVal(pas), toVal(mod),
-          toVal(queue), toVal(obj_cnt, 'integer'), toVal(created)
-        ];
-        stmts.push({ type: 'execute', stmt: { sql: sql, args: args } });
-      });
-    }
-
-    // Process Sheet 2 rows
-    if (data2 && data2.table && data2.table.rows) {
-      data2.table.rows.forEach(function(r) {
-        if (!r.c) return;
-        var vals = r.c.map(function(cell) { return cell ? (cell.f || cell.v || '') : ''; });
-        if (vals.length < 15) return;
-        var ts = vals[0] || '';
-        var shift = vals[1] || '';
-        var unit = vals[2] || '';
-        var qtc_name = vals[3] || '';
-        var yk_email = String(vals[4] || '').toLowerCase().trim();
-        var lab_name = vals[5] || '';
-        var nat_id = String(vals[6] || '').trim();
-        var pc_no = String(vals[7] || '').trim();
-        var mod = vals[8] || '';
-        var queue = vals[9] || '';
-        var link = vals[10] || '';
-        var tid = String(vals[11] || '').trim();
-        var obj_cnt = vals[12] || 0;
-        var pas = String(vals[13] || '').trim();
-        var stage = vals[14] || '';
-
-        if (!tid) return;
-
-        var sql = "INSERT OR IGNORE INTO task_submissions (timestamp, shift, unit, pc_no, labeler_name, national_id, qtc_shift, yubikey_email, qtc_name, stage, task_link, task_id, pass, modality, queue_name, object_count, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-        var args = [
-          toVal(ts), toVal(shift), toVal(unit), toVal(pc_no), toVal(lab_name),
-          toVal(nat_id), toVal(shift), toVal(yk_email), toVal(qtc_name),
-          toVal(stage), toVal(link), toVal(tid), toVal(pas), toVal(mod),
-          toVal(queue), toVal(obj_cnt, 'integer'), toVal(ts)
-        ];
-        stmts.push({ type: 'execute', stmt: { sql: sql, args: args } });
-      });
-    }
-
-    if (stmts.length > 0) {
-      for (var b = 0; b < stmts.length; b += 50) {
-        await executePipelineBatch(stmts.slice(b, b + 50));
-      }
-    }
-
     if (!isAuto) {
-      alert('✅ تم مزامنة أحدث بيانات Google Sheets بنجاح!');
+      alert('✅ تم مزامنة أحدث بيانات Google Sheets بنجاح! (العدد الإجمالي: ' + (data.total_submissions || _totalDbCount) + ')');
     }
+    fetchLiveDataOnly();
   } catch(err) {
     console.warn('Sync error:', err);
+    if (!isAuto) {
+      alert('❌ فشلت المزامنة: ' + (err.message || err));
+    }
   } finally {
     _isSyncingSheets = false;
     if (!isAuto && btn) {
       btn.disabled = false;
       if (icon) icon.innerHTML = '⚡';
       if (text) text.innerText = 'Sync Sheets';
-    }
-    // Refresh table view only if new statements were synced or manual
-    if (stmts.length > 0 || !isAuto) {
-      fetchLiveDataOnly();
     }
   }
 }
@@ -4796,5 +4723,30 @@ document.addEventListener("DOMContentLoaded", function() {
 });
 
   </script>
+
+  <!-- Archive Search Overlay Modal -->
+  <div class="arcs-ov" id="arcsOv" onclick="if(event.target===this)closeArchiveSearch()"><div class="arcs-box">
+  <div class="arcs-hd"><span class="t">📦 SEARCH FROM ARCHIVE</span><span class="arcs-x" onclick="closeArchiveSearch()">✕</span></div>
+  <div class="arcs-bar"><input class="arcs-in" id="arcsIn" placeholder="Task ID (optional)…" autocomplete="off" onkeydown="if(event.key==='Enter')runArchiveSearch()"/><button class="arcs-go" id="arcsGo" onclick="runArchiveSearch()">Search</button><button class="arcs-clear" onclick="clearArchiveFilters()" title="Clear all fields">Clear</button></div>
+  <div class="arcs-filters" id="arcsFilters"></div>
+  <div class="arcs-st" id="arcsSt">Type an ID (3+ characters) and press Search.</div>
+  <div class="arcs-prog" id="arcsProg" style="display:none"><div class="arcs-track"><span class="arcs-pfill" id="arcsFill"></span></div><span class="arcs-ppct" id="arcsPct">0%</span></div>
+  <div class="arcs-res" id="arcsRes"></div>
+  </div></div>
+
+  <!-- Hidden Status Elements for Analytics Integration -->
+  <div style="display:none">
+    <span id="todayLabel"></span>
+    <span id="lastUpdated"></span>
+    <span id="totalBadge"></span>
+    <span id="tlRed"></span><span id="tlYellow"></span><span id="tlGreen"></span>
+    <span id="darkBtn"></span>
+    <span id="arBtn"></span>
+    <span id="cmpBtn"></span>
+    <span id="refreshBtn"></span>
+  </div>
+
+  <script src="analytics-engine.js"></script>
+  <script src="dashboard-ui.js"></script>
 </body>
 </html>

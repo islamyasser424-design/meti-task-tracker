@@ -167,6 +167,17 @@ describe("MEEG Secure Backend Comprehensive Test Suite", () => {
     assert.equal(res2.status, 409);
     const data2 = await res2.json();
     assert.equal(data2.error, "duplicate_task");
+
+    // Clean up created test row immediately to ensure database remains 100% clean
+    await fetch(TEST_ENV.TURSO_URL, {
+      method: "POST",
+      headers: { "Authorization": "Bearer " + TEST_ENV.TURSO_TOKEN, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        requests: [
+          { type: "execute", stmt: { sql: "DELETE FROM task_submissions WHERE task_id = ?", args: [{ type: "text", value: payload.task_id }] } }
+        ]
+      })
+    });
   });
 
   test("/api/queues and /api/qtc return configured operational entities", async () => {

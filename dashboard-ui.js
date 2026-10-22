@@ -304,34 +304,86 @@ const qtcFloorFilters={query:'',qtc:'',floor:'',shift:'',category:'',sortCol:'to
 const floorPerformanceFilters={sortCol:'totalSubmit',sortAsc:false,page:0,pageSize:15};
 let view='both';let target=0;try{target=Math.max(0,Number(localStorage.getItem('meeg_personal_target'))||0);}catch(e){}
 const reduced=()=>matchMedia('(prefers-reduced-motion: reduce)').matches;
+const isUnified=!!document.getElementById('mainSidebar');
+const panelAnalytics=document.getElementById('panelAnalytics');
+const targetContainer=panelAnalytics || document.body;
+
 const root=document.createElement('div');root.id='uxDashboard';
-const start=document.querySelector('.hdr'),end=$('mainContent');
-let n=start;while(n){const next=n.nextSibling;root.appendChild(n);if(n===end)break;n=next;}
-document.body.appendChild(root);
+const start=document.querySelector('.hdr') || (panelAnalytics ? panelAnalytics.querySelector('#syncBar') : $('syncBar'));
+const end=$('mainContent');
+if(start && end){
+  let n=start;
+  while(n){
+    const next=n.nextSibling;
+    root.appendChild(n);
+    if(n===end)break;
+    n=next;
+  }
+}
+targetContainer.appendChild(root);
+
 const overview=document.createElement('section');overview.className='ux-overview';overview.id='uxOverview';
-$('syncBar').after(overview);
+if($('syncBar')) $('syncBar').after(overview);
+else root.prepend(overview);
+
 const analysis=document.createElement('section');analysis.id='uxAnalysis';analysis.hidden=true;analysis.innerHTML='<div class="ux-placeholder"><span class="ux-symbol" aria-hidden="true">◈</span><div class="ux-eyebrow" style="margin-top:24px">Your next workspace</div><h1>Analysis</h1><p>This space is ready for your analysis.<br>Metrics, charts and workflows will be added once you define them.</p><button class="btn btn-c" id="uxBack" style="margin-top:24px">Back to dashboard →</button></div>';
-document.body.appendChild(analysis);
-const performance=document.createElement('section');performance.id='uxPerformance';performance.hidden=true;document.body.appendChild(performance);
-const dailyPage=document.createElement('section');dailyPage.id='uxDaily';dailyPage.hidden=true;document.body.appendChild(dailyPage);
-const queuesPage=document.createElement('section');queuesPage.id='uxQueues';queuesPage.hidden=true;document.body.appendChild(queuesPage);
-const qtcFloorPage=document.createElement('section');qtcFloorPage.id='uxQtcFloor';qtcFloorPage.hidden=true;document.body.appendChild(qtcFloorPage);
+targetContainer.appendChild(analysis);
+
+const performance=document.createElement('section');performance.id='uxPerformance';performance.hidden=true;targetContainer.appendChild(performance);
+const dailyPage=document.createElement('section');dailyPage.id='uxDaily';dailyPage.hidden=true;targetContainer.appendChild(dailyPage);
+const queuesPage=document.createElement('section');queuesPage.id='uxQueues';queuesPage.hidden=true;targetContainer.appendChild(queuesPage);
+const qtcFloorPage=document.createElement('section');qtcFloorPage.id='uxQtcFloor';qtcFloorPage.hidden=true;targetContainer.appendChild(qtcFloorPage);
+
 const aside=document.createElement('aside');aside.className='ux-sidebar';aside.setAttribute('aria-label','Main navigation');aside.innerHTML='<div class="ux-brand"><div class="brand-logo-card"><img src="logo.jpg" alt="MEEG - Micro Engineering Egypt" class="brand-img"></div><span class="brand-workspace-tag">PRODUCTIVITY WORKSPACE</span></div><small>WORKSPACE</small><button class="ux-nav active" data-page="dashboard">▦ &nbsp; Overview</button><button class="ux-nav" data-page="analysis">◈ &nbsp; Analysis</button><button class="ux-nav" data-page="queues">☷ &nbsp; Queues Analysis</button><button class="ux-nav" data-page="performance">▤ &nbsp; Performance per Labelers</button><button class="ux-nav" data-page="qtcfloor">🏢 &nbsp; Performance per QTC & Floor</button><button class="ux-nav" data-page="daily">▦ &nbsp; Daily Report</button><footer>Connected to your existing data<br><span style="display:block;margin-top:8px">MEEG · Internal Dashboard</span></footer>';
+if (isUnified) {
+  aside.style.display = 'none';
+}
 document.body.appendChild(aside);
-const menu=document.createElement('button');menu.className='btn ux-mobile';menu.textContent='☰ Menu';menu.setAttribute('aria-expanded','false');menu.setAttribute('aria-label','Open navigation');document.body.insertBefore(menu,root);
-const backdrop=document.createElement('button');backdrop.className='ux-backdrop';backdrop.setAttribute('aria-label','Close navigation');document.body.appendChild(backdrop);
+
+const menu=document.createElement('button');menu.className='btn ux-mobile';menu.textContent='☰ Menu';menu.setAttribute('aria-expanded','false');menu.setAttribute('aria-label','Open navigation');
+if (isUnified) menu.style.display = 'none';
+document.body.insertBefore(menu,root);
+
+const backdrop=document.createElement('button');backdrop.className='ux-backdrop';backdrop.setAttribute('aria-label','Close navigation');
+if (isUnified) backdrop.style.display = 'none';
+document.body.appendChild(backdrop);
+
 function closeNav(){document.body.classList.remove('ux-sidebar-open');menu.setAttribute('aria-expanded','false');}
 menu.onclick=()=>{const open=document.body.classList.toggle('ux-sidebar-open');menu.setAttribute('aria-expanded',String(open));if(open)aside.querySelector('button').focus();};backdrop.onclick=closeNav;
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeNav();menu.focus();}});
-function route(){const current=location.hash==='#analysis-overview'?'analysis':location.hash==='#queues-analysis'?'queues':location.hash==='#performance-labelers'?'performance':location.hash==='#performance-qtc-floor'?'qtcfloor':location.hash==='#daily-report'?'daily':'dashboard';root.hidden=current!=='dashboard';analysis.hidden=current!=='analysis';queuesPage.hidden=current!=='queues';performance.hidden=current!=='performance';qtcFloorPage.hidden=current!=='qtcfloor';dailyPage.hidden=current!=='daily';aside.querySelectorAll('[data-page]').forEach(b=>{const active=b.dataset.page===current;b.classList.toggle('active',active);if(active)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});closeNav();
- if(current==='queues'&&typeof renderQueuesAnalysis==='function')renderQueuesAnalysis();
- else if(current==='analysis'&&typeof renderAnalysis==='function')renderAnalysis();
- else if(current==='performance'&&typeof renderPerformance==='function')renderPerformance();
- else if(current==='qtcfloor'&&typeof renderQtcFloorPerformance==='function')renderQtcFloorPerformance();
- else if(current==='daily'&&typeof renderDailyReport==='function')renderDailyReport();
- else if(typeof renderOverview==='function')renderOverview();
- queueMicrotask(()=>{renderAllSections();if(!root.hidden&&!rawRows.length&&getAuthToken())loadData();});}
-aside.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>{location.hash=b.dataset.page==='analysis'?'analysis-overview':b.dataset.page==='queues'?'queues-analysis':b.dataset.page==='performance'?'performance-labelers':b.dataset.page==='qtcfloor'?'performance-qtc-floor':b.dataset.page==='daily'?'daily-report':'dashboard';});$('uxBack').onclick=()=>location.hash='dashboard';$('uxSideRefresh')?.addEventListener('click',()=>loadData());$('uxSideTheme')?.addEventListener('click',()=>toggleDark());window.addEventListener('hashchange',route);route();
+
+function route(){
+  const current=location.hash==='#analysis-overview'?'analysis':location.hash==='#queues-analysis'?'queues':location.hash==='#performance-labelers'?'performance':location.hash==='#performance-qtc-floor'?'qtcfloor':location.hash==='#daily-report'?'daily':'dashboard';
+  root.hidden=current!=='dashboard';
+  analysis.hidden=current!=='analysis';
+  queuesPage.hidden=current!=='queues';
+  performance.hidden=current!=='performance';
+  qtcFloorPage.hidden=current!=='qtcfloor';
+  dailyPage.hidden=current!=='daily';
+  if(aside){
+    aside.querySelectorAll('[data-page]').forEach(b=>{
+      const active=b.dataset.page===current;
+      b.classList.toggle('active',active);
+      if(active)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');
+    });
+  }
+  closeNav();
+  if(current==='queues'&&typeof renderQueuesAnalysis==='function')renderQueuesAnalysis();
+  else if(current==='analysis'&&typeof renderAnalysis==='function')renderAnalysis();
+  else if(current==='performance'&&typeof renderPerformance==='function')renderPerformance();
+  else if(current==='qtcfloor'&&typeof renderQtcFloorPerformance==='function')renderQtcFloorPerformance();
+  else if(current==='daily'&&typeof renderDailyReport==='function')renderDailyReport();
+  else if(typeof renderOverview==='function')renderOverview();
+  queueMicrotask(()=>{renderAllSections();if(!root.hidden&&!rawRows.length&&getAuthToken())loadData();});
+}
+
+window.switchAnalyticsWorkspace = function(hash) {
+  if (hash) location.hash = hash;
+  route();
+};
+
+aside.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>{location.hash=b.dataset.page==='analysis'?'analysis-overview':b.dataset.page==='queues'?'queues-analysis':b.dataset.page==='performance'?'performance-labelers':b.dataset.page==='qtcfloor'?'performance-qtc-floor':b.dataset.page==='daily'?'daily-report':'dashboard';});
+$('uxBack').onclick=()=>{ if(typeof switchTab==='function') switchTab('overview'); else location.hash='dashboard'; };$('uxSideRefresh')?.addEventListener('click',()=>loadData());$('uxSideTheme')?.addEventListener('click',()=>toggleDark());window.addEventListener('hashchange',route);route();
 function rowsInView(){return activeLoc&& !activeLoc.startsWith('__')&&locColIdx>=0?fcache.filter(r=>String(r[locColIdx]||'').trim()===activeLoc):fcache;}
 function uniq(rows,name){const i=hdrs.findIndex(h=>h.toLowerCase()===name.toLowerCase());return i<0?null:new Set(rows.map(r=>String(r[i]||'').trim()).filter(Boolean)).size;}
 function daily(rows){const map=new Map();rows.forEach(r=>{const d=rDate(r);if(d)map.set(d,(map.get(d)||0)+1);});return [...map].sort(([a],[b])=>a.localeCompare(b));}
