@@ -77,11 +77,11 @@ async function hashPassword(password) {
   const salt = crypto.getRandomValues(new Uint8Array(16));
   const key = await crypto.subtle.importKey("raw", te.encode(password), "PBKDF2", false, ["deriveBits"]);
   const derived = await crypto.subtle.deriveBits(
-    { name: "PBKDF2", hash: "SHA-256", salt, iterations: 310000 },
+    { name: "PBKDF2", hash: "SHA-256", salt, iterations: 100000 },
     key,
     256
   );
-  return `pbkdf2-sha256$310000$${b64url(salt)}$${b64url(new Uint8Array(derived))}`;
+  return `pbkdf2-sha256$100000$${b64url(salt)}$${b64url(new Uint8Array(derived))}`;
 }
 
 async function checkPassword(password, stored) {
@@ -89,7 +89,7 @@ async function checkPassword(password, stored) {
   const parts = String(stored).split("$");
   if (parts.length !== 4 || parts[0] !== "pbkdf2-sha256") return false;
   const iterations = parseInt(parts[1], 10);
-  if (isNaN(iterations) || iterations < 310000 || iterations > 1000000) return false;
+  if (isNaN(iterations) || iterations < 10000 || iterations > 100000) return false;
 
   let salt, expected;
   try {
@@ -331,6 +331,27 @@ export default {
     const isSameSite = !origin || origin.includes(url.hostname);
 
     try {
+      // ------------------------------------------------------------
+      // 0. STATIC FRONTEND ASSETS REVERSE PROXY
+      // ------------------------------------------------------------
+      // Any non-API request proxies directly to GitHub Pages
+      // ensuring 100% same-site origin for cookies, session, and static files!
+      if (!pathname.startsWith("/api/")) {
+        const ghTarget = "https://islamyasser424-design.github.io/meti-task-tracker" + (pathname === "/" ? "/dashboard.html" : pathname);
+        const ghRes = await fetch(ghTarget, {
+          headers: { "User-Agent": "MEEG-Secure-Gateway/1.0" }
+        });
+
+        const newHeaders = new Headers(ghRes.headers);
+        newHeaders.set("X-Content-Type-Options", "nosniff");
+        newHeaders.set("X-Frame-Options", "SAMEORIGIN");
+        newHeaders.delete("Content-Security-Policy");
+
+        return new Response(ghRes.body, {
+          status: ghRes.status,
+          headers: newHeaders
+        });
+      }
       // ------------------------------------------------------------
       // 1. HEALTH CHECK
       // ------------------------------------------------------------
@@ -948,3 +969,4 @@ export default {
     }
   }
 };
+

@@ -2401,7 +2401,7 @@
     // MEEG UNIFIED SECURE BACKEND API CLIENT
     // Zero database credentials or tokens exposed to the browser
     // ============================================================
-    var API_BASE = window.MEEG_API_URL || localStorage.getItem("meeg_api_url") || "";
+    var API_BASE = window.MEEG_API_URL || localStorage.getItem("meeg_api_url") || (window.location.hostname.includes("github.io") ? "https://meeg-secure-api.islamyasser424.workers.dev" : "");
 
     function getAuthToken() {
       return sessionStorage.getItem("meeg_auth_token") || "";

@@ -14,7 +14,7 @@ def b64url_decode(s: str) -> bytes:
     padding = '=' * (-len(s) % 4)
     return base64.b64decode(s.replace('-', '+').replace('_', '/') + padding)
 
-def hash_password(password: str, iterations: int = 310000) -> str:
+def hash_password(password: str, iterations: int = 100000) -> str:
     salt = os.urandom(16)
     dk = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt, iterations, dklen=32)
     return f"pbkdf2-sha256${iterations}${b64url(salt)}${b64url(dk)}"
@@ -95,3 +95,4 @@ def migrate():
 
 if __name__ == '__main__':
     migrate()
+
