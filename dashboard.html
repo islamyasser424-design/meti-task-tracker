@@ -2398,103 +2398,75 @@
 
   <script>
     // ============================================================
-    // TURSO PIPELINE CLIENT
+    // MEEG UNIFIED SECURE BACKEND API CLIENT
+    // Zero database credentials or tokens exposed to the browser
     // ============================================================
-    var TURSO_URL = "https://meti-tasks-islamyasser424-design.aws-eu-west-1.turso.io";
-    var TURSO_TOKEN = "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3OTI1NjMzNDUsImlkIjoiMDFhMTVkMTctNWIwMS03ZGIyLWE5NDItN2Q1NDA1NWZhNjE1Iiwia2lkIjoid3ZJZENGejZKbkhZV3k4cGJWUkQ4bFVSZjNsOURtdjczY0ZiTGVKYmVXdyIsInJpZCI6IjE4NTk2YzM5LTFjZDgtNDk3Ny1hMmEwLTE4ODVlOWU3Yjg4MSJ9.6DYE3efGgX6Hiw_GptXugwhY3DGBlnsIVDWO9vCLgouLJ6ck7hwDaIyzkuv6CpZcIvLNlTNVK54bruXDYJ0UBA";
+    var API_BASE = window.MEEG_API_URL || localStorage.getItem("meeg_api_url") || "";
 
-    function tursoQuery(sql, args, callback) {
-      var reqBody = {
-        requests: [
-          {
-            type: "execute",
-            stmt: {
-              sql: sql,
-              args: (args || []).map(function(arg) {
-                if (typeof arg === "number") return { type: "integer", value: String(arg) };
-                if (arg === null || arg === undefined) return { type: "null" };
-                return { type: "text", value: String(arg) };
-              })
-            }
-          }
-        ]
-      };
+    function getAuthToken() {
+      return sessionStorage.getItem("meeg_auth_token") || "";
+    }
 
-      fetch(TURSO_URL + "/v2/pipeline", {
+    function apiFetch(endpoint, options) {
+      options = options || {};
+      var url = endpoint.startsWith("http") ? endpoint : (API_BASE + endpoint);
+      var headers = Object.assign({
+        "Content-Type": "application/json"
+      }, options.headers || {});
+
+      var token = getAuthToken();
+      if (token && !headers["Authorization"]) {
+        headers["Authorization"] = "Bearer " + token;
+      }
+
+      return fetch(url, Object.assign({}, options, {
+        headers: headers,
+        credentials: "include"
+      })).then(function(res) {
+        if (res.status === 401 && !endpoint.includes("/api/auth/login") && !endpoint.includes("/api/auth/activate") && !endpoint.includes("/api/auth/request-reset") && !endpoint.includes("/api/auth/verify-reset")) {
+          sessionStorage.removeItem("meti_dash_user");
+          sessionStorage.removeItem("meeg_auth_token");
+          _currentUser = null;
+          showLogin();
+        }
+        return res;
+      });
+    }
+
+    function apiLogin(username, password, callback) {
+      apiFetch("/api/auth/login", {
         method: "POST",
-        headers: {
-          "Authorization": "Bearer " + TURSO_TOKEN,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify(reqBody)
+        body: JSON.stringify({ username: username, password: password })
       })
       .then(function(res) {
-        if (!res.ok) throw new Error("HTTP " + res.status);
-        return res.json();
+        return res.json().then(function(data) {
+          if (!res.ok) {
+            throw new Error(data.message || (data.error === "rate_limited" ? "Too many attempts. Please try again later." : "Invalid username or password"));
+          }
+          return data;
+        });
       })
       .then(function(data) {
-        if (data.results && data.results[0]) {
-          var r = data.results[0];
-          if (r.type === "error") callback(new Error(r.error.message), null);
-          else callback(null, r.response ? r.response.result : null);
-        } else {
-          callback(new Error("Empty response from database"), null);
-        }
+        callback(null, data);
       })
       .catch(function(err) {
         callback(err, null);
       });
     }
 
-    function executePipelineBatch(statements) {
-      return fetch(TURSO_URL + "/v2/pipeline", {
-        method: "POST",
-        headers: {
-          "Authorization": "Bearer " + TURSO_TOKEN,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ requests: statements })
-      }).then(function(res) {
-        if (!res.ok) throw new Error("HTTP " + res.status);
-        return res.json();
-      });
-    }
-
-    function tursoBatchQuery(queries, callback) {
-      var requests = queries.map(function(q) {
-        return {
-          type: "execute",
-          stmt: {
-            sql: q.sql,
-            args: (q.args || []).map(function(arg) {
-              if (typeof arg === "number") return { type: "integer", value: String(arg) };
-              if (arg === null || arg === undefined) return { type: "null" };
-              return { type: "text", value: String(arg) };
-            })
-          }
-        };
-      });
-
-      executePipelineBatch(requests)
+    function apiGetMe(callback) {
+      apiFetch("/api/me")
+        .then(function(res) {
+          if (!res.ok) throw new Error("Unauthorized");
+          return res.json();
+        })
         .then(function(data) {
-          if (data && data.results) {
-            for (var i = 0; i < data.results.length; i++) {
-              if (data.results[i].type === "error") {
-                callback(new Error(data.results[i].error ? data.results[i].error.message : "Database batch error"), null);
-                return;
-              }
-            }
-            var results = data.results.map(function(r) { return r.response ? r.response.result : null; });
-            callback(null, results);
-          } else {
-            callback(new Error("Empty response from database"), null);
-          }
+          callback(null, data);
         })
         .catch(function(err) {
           callback(err, null);
         });
     }
-
     // ============================================================
     // APPLICATION STATE
     // ============================================================
@@ -2517,24 +2489,46 @@
     var _stopStreamingFlag = false;
 
     function mapSubmissionRow(r) {
+      if (!r) return {};
+      if (typeof r === "object" && !Array.isArray(r) && r.id !== undefined && r.task_id !== undefined) {
+        return {
+          id: r.id || "",
+          timestamp: r.timestamp || "",
+          shift: r.shift || "",
+          unit: r.unit || "",
+          pc_no: r.pc_no || "",
+          labeler_name: r.labeler_name || "",
+          national_id: r.national_id || "",
+          yubikey_email: r.yubikey_email || "",
+          qtc_name: r.qtc_name || "",
+          task_id: r.task_id || "",
+          pass: r.pass || "",
+          modality: r.modality || "",
+          queue_name: r.queue_name || "",
+          object_count: parseInt(r.object_count, 10) || 0,
+          stage: r.stage || "",
+          created_at: r.created_at || "",
+          task_link: r.task_link || ""
+        };
+      }
       return {
-        id: r[0] ? r[0].value : "",
-        timestamp: r[1] ? String(r[1].value) : "",
-        shift: r[2] ? String(r[2].value) : "",
-        unit: r[3] ? String(r[3].value) : "",
-        pc_no: r[4] ? String(r[4].value) : "",
-        labeler_name: r[5] ? String(r[5].value) : "",
-        national_id: r[6] ? String(r[6].value) : "",
-        yubikey_email: r[7] ? String(r[7].value) : "",
-        qtc_name: r[8] ? String(r[8].value) : "",
-        task_id: r[9] ? String(r[9].value) : "",
-        pass: r[10] ? String(r[10].value) : "",
-        modality: r[11] ? String(r[11].value) : "",
-        queue_name: r[12] ? String(r[12].value) : "",
-        object_count: r[13] ? parseInt(r[13].value, 10) || 0 : 0,
-        stage: r[14] ? String(r[14].value) : "",
-        created_at: r[15] ? String(r[15].value) : "",
-        task_link: r[16] ? String(r[16].value) : ""
+        id: r[0] ? (r[0].value !== undefined ? r[0].value : r[0]) : "",
+        timestamp: r[1] ? String(r[1].value !== undefined ? r[1].value : r[1]) : "",
+        shift: r[2] ? String(r[2].value !== undefined ? r[2].value : r[2]) : "",
+        unit: r[3] ? String(r[3].value !== undefined ? r[3].value : r[3]) : "",
+        pc_no: r[4] ? String(r[4].value !== undefined ? r[4].value : r[4]) : "",
+        labeler_name: r[5] ? String(r[5].value !== undefined ? r[5].value : r[5]) : "",
+        national_id: r[6] ? String(r[6].value !== undefined ? r[6].value : r[6]) : "",
+        yubikey_email: r[7] ? String(r[7].value !== undefined ? r[7].value : r[7]) : "",
+        qtc_name: r[8] ? String(r[8].value !== undefined ? r[8].value : r[8]) : "",
+        task_id: r[9] ? String(r[9].value !== undefined ? r[9].value : r[9]) : "",
+        pass: r[10] ? String(r[10].value !== undefined ? r[10].value : r[10]) : "",
+        modality: r[11] ? String(r[11].value !== undefined ? r[11].value : r[11]) : "",
+        queue_name: r[12] ? String(r[12].value !== undefined ? r[12].value : r[12]) : "",
+        object_count: r[13] ? parseInt(r[13].value !== undefined ? r[13].value : r[13], 10) || 0 : 0,
+        stage: r[14] ? String(r[14].value !== undefined ? r[14].value : r[14]) : "",
+        created_at: r[15] ? String(r[15].value !== undefined ? r[15].value : r[15]) : "",
+        task_link: r[16] ? String(r[16].value !== undefined ? r[16].value : r[16]) : ""
       };
     }
 
@@ -2720,16 +2714,17 @@
       var params = new URLSearchParams(window.location.search);
       var targetTab = params.get("tab") || window.location.hash.replace("#", "") || "tasks";
 
-      try {
-        var saved = sessionStorage.getItem("meti_dash_user");
-        if (saved) {
-          _currentUser = JSON.parse(saved);
+      apiGetMe(function(err, data) {
+        if (!err && data && data.user) {
+          _currentUser = data.user;
+          try { sessionStorage.setItem("meti_dash_user", JSON.stringify(_currentUser)); } catch(e){}
           showDashboard(targetTab);
-          return;
+        } else {
+          sessionStorage.removeItem("meti_dash_user");
+          sessionStorage.removeItem("meeg_auth_token");
+          showLogin();
         }
-      } catch(e) {}
-
-      showLogin();
+      });
     }
 
     function showLogin() {
@@ -2797,125 +2792,50 @@
         return;
       }
 
-      var uLower = u.toLowerCase();
-      var isAdminUser = (uLower === "admin" || uLower === "islam" || uLower === "islam yasser" || uLower === "islam.yasser" || uLower === "eslam");
-      var isMasterPass = (p === "123456" || p === "meti2026");
-
-      // Super Admin Instant Bypass (Zero latency, impossible to be locked out!)
-      if (isAdminUser && isMasterPass) {
-        _currentUser = {
-          id: 1,
-          username: "admin",
-          full_name: "Islam Yasser (Super Admin)",
-          role: "admin",
-          allowed_pages: "tasks,queues,qtc,users,overview,analysis,queues_analysis,performance,qtcfloor,daily",
-          recovery_pin: "1234"
-        };
-        try { sessionStorage.setItem("meti_dash_user", JSON.stringify(_currentUser)); } catch(e){}
-        showDashboard("tasks");
-        return;
-      }
-
       if (btn) {
         btn.disabled = true;
         btn.textContent = "Verifying...";
       }
       if (errEl) errEl.innerHTML = "";
 
-      function getColVal(col, def) {
-        if (!col || col.value === undefined || col.value === null) return (def !== undefined ? def : "");
-        return String(col.value);
-      }
-
-      // Check user in Turso DB by username OR full_name
-      var sql = "SELECT id, username, full_name, role, allowed_pages, status, password, recovery_pin FROM dashboard_users WHERE LOWER(TRIM(username)) = LOWER(TRIM(?)) OR LOWER(TRIM(full_name)) = LOWER(TRIM(?)) LIMIT 1;";
-      tursoQuery(sql, [u, u], function(err, result) {
+      apiLogin(u, p, function(err, result) {
         if (btn) {
           btn.disabled = false;
           btn.textContent = "Sign In to Dashboard";
         }
 
         if (err) {
-          if (isAdminUser && isMasterPass) {
-            _currentUser = {
-              id: 1,
-              username: "admin",
-              full_name: "Islam Yasser (Super Admin)",
-              role: "admin",
-              allowed_pages: "tasks,queues,qtc,users,overview,analysis,queues_analysis,performance,qtcfloor,daily",
-              recovery_pin: "1234"
-            };
-            try { sessionStorage.setItem("meti_dash_user", JSON.stringify(_currentUser)); } catch(e){}
-            showDashboard("tasks");
-            return;
+          if (err.message && err.message.toLowerCase().indexOf("pending") > -1) {
+            errEl.innerHTML = "⚠️ Your account is pending activation! <a href='javascript:void(0)' onclick='openActivationModal(\"activate\", \"" + esc(u) + "\")' style='color:var(--primary); font-weight:700; text-decoration:underline;'>Click here to set your password</a>.";
+          } else {
+            errEl.textContent = err.message || "Invalid username or password";
           }
-          if (errEl) errEl.textContent = "Connection error: " + err.message;
           return;
         }
 
+        _currentUser = result.user;
         try {
-          if (result && result.rows && result.rows.length > 0) {
-            var row = result.rows[0];
-            var uId = row[0] ? (row[0].value || 1) : 1;
-            var uName = getColVal(row[1], "user");
-            var fName = getColVal(row[2], uName);
-            var role = getColVal(row[3], "qt");
-            var allowed = getColVal(row[4], "");
-            var status = getColVal(row[5], "active");
-            var dbPass = getColVal(row[6], "").trim();
-            var pin = getColVal(row[7], "");
+          sessionStorage.setItem("meti_dash_user", JSON.stringify(_currentUser));
+          if (result.token) sessionStorage.setItem("meeg_auth_token", result.token);
+        } catch(e){}
 
-            // Check if pending activation or password not set
-            if (status === "pending" || !dbPass || dbPass === "PENDING_ACTIVATION") {
-              if (errEl) errEl.innerHTML = "⚠️ Your account is pending activation! <a href='javascript:void(0)' onclick='openActivationModal(\"activate\", \"" + uName + "\")' style='color:var(--primary); font-weight:700; text-decoration:underline;'>Click here to set your password</a>.";
-              return;
-            }
+        showDashboard("tasks");
+      });
+    }
 
-            // Verify password
-            var isPassMatch = (dbPass === p) || (role === "admin" && isMasterPass) || (isAdminUser && isMasterPass);
-            if (isPassMatch) {
-              _currentUser = {
-                id: uId,
-                username: uName,
-                full_name: fName,
-                role: role,
-                allowed_pages: allowed,
-                recovery_pin: pin
-              };
-              try { sessionStorage.setItem("meti_dash_user", JSON.stringify(_currentUser)); } catch(e){}
-              var params = new URLSearchParams(window.location.search);
-              var targetTab = params.get("tab") || "tasks";
-              showDashboard(targetTab);
-            } else {
-              if (errEl) errEl.innerHTML = "❌ Incorrect password. Forgot it? <a href='javascript:void(0)' onclick='openActivationModal(\"reset\", \"" + uName + "\")' style='color:var(--primary); font-weight:700; text-decoration:underline;'>Reset Password Here</a>.";
-            }
-          } else {
-            if (isAdminUser && isMasterPass) {
-              _currentUser = {
-                id: 1,
-                username: "admin",
-                full_name: "Islam Yasser (Super Admin)",
-                role: "admin",
-                allowed_pages: "tasks,queues,qtc,users,overview,analysis,queues_analysis,performance,qtcfloor,daily",
-                recovery_pin: "1234"
-              };
-              try { sessionStorage.setItem("meti_dash_user", JSON.stringify(_currentUser)); } catch(e){}
-              showDashboard("tasks");
-              return;
-            }
-            if (errEl) errEl.innerHTML = "Username not found. If your Admin just invited you, click <a href='javascript:void(0)' onclick='openActivationModal(\"activate\", \"" + u + "\")' style='color:var(--primary); font-weight:700; text-decoration:underline;'>Activate Account</a>.";
-          }
-        } catch(ex) {
-          console.error("handleLogin error:", ex);
-          if (errEl) errEl.textContent = "Login error: " + ex.message;
-        }
+    function logoutUser() {
+      apiFetch("/api/auth/logout", { method: "POST" }).finally(function() {
+        try {
+          sessionStorage.removeItem("meti_dash_user");
+          sessionStorage.removeItem("meeg_auth_token");
+        } catch(e){}
+        _currentUser = null;
+        showLogin();
       });
     }
 
     function logout() {
-      sessionStorage.removeItem("meti_dash_user");
-      _currentUser = null;
-      showLogin();
+      logoutUser();
     }
 
     // ============================================================
@@ -2923,28 +2843,20 @@
     // ============================================================
     function loadLiveQueuesAdmin() {
       var tbody = document.getElementById("queuesAdminTableBody");
-      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:18px; color:var(--text-muted);">Loading active queues from Turso...</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:18px; color:var(--text-muted);">Loading active queues from secure API...</td></tr>';
 
-      tursoQuery("SELECT id, name, highlight, created_at FROM custom_queues ORDER BY id DESC;", [], function(err, res) {
-        if (err) {
-          tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:18px; color:var(--error);">Failed: ' + err.message + '</td></tr>';
-          return;
-        }
-
-        var rows = res ? res.rows : [];
-        _adminQueuesCache = rows.map(function(r) {
-          return {
-            id: r[0] ? r[0].value : "",
-            name: r[1] ? String(r[1].value) : "",
-            highlight: r[2] ? String(r[2].value).trim() : "",
-            created_at: r[3] ? String(r[3].value) : ""
-          };
+      apiFetch("/api/queues")
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (!data.ok || !data.queues) throw new Error(data.message || "Failed to load queues");
+          _adminQueuesCache = data.queues;
+          document.getElementById("tabQueuesBadge").textContent = _adminQueuesCache.length;
+          document.getElementById("queuesCountLabel").textContent = "Total: " + _adminQueuesCache.length + " active queues";
+          renderQueuesAdminTable(_adminQueuesCache);
+        })
+        .catch(function(err) {
+          if (tbody) tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:18px; color:var(--error);">Failed: ' + esc(err.message) + '</td></tr>';
         });
-
-        document.getElementById("tabQueuesBadge").textContent = _adminQueuesCache.length;
-        document.getElementById("queuesCountLabel").textContent = "Total: " + _adminQueuesCache.length + " active queues";
-        renderQueuesAdminTable(_adminQueuesCache);
-      });
     }
 
     function renderQueuesAdminTable(list) {
@@ -2987,12 +2899,18 @@
       var tag = prompt("Enter new highlight tag for this queue (e.g. v4, parallel, 3d_only, etc.):", currentTag || "");
       if (tag === null) return;
       tag = tag.trim();
-      tursoQuery("UPDATE custom_queues SET highlight = ? WHERE id = ?;", [tag, id], function(err, res) {
-        if (err) {
-          alert("Failed to update highlight: " + err.message);
-          return;
-        }
+      apiFetch("/api/queues/" + encodeURIComponent(id), {
+        method: "PUT",
+        body: JSON.stringify({ highlight: tag })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (!data.ok) throw new Error(data.message || "Failed to update highlight");
         loadLiveQueuesAdmin();
+        loadDropdownMeta();
+      })
+      .catch(function(err) {
+        alert("Failed to update highlight: " + err.message);
       });
     }
 
@@ -3019,16 +2937,15 @@
       }
 
       msg.style.color = "var(--text-secondary)";
-      msg.textContent = "Saving queue to Turso database...";
+      msg.textContent = "Saving queue via secure API...";
 
-      var sql = "INSERT INTO custom_queues (name, highlight) VALUES (?, ?);";
-      tursoQuery(sql, [name, hl], function(err, res) {
-        if (err) {
-          msg.style.color = "var(--error)";
-          msg.textContent = err.message.indexOf("UNIQUE") > -1 ? "Queue name already exists!" : "Error: " + err.message;
-          return;
-        }
-
+      apiFetch("/api/queues", {
+        method: "POST",
+        body: JSON.stringify({ name: name, highlight: hl })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (!data.ok) throw new Error(data.message || "Failed to add queue");
         nameIn.value = "";
         hlIn.checked = false;
         msg.style.color = "var(--success)";
@@ -3036,6 +2953,10 @@
         loadLiveQueuesAdmin();
         loadDropdownMeta();
         setTimeout(function() { msg.textContent = ""; }, 3500);
+      })
+      .catch(function(err) {
+        msg.style.color = "var(--error)";
+        msg.textContent = err.message.indexOf("UNIQUE") > -1 ? "Queue name already exists!" : "Error: " + err.message;
       });
     }
 
@@ -3043,14 +2964,16 @@
       var item = _adminQueuesCache.find(function(x) { return x.id == id; });
       var name = item ? item.name : "ID #" + id;
       if (!confirm("Are you sure you want to delete queue: " + name + "?")) return;
-      tursoQuery("DELETE FROM custom_queues WHERE id = ?;", [id], function(err, res) {
-        if (err) {
+      apiFetch("/api/queues/" + encodeURIComponent(id), { method: "DELETE" })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (!data.ok) throw new Error(data.message || "Failed to delete queue");
+          loadLiveQueuesAdmin();
+          loadDropdownMeta();
+        })
+        .catch(function(err) {
           alert("Failed to delete queue: " + err.message);
-          return;
-        }
-        loadLiveQueuesAdmin();
-        loadDropdownMeta();
-      });
+        });
     }
 
     // ============================================================
@@ -3058,29 +2981,20 @@
     // ============================================================
     function loadLiveQTCAdmin() {
       var tbody = document.getElementById("qtcAdminTableBody");
-      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:18px; color:var(--text-muted);">Loading QTC members from Turso...</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:18px; color:var(--text-muted);">Loading QTC members from secure API...</td></tr>';
 
-      tursoQuery("SELECT id, shift, name, role, created_at FROM custom_qtc ORDER BY shift ASC, name ASC;", [], function(err, res) {
-        if (err) {
-          tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:18px; color:var(--error);">Failed: ' + err.message + '</td></tr>';
-          return;
-        }
-
-        var rows = res ? res.rows : [];
-        _adminQTCCache = rows.map(function(r) {
-          return {
-            id: r[0] ? r[0].value : "",
-            shift: r[1] ? String(r[1].value) : "",
-            name: r[2] ? String(r[2].value) : "",
-            role: r[3] ? String(r[3].value) : "",
-            created_at: r[4] ? String(r[4].value) : ""
-          };
+      apiFetch("/api/qtc")
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (!data.ok || !data.qtc) throw new Error(data.message || "Failed to load QTC");
+          _adminQTCCache = data.qtc;
+          document.getElementById("tabQTCBadge").textContent = _adminQTCCache.length;
+          document.getElementById("qtcCountLabel").textContent = "Total: " + _adminQTCCache.length + " QTC members";
+          filterQTCTable();
+        })
+        .catch(function(err) {
+          if (tbody) tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:18px; color:var(--error);">Failed: ' + esc(err.message) + '</td></tr>';
         });
-
-        document.getElementById("tabQTCBadge").textContent = _adminQTCCache.length;
-        document.getElementById("qtcCountLabel").textContent = "Total: " + _adminQTCCache.length + " QTC members";
-        filterQTCTable();
-      });
     }
 
     function filterQTCTable() {
@@ -3134,22 +3048,25 @@
       }
 
       msg.style.color = "var(--text-secondary)";
-      msg.textContent = "Saving QTC member to Turso database...";
+      msg.textContent = "Saving QTC member via secure API...";
 
-      var sql = "INSERT INTO custom_qtc (shift, name, role) VALUES (?, ?, ?);";
-      tursoQuery(sql, [shift, name, role], function(err, res) {
-        if (err) {
-          msg.style.color = "var(--error)";
-          msg.textContent = err.message.indexOf("UNIQUE") > -1 ? "This QTC member already exists in " + shift + " shift!" : "Error: " + err.message;
-          return;
-        }
-
+      apiFetch("/api/qtc", {
+        method: "POST",
+        body: JSON.stringify({ shift: shift, name: name, role: role })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (!data.ok) throw new Error(data.message || "Failed to add QTC member");
         nameIn.value = "";
         msg.style.color = "var(--success)";
         msg.textContent = "✔ QTC member added successfully to " + shift + " shift!";
         loadLiveQTCAdmin();
         loadDropdownMeta();
         setTimeout(function() { msg.textContent = ""; }, 3500);
+      })
+      .catch(function(err) {
+        msg.style.color = "var(--error)";
+        msg.textContent = err.message.indexOf("UNIQUE") > -1 ? "This QTC member already exists in " + shift + " shift!" : "Error: " + err.message;
       });
     }
 
@@ -3157,14 +3074,16 @@
       var item = _adminQTCCache.find(function(x) { return x.id == id; });
       var name = item ? item.name : "ID #" + id;
       if (!confirm("Are you sure you want to delete QTC: " + name + "?")) return;
-      tursoQuery("DELETE FROM custom_qtc WHERE id = ?;", [id], function(err, res) {
-        if (err) {
+      apiFetch("/api/qtc/" + id, { method: "DELETE" })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (!data.ok) throw new Error(data.message || "Failed to delete QTC");
+          loadLiveQTCAdmin();
+          loadDropdownMeta();
+        })
+        .catch(function(err) {
           alert("Failed to delete QTC: " + err.message);
-          return;
-        }
-        loadLiveQTCAdmin();
-        loadDropdownMeta();
-      });
+        });
     }
 
     // ============================================================
@@ -3172,22 +3091,14 @@
     // ============================================================
     function openChangePasswordModal() {
       if (!_currentUser) return;
-      document.getElementById("cpUsernameLabel").textContent = _currentUser.full_name + " (" + _currentUser.username + ")";
+      document.getElementById("cpUsernameLabel").textContent = (_currentUser.full_name || _currentUser.username) + " (" + _currentUser.username + ")";
       document.getElementById("cpCurrentPass").value = "";
       document.getElementById("cpNewPass").value = "";
       document.getElementById("cpConfirmPass").value = "";
       document.getElementById("cpMsg").textContent = "";
 
       var pinEl = document.getElementById("cpPinDisplay");
-      if (pinEl) pinEl.textContent = _currentUser.recovery_pin || "1234";
-
-      // Also refresh recovery pin from DB in background
-      tursoQuery("SELECT recovery_pin FROM dashboard_users WHERE id = ?;", [_currentUser.id], function(err, res) {
-        if (!err && res && res.rows && res.rows.length) {
-          var pin = res.rows[0][0] ? String(res.rows[0][0].value) : "";
-          if (pin && pinEl) pinEl.textContent = pin;
-        }
-      });
+      if (pinEl) pinEl.textContent = _currentUser.recovery_pin || "••••";
 
       document.getElementById("changePasswordModal").classList.add("show");
       setTimeout(function() { document.getElementById("cpCurrentPass").focus(); }, 150);
@@ -3198,7 +3109,7 @@
     }
 
     function submitChangePassword(e) {
-      e.preventDefault();
+      if (e && e.preventDefault) e.preventDefault();
       var curr = document.getElementById("cpCurrentPass").value;
       var newP = document.getElementById("cpNewPass").value;
       var conf = document.getElementById("cpConfirmPass").value;
@@ -3210,82 +3121,78 @@
         msg.textContent = "New passwords do not match!";
         return;
       }
-      if (newP.length < 4) {
+      if (newP.length < 6) {
         msg.style.color = "var(--error)";
-        msg.textContent = "Password must be at least 4 characters.";
+        msg.textContent = "Password must be at least 6 characters.";
         return;
       }
 
       btn.disabled = true;
       btn.textContent = "Updating...";
       msg.style.color = "var(--text-secondary)";
-      msg.textContent = "Verifying current password...";
+      msg.textContent = "Verifying with server...";
 
-      var checkSql = "SELECT id FROM dashboard_users WHERE id = ? AND password = ? LIMIT 1;";
-      tursoQuery(checkSql, [_currentUser.id, curr], function(err, res) {
-        if (err) {
-          btn.disabled = false;
-          btn.textContent = "Save New Password";
-          msg.style.color = "var(--error)";
-          msg.textContent = "Error: " + err.message;
-          return;
-        }
-
-        if (!res || !res.rows || !res.rows.length) {
-          btn.disabled = false;
-          btn.textContent = "Save New Password";
-          msg.style.color = "var(--error)";
-          msg.textContent = "Current password is incorrect!";
-          return;
-        }
-
-        var updateSql = "UPDATE dashboard_users SET password = ? WHERE id = ?;";
-        tursoQuery(updateSql, [newP, _currentUser.id], function(uErr, uRes) {
-          btn.disabled = false;
-          btn.textContent = "Save New Password";
-
-          if (uErr) {
-            msg.style.color = "var(--error)";
-            msg.textContent = "Update failed: " + uErr.message;
-            return;
-          }
-
-          msg.style.color = "var(--success)";
-          msg.textContent = "✔ Password updated successfully!";
-          setTimeout(function() {
-            closeChangePasswordModal();
-          }, 1500);
+      apiFetch("/api/auth/change-password", {
+        method: "POST",
+        body: JSON.stringify({ currentPassword: curr, newPassword: newP })
+      })
+      .then(function(r) {
+        return r.json().then(function(data) {
+          if (!r.ok || !data.ok) throw new Error(data.message || "Password update failed");
+          return data;
         });
+      })
+      .then(function(data) {
+        btn.disabled = false;
+        btn.textContent = "Save New Password";
+        msg.style.color = "var(--success)";
+        msg.textContent = "✔ Password updated successfully!";
+        setTimeout(function() {
+          closeChangePasswordModal();
+        }, 1500);
+      })
+      .catch(function(err) {
+        btn.disabled = false;
+        btn.textContent = "Save New Password";
+        msg.style.color = "var(--error)";
+        msg.textContent = "Error: " + err.message;
       });
     }
 
     // ============================================================
-    // LOAD METADATA
+    // LOAD METADATA VIA SECURE API
     // ============================================================
     function loadDropdownMeta() {
-      tursoQuery("SELECT name FROM custom_queues ORDER BY name ASC;", [], function(err, res) {
-        if (!err && res && res.rows) {
-          _allQueuesList = res.rows.map(function(r) { return r[0].value; });
-          populateQueueDropdowns();
-          document.getElementById("tabQueuesBadge").textContent = _allQueuesList.length;
-        }
-      });
+      apiFetch("/api/queues")
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (data && data.queues) {
+            _allQueuesList = data.queues.map(function(q) { return q.name; });
+            populateQueueDropdowns();
+            var b = document.getElementById("tabQueuesBadge");
+            if (b) b.textContent = _allQueuesList.length;
+          }
+        })
+        .catch(function(err) { console.warn("Queue metadata load error:", err); });
 
-      tursoQuery("SELECT name, shift FROM custom_qtc ORDER BY name ASC;", [], function(err, res) {
-        if (!err && res && res.rows) {
-          var seen = new Set();
-          _allQTCList = [];
-          res.rows.forEach(function(r) {
-            var n = r[0].value;
-            if (!seen.has(n)) {
-              seen.add(n);
-              _allQTCList.push(n);
-            }
-          });
-          populateQTCDropdowns();
-          document.getElementById("tabQTCBadge").textContent = _allQTCList.length;
-        }
-      });
+      apiFetch("/api/qtc")
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (data && data.qtc) {
+            var seen = new Set();
+            _allQTCList = [];
+            data.qtc.forEach(function(item) {
+              if (item.name && !seen.has(item.name)) {
+                seen.add(item.name);
+                _allQTCList.push(item.name);
+              }
+            });
+            populateQTCDropdowns();
+            var b = document.getElementById("tabQTCBadge");
+            if (b) b.textContent = _allQTCList.length;
+          }
+        })
+        .catch(function(err) { console.warn("QTC metadata load error:", err); });
     }
 
     function populateQueueDropdowns() {
@@ -3656,13 +3563,15 @@
         return;
       }
       if (!confirm("Are you sure you want to permanently delete task #" + id + "?")) return;
-      tursoQuery("DELETE FROM task_submissions WHERE id = ?;", [id], function(err, res) {
-        if (err) {
+      apiFetch("/api/tasks/" + id, { method: "DELETE" })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (!data.ok) throw new Error(data.message || "Failed to delete task");
+          fetchLiveData();
+        })
+        .catch(function(err) {
           alert("Failed to delete task: " + err.message);
-          return;
-        }
-        fetchLiveData();
-      });
+        });
     }
 
     var _editingTaskId = null;
@@ -3704,16 +3613,30 @@
       var mod = document.getElementById("editTaskModality").value;
       var stage = document.getElementById("editTaskStage").value.trim();
 
-      var sql = "UPDATE task_submissions SET labeler_name = ?, pc_no = ?, pass = ?, object_count = ?, queue_name = ?, modality = ?, stage = ? WHERE id = ?;";
-      tursoQuery(sql, [lab, pc, pass, obj, qName, mod, stage, _editingTaskId], function(err, res) {
+      apiFetch("/api/tasks/" + _editingTaskId, {
+        method: "PUT",
+        body: JSON.stringify({
+          labeler_name: lab,
+          pc_no: pc,
+          pass: pass,
+          object_count: obj,
+          queue_name: qName,
+          modality: mod,
+          stage: stage
+        })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
         btn.disabled = false;
         btn.textContent = "💾 Save Changes";
-        if (err) {
-          alert("Failed to update task: " + err.message);
-          return;
-        }
+        if (!data.ok) throw new Error(data.message || "Failed to update task");
         closeEditTaskModal();
         fetchLiveData();
+      })
+      .catch(function(err) {
+        btn.disabled = false;
+        btn.textContent = "💾 Save Changes";
+        alert("Failed to update task: " + err.message);
       });
     }
 
@@ -3923,68 +3846,39 @@
       var minId = Infinity;
       var exportedCount = 0;
 
+      var exportPage = 1;
       while (true) {
-        var sql = (minId !== Infinity)
-          ? "SELECT id, timestamp, shift, unit, pc_no, labeler_name, national_id, yubikey_email, qtc_name, task_id, task_link, pass, modality, queue_name, object_count, stage FROM task_submissions WHERE id < ? ORDER BY id DESC LIMIT 10000;"
-          : "SELECT id, timestamp, shift, unit, pc_no, labeler_name, national_id, yubikey_email, qtc_name, task_id, task_link, pass, modality, queue_name, object_count, stage FROM task_submissions ORDER BY id DESC LIMIT 10000;";
-        var args = (minId !== Infinity) ? [minId] : [];
-
         try {
-          var res = await new Promise(function(resolve, reject) {
-            tursoQuery(sql, args, function(err, result) {
-              if (err) reject(err);
-              else resolve(result);
-            });
-          });
+          var res = await apiFetch("/api/tasks?page=" + exportPage + "&limit=5000");
+          var data = await res.json();
+          if (!data.ok || !data.tasks || !data.tasks.length) break;
 
-          var rows = (res && res.rows) ? res.rows : [];
-          if (!rows.length) break;
-
-          rows.forEach(function(r) {
-            var id = r[0] ? r[0].value : "";
-            var ts = r[1] ? String(r[1].value) : "";
-            var shift = r[2] ? String(r[2].value) : "";
-            var unit = r[3] ? String(r[3].value) : "";
-            var pc_no = r[4] ? String(r[4].value) : "";
-            var lab_name = r[5] ? String(r[5].value) : "";
-            var nat_id = r[6] ? String(r[6].value) : "";
-            var yk_email = r[7] ? String(r[7].value) : "";
-            var qtc_name = r[8] ? String(r[8].value) : "";
-            var tid = r[9] ? String(r[9].value) : "";
-            var tlink = r[10] ? String(r[10].value) : "";
-            var pas = r[11] ? String(r[11].value) : "";
-            var mod = r[12] ? String(r[12].value) : "";
-            var qname = r[13] ? String(r[13].value) : "";
-            var obj_cnt = r[14] ? (r[14].value || 0) : 0;
-            var stage = r[15] ? String(r[15].value) : "";
-
-            var numId = parseInt(id, 10);
-            if (!isNaN(numId) && numId < minId) minId = numId;
-
+          data.tasks.forEach(function(r) {
             var line = [
-              id,
-              '"' + ts.replace(/"/g, '""') + '"',
-              '"' + shift.replace(/"/g, '""') + '"',
-              '"' + unit.replace(/"/g, '""') + '"',
-              '"' + pc_no.replace(/"/g, '""') + '"',
-              '"' + lab_name.replace(/"/g, '""') + '"',
-              '"' + nat_id.replace(/"/g, '""') + '"',
-              '"' + yk_email.replace(/"/g, '""') + '"',
-              '"' + qtc_name.replace(/"/g, '""') + '"',
-              '"' + tid.replace(/"/g, '""') + '"',
-              '"' + tlink.replace(/"/g, '""') + '"',
-              '"' + pas.replace(/"/g, '""') + '"',
-              '"' + mod.replace(/"/g, '""') + '"',
-              '"' + qname.replace(/"/g, '""') + '"',
-              obj_cnt,
-              '"' + stage.replace(/"/g, '""') + '"'
+              r.id || "",
+              '"' + String(r.timestamp || "").replace(/"/g, '""') + '"',
+              '"' + String(r.shift || "").replace(/"/g, '""') + '"',
+              '"' + String(r.unit || "").replace(/"/g, '""') + '"',
+              '"' + String(r.pc_no || "").replace(/"/g, '""') + '"',
+              '"' + String(r.labeler_name || "").replace(/"/g, '""') + '"',
+              '"' + String(r.national_id || "").replace(/"/g, '""') + '"',
+              '"' + String(r.yubikey_email || "").replace(/"/g, '""') + '"',
+              '"' + String(r.qtc_name || "").replace(/"/g, '""') + '"',
+              '"' + String(r.task_id || "").replace(/"/g, '""') + '"',
+              '"' + String(r.task_link || "").replace(/"/g, '""') + '"',
+              '"' + String(r.pass || "").replace(/"/g, '""') + '"',
+              '"' + String(r.modality || "").replace(/"/g, '""') + '"',
+              '"' + String(r.queue_name || "").replace(/"/g, '""') + '"',
+              r.object_count || 0,
+              '"' + String(r.stage || "").replace(/"/g, '""') + '"'
             ];
             csvLines.push(line.join(","));
             exportedCount++;
           });
 
           if (sync) sync.textContent = "⏳ Streamed " + exportedCount.toLocaleString() + " records...";
-          if (rows.length < 10000) break;
+          if (data.tasks.length < 5000 || exportedCount >= (data.total || 0)) break;
+          exportPage++;
           await new Promise(function(r) { setTimeout(r, 40); });
         } catch(err) {
           alert("Error streaming full database export: " + err.message);
@@ -4015,34 +3909,12 @@
       var tbody = document.getElementById("usersTableBody");
       tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:14px; color:var(--text-muted);">Loading users...</td></tr>';
 
-      tursoQuery("SELECT id, username, full_name, role, allowed_pages, created_at, status, recovery_pin, reset_status, reset_code, reset_requested_at, email FROM dashboard_users ORDER BY id ASC;", [], function(err, res) {
-        if (err) {
-          tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:14px; color:var(--error);">Failed: ' + err.message + '</td></tr>';
-          return;
-        }
-
-        var rows = res ? res.rows : [];
-        if (!rows.length) {
-          tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:14px; color:var(--text-muted);">No users found.</td></tr>';
-          return;
-        }
-
-        _usersCache = rows.map(function(r) {
-          return {
-            id: r[0] ? r[0].value : "",
-            username: r[1] ? String(r[1].value) : "",
-            full_name: r[2] ? String(r[2].value) : "",
-            role: r[3] ? String(r[3].value) : "",
-            allowed_pages: r[4] ? String(r[4].value) : "",
-            created_at: r[5] ? String(r[5].value) : "",
-            status: r[6] ? String(r[6].value) : "active",
-            recovery_pin: r[7] ? String(r[7].value) : "",
-            reset_status: r[8] ? String(r[8].value) : "none",
-            reset_code: r[9] ? String(r[9].value) : "",
-            reset_requested_at: r[10] ? String(r[10].value) : "",
-            email: r[11] ? String(r[11].value) : ""
-          };
-        });
+      apiFetch("/api/users")
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (!data.ok || !data.users) throw new Error(data.message || "Failed to load users");
+          var rows = data.users;
+          _usersCache = rows;
 
         // Check if there are pending reset requests requiring Admin approval
         var pendingResets = _usersCache.filter(function(u) { return (u.reset_status || "").toLowerCase() === "requested"; });
@@ -4128,7 +4000,10 @@
         });
 
         tbody.innerHTML = html;
-      });
+        })
+        .catch(function(err) {
+          if (tbody) tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:14px; color:var(--error);">Failed: ' + esc(err.message) + '</td></tr>';
+        });
     }
 
     function openPermissionsModal(userId) {
@@ -4169,20 +4044,23 @@
       });
 
       var val = selected.join(",");
-      tursoQuery("UPDATE dashboard_users SET allowed_pages = ? WHERE id = ?;", [val, _editingPermissionsUserId], function(err, res) {
-        if (err) {
-          alert("Failed to save permissions: " + err.message);
-          return;
-        }
-
+      apiFetch("/api/users/" + _editingPermissionsUserId, {
+        method: "PUT",
+        body: JSON.stringify({ allowed_pages: val })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (!data.ok) throw new Error(data.message || "Failed to save permissions");
         if (_currentUser && _currentUser.id == _editingPermissionsUserId) {
           _currentUser.allowed_pages = val;
-          sessionStorage.setItem("meti_dash_user", JSON.stringify(_currentUser));
+          try { sessionStorage.setItem("meti_dash_user", JSON.stringify(_currentUser)); } catch(e){}
           applyUserPermissions();
         }
-
         closePermissionsModal();
         loadUsersList();
+      })
+      .catch(function(err) {
+        alert("Failed to save permissions: " + err.message);
       });
     }
 
@@ -4224,19 +4102,25 @@
       }
 
       msg.style.color = "var(--text-secondary)";
-      msg.textContent = "Authorizing user in Turso database...";
+      msg.textContent = "Authorizing user via secure backend...";
 
       var defaultAllowed = getUserAllowedPages({ role: r });
       var allowedStr = defaultAllowed.join(",");
 
-      // We store an empty password and status='pending'. The USER creates their own password upon activation!
-      var sql = "INSERT INTO dashboard_users (username, password, full_name, email, role, allowed_pages, status, recovery_pin, reset_status) VALUES (?, '', ?, ?, ?, ?, 'pending', ?, 'none');";
-      tursoQuery(sql, [u, f, email, r, allowedStr, pin], function(err, res) {
-        if (err) {
-          msg.style.color = "var(--error)";
-          msg.textContent = err.message.indexOf("UNIQUE") > -1 ? "Username already exists! Choose another username." : "Error: " + err.message;
-          return;
-        }
+      apiFetch("/api/users", {
+        method: "POST",
+        body: JSON.stringify({
+          username: u,
+          full_name: f,
+          email: email,
+          role: r,
+          allowed_pages: allowedStr,
+          recovery_pin: pin
+        })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (!data.ok) throw new Error(data.message || "Failed to create user");
 
         _lastInviteData = {
           username: u,
@@ -4266,6 +4150,10 @@
         }
 
         loadUsersList();
+      })
+      .catch(function(err) {
+        msg.style.color = "var(--error)";
+        msg.textContent = err.message.indexOf("UNIQUE") > -1 ? "Username already exists! Choose another username." : "Error: " + err.message;
       });
     }
 
@@ -4286,13 +4174,18 @@
       var newPin = String(Math.floor(1000 + Math.random() * 9000));
       if (!confirm("Re-issue PIN and reset status for @" + username + "?\nNew PIN will be: " + newPin + "\nThis allows the user to re-register their password if forgotten.")) return;
 
-      tursoQuery("UPDATE dashboard_users SET recovery_pin = ?, status = 'pending', password = '' WHERE id = ?;", [newPin, id], function(err, res) {
-        if (err) {
-          alert("Failed to reset PIN: " + err.message);
-          return;
-        }
+      apiFetch("/api/users/" + id, {
+        method: "PUT",
+        body: JSON.stringify({ recovery_pin: newPin, status: "pending", clear_password: true })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (!data.ok) throw new Error(data.message || "Failed to reset PIN");
         alert("✅ Account reset!\nUsername: " + username + "\nNew Activation PIN: " + newPin + "\nUser can now activate with this PIN on the login screen.");
         loadUsersList();
+      })
+      .catch(function(err) {
+        alert("Failed to reset PIN: " + err.message);
       });
     }
 
@@ -4360,46 +4253,26 @@
       btn.disabled = true;
       btn.textContent = "Submitting request to Admin...";
       msg.style.color = "var(--text-secondary)";
-      msg.textContent = "Sending request to database...";
+      msg.textContent = "Sending request to secure backend...";
 
-      // Check if user exists by username OR email OR full_name
-      var sql = "SELECT id, username, full_name, email, reset_status FROM dashboard_users WHERE LOWER(TRIM(username)) = LOWER(TRIM(?)) OR LOWER(TRIM(email)) = LOWER(TRIM(?)) OR LOWER(TRIM(full_name)) = LOWER(TRIM(?)) LIMIT 1;";
-      tursoQuery(sql, [u, u, u], function(err, res) {
+      apiFetch("/api/auth/request-reset", {
+        method: "POST",
+        body: JSON.stringify({ identifier: u })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
         btn.disabled = false;
         btn.textContent = "📩 Submit Reset Request to Admin";
-
-        if (err) {
-          msg.style.color = "var(--error)";
-          msg.textContent = "Database connection error: " + err.message;
-          return;
-        }
-
-        var rows = res ? res.rows : [];
-        if (!rows.length) {
-          msg.style.color = "var(--error)";
-          msg.textContent = "❌ Account not found. Please verify your username/email with your Admin.";
-          return;
-        }
-
-        var uId = rows[0][0].value;
-        var uName = rows[0][1].value;
-        var fName = rows[0][2].value;
-        var uEmail = rows[0][3] ? String(rows[0][3].value) : "";
-
-        // Flag user as reset_status = 'requested'
-        var nowStr = new Date().toISOString().replace('T', ' ').substring(0, 19);
-        tursoQuery("UPDATE dashboard_users SET reset_status = 'requested', reset_requested_at = ? WHERE id = ?;", [nowStr, uId], function(updErr) {
-          if (updErr) {
-            msg.style.color = "var(--error)";
-            msg.textContent = "Failed to submit request: " + updErr.message;
-            return;
-          }
-
-          msg.style.color = "var(--success)";
-          var maskedEmail = uEmail ? uEmail.replace(/(.{2})(.*)(?=@)/, function(gp1, gp2, gp3) { return gp2 + "*".repeat(Math.max(gp3.length, 3)); }) : "بريدك الإلكتروني";
-          msg.innerHTML = "✅ <strong>تم إرسال طلب إعادة التعيين للإدمن بنجاح!</strong><br>"
-            + "بمجرد موافقة مسؤول النظام (Admin) على طلبك في لوحة التحكم، سيصلك <strong>كود التأكيد السري المكون من 6 أرقام تلقائياً على بريدك الإلكتروني</strong> (" + maskedEmail + ") لتكتبه أدناه وتختار كلمة المرور الجديدة.";
-        });
+        if (!data.ok) throw new Error(data.message || "Request failed");
+        msg.style.color = "var(--success)";
+        msg.innerHTML = "✅ <strong>تم إرسال طلب إعادة التعيين للإدمن بنجاح!</strong><br>"
+          + "بمجرد موافقة مسؤول النظام (Admin) على طلبك في لوحة التحكم، سيصلك <strong>كود التأكيد السري المكون من 6 أرقام تلقائياً على بريدك الإلكتروني</strong> لتكتبه أدناه وتختار كلمة المرور الجديدة.";
+      })
+      .catch(function(err) {
+        btn.disabled = false;
+        btn.textContent = "📩 Submit Reset Request to Admin";
+        msg.style.color = "var(--error)";
+        msg.textContent = "Error: " + err.message;
       });
     }
 
@@ -4416,7 +4289,7 @@
     }
 
     function submitActivationOrReset(e) {
-      e.preventDefault();
+      if (e && e.preventDefault) e.preventDefault();
       var u = document.getElementById("actUsername").value.trim().toLowerCase();
       var pin = document.getElementById("actPin").value.trim();
       var p1 = document.getElementById("actNewPass").value.trim();
@@ -4429,9 +4302,9 @@
         msg.textContent = "Please fill in all fields.";
         return;
       }
-      if (p1.length < 4) {
+      if (p1.length < 6) {
         msg.style.color = "var(--error)";
-        msg.textContent = "Password must be at least 4 characters long.";
+        msg.textContent = "Password must be at least 6 characters long.";
         return;
       }
       if (p1 !== p2) {
@@ -4441,270 +4314,104 @@
       }
 
       btn.disabled = true;
-      btn.textContent = "Verifying with database...";
+      btn.textContent = "Verifying with server...";
       msg.style.color = "var(--text-secondary)";
-      msg.textContent = "Checking authorization...";
+      msg.textContent = "Processing authorization...";
 
-      var sql = "SELECT id, username, full_name, role, allowed_pages, status, recovery_pin, reset_status, reset_code FROM dashboard_users WHERE LOWER(TRIM(username)) = LOWER(TRIM(?)) OR LOWER(TRIM(full_name)) = LOWER(TRIM(?)) LIMIT 1;";
-      tursoQuery(sql, [u, u], function(err, res) {
-        if (err) {
-          btn.disabled = false;
-          btn.textContent = "Try Again";
-          msg.style.color = "var(--error)";
-          msg.textContent = "Connection error: " + err.message;
-          return;
-        }
+      var endpoint = (_actMode === "activate") ? "/api/auth/activate" : "/api/auth/verify-reset";
+      var payload = (_actMode === "activate")
+        ? { username: u, recoveryPin: pin, password: p1 }
+        : { identifier: u, code: pin, newPassword: p1 };
 
-        var rows = res ? res.rows : [];
-        if (!rows.length) {
-          btn.disabled = false;
-          btn.textContent = "Try Again";
-          msg.style.color = "var(--error)";
-          msg.textContent = "❌ Username not authorized! You must be pre-authorized by an Admin before creating a password.";
-          return;
-        }
-
-        var row = rows[0];
-        var uId = row[0].value;
-        var uName = row[1].value;
-        var fName = row[2].value;
-        var role = row[3].value;
-        var allowed = row[4] ? String(row[4].value) : "";
-        var dbPin = row[6] ? String(row[6].value).trim() : "";
-        var resetStatus = row[7] ? String(row[7].value).trim().toLowerCase() : "none";
-        var resetCode = row[8] ? String(row[8].value).trim() : "";
-
-        // Check if mode is 'reset' (Strict Admin Approval for users, Master PIN for Admin)
-        if (_actMode === "reset") {
-          var isSuperAdmin = (role === "admin" || u === "admin" || u === "islam" || u === "islam.yasser");
-          if (isSuperAdmin) {
-            // Super Admin Emergency Recovery via Admin PIN
-            if (pin !== dbPin && pin !== "1234") {
-              btn.disabled = false;
-              btn.textContent = "Try Again";
-              msg.style.color = "var(--error)";
-              msg.textContent = "❌ Incorrect Admin Recovery PIN! Default PIN is 1234.";
-              return;
-            }
-          } else {
-            // Regular User: Strictly Enforce Explicit Admin Approval
-            if (resetStatus === "none") {
-              btn.disabled = false;
-              btn.textContent = "Try Again";
-              msg.style.color = "var(--error)";
-              msg.innerHTML = "❌ <strong>No approved reset request found!</strong><br>لحماية بيانات الشركة وسرية الحسابات، يجب أولاً تقديم طلب لإعادة التعيين بالضغط على 'Submit Reset Request to Admin' أعلاه ليوافق عليه الإدمن.";
-              return;
-            }
-            if (resetStatus === "requested") {
-              btn.disabled = false;
-              btn.textContent = "Try Again";
-              msg.style.color = "var(--error)";
-              msg.innerHTML = "⏳ <strong>Pending Admin Approval!</strong><br>طلبك قيد انتظار موافقة الإدمن في لوحة التحكم. بمجرد موافقة الإدمن سيعطيك كود الموافقة المكون من 4 أرقام.";
-              return;
-            }
-            if (resetStatus === "approved") {
-              if (!resetCode || resetCode !== pin) {
-                btn.disabled = false;
-                btn.textContent = "Try Again";
-                msg.style.color = "var(--error)";
-                msg.textContent = "❌ Incorrect Admin Approval Code! Please check with your Admin for the approved 4-digit code.";
-                return;
-              }
-            }
-          }
-        } else {
-          // 'activate' mode: verify initial Activation PIN
-          if (!dbPin || dbPin !== pin) {
-            btn.disabled = false;
-            btn.textContent = "Try Again";
-            msg.style.color = "var(--error)";
-            msg.textContent = "❌ Incorrect Verification PIN! Please check with your Admin for your assigned PIN code.";
-            return;
-          }
-        }
-
-        // Code is verified! Save new password and clear reset status
-        msg.style.color = "var(--primary)";
-        msg.textContent = "Saving your new password...";
-
-        tursoQuery("UPDATE dashboard_users SET password = ?, status = 'active', reset_status = 'none', reset_code = '', reset_requested_at = '' WHERE id = ?;", [p1, uId], function(updErr, updRes) {
-          btn.disabled = false;
-          btn.textContent = "Done!";
-
-          if (updErr) {
-            msg.style.color = "var(--error)";
-            msg.textContent = "Failed to update password: " + updErr.message;
-            return;
-          }
-
-          msg.style.color = "var(--success)";
-          msg.textContent = "🎉 Password successfully updated! Signing in to your dashboard...";
-
-          setTimeout(function() {
-            closeActivationModal();
-            _currentUser = {
-              id: uId,
-              username: uName,
-              full_name: fName,
-              role: role,
-              allowed_pages: allowed,
-              recovery_pin: dbPin
-            };
-            sessionStorage.setItem("meti_dash_user", JSON.stringify(_currentUser));
-            showDashboard("tasks");
-          }, 800);
+      apiFetch(endpoint, {
+        method: "POST",
+        body: JSON.stringify(payload)
+      })
+      .then(function(r) {
+        return r.json().then(function(data) {
+          if (!r.ok || !data.ok) throw new Error(data.message || "Verification failed");
+          return data;
         });
+      })
+      .then(function(data) {
+        btn.disabled = false;
+        btn.textContent = "Done!";
+        msg.style.color = "var(--success)";
+        msg.textContent = "🎉 Password successfully saved! You may now sign in.";
+        setTimeout(function() {
+          closeActivationModal();
+          var pIn = document.getElementById("loginPassword");
+          var uIn = document.getElementById("loginUsername");
+          if (uIn) uIn.value = u;
+          if (pIn) pIn.value = p1;
+          handleLogin();
+        }, 1200);
+      })
+      .catch(function(err) {
+        btn.disabled = false;
+        btn.textContent = "Try Again";
+        msg.style.color = "var(--error)";
+        msg.textContent = err.message || "Failed to process request";
       });
     }
 
-    // ============================================================
-    // ADMIN ACTIONS: APPROVE / REJECT RESET REQUESTS
-    // ============================================================
     function approveResetRequest(userId, username) {
-      var userObj = _usersCache.find(function(u) { return u.id == userId; });
+      var userObj = _cachedUsersList.find(function(u) { return u.id == userId; });
       var userEmail = (userObj && userObj.email) ? userObj.email.trim() : "";
       var fullName = (userObj && userObj.full_name) ? userObj.full_name : username;
 
-      var code = String(Math.floor(100000 + Math.random() * 900000));
       var confirmMsg = "Approve password reset request for " + fullName + " (@" + username + ")?\n"
-        + (userEmail ? ("\n📩 An automated email with One-Time Code [" + code + "] will be dispatched to: " + userEmail) : "\n⚠️ Notice: No email address is on file for this user!")
+        + (userEmail ? ("\n📩 An automated email with One-Time Code will be dispatched to: " + userEmail) : "\n⚠️ Notice: No email address is on file for this user!")
         + "\n\nConfirm approval?";
 
       if (!confirm(confirmMsg)) return;
 
-      tursoQuery("UPDATE dashboard_users SET reset_status = 'approved', reset_code = ? WHERE id = ?;", [code, userId], function(err) {
-        if (err) {
+      apiFetch("/api/users/" + userId + "/approve-reset", { method: "POST" })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (!data.ok) throw new Error(data.message || "Failed to approve reset");
+          var code = data.code || "";
+          var msgText = "✅ Password Reset Approved for @" + username + "!\n\n"
+            + (code ? ("🔑 One-Time Reset Code: " + code + "\n\n") : "")
+            + (userEmail
+                ? ("📩 An automated email has been dispatched to: " + userEmail + "\nThe employee can now check their inbox and set their new password.")
+                : ("⚠️ Note: No email address was on file, so please provide code [" + code + "] manually to " + username + "."));
+
+          alert(msgText);
+          loadUsersList();
+        })
+        .catch(function(err) {
           alert("Failed to approve reset: " + err.message);
-          return;
-        }
-
-        // Trigger automatic email dispatch
-        if (userEmail) {
-          dispatchResetEmail(userEmail, fullName, username, code);
-        }
-
-        var msgText = "✅ Password Reset Approved for @" + username + "!\n\n"
-          + "🔑 One-Time Reset Code: " + code + "\n\n"
-          + (userEmail
-              ? ("📩 An automated email has been dispatched to: " + userEmail + "\nThe employee can now check their inbox and set their new password.")
-              : ("⚠️ Note: No email address was on file, so please provide this code manually to " + username + "."));
-
-        alert(msgText);
-        loadUsersList();
-      });
+        });
     }
-    // ============================================================
-    // AUTOMATED EMAIL DISPATCHER ENGINE
-    // ============================================================
-    var DEFAULT_GAS_MAILER_URL = "https://script.google.com/macros/s/AKfycbwU6RQpM9OwOPfc6OVNts2x6mOpHMwGr6Px5T_HxN-h0grQsqVegw-MOYgvyXeTAtdbig/exec";
-    var storedWebhook = localStorage.getItem("meti_mailer_webhook");
-    if (!storedWebhook || storedWebhook.indexOf("AKfycbxa-Id35") !== -1) {
-      localStorage.setItem("meti_mailer_webhook", DEFAULT_GAS_MAILER_URL);
-      storedWebhook = DEFAULT_GAS_MAILER_URL;
-    }
-    var GAS_MAILER_URL = storedWebhook;
-
-    function dispatchResetEmail(toEmail, fullName, username, code) {
-      if (!toEmail) return;
-      var webhook = localStorage.getItem("meti_mailer_webhook") || GAS_MAILER_URL;
-      if (!webhook) return;
-
-      var url = webhook + (webhook.includes("?") ? "&" : "?") + "action=send_reset_code"
-        + "&to=" + encodeURIComponent(toEmail)
-        + "&name=" + encodeURIComponent(fullName || username)
-        + "&username=" + encodeURIComponent(username)
-        + "&code=" + encodeURIComponent(code);
-
-      try {
-        fetch(url, { method: "GET", mode: "no-cors", cache: "no-store" })
-          .catch(function() {
-            var img = new Image();
-            img.src = url + "&_t=" + Date.now();
-          });
-      } catch(e) {
-        var img = new Image();
-        img.src = url + "&_t=" + Date.now();
-      }
-    }
-
-    function openEmailSettingsModal() {
-      var inp = document.getElementById("mailerWebhookUrl");
-      var cur = localStorage.getItem("meti_mailer_webhook") || GAS_MAILER_URL;
-      if (inp) inp.value = cur;
-      var msg = document.getElementById("testEmailMsg");
-      if (msg) msg.textContent = "";
-      document.getElementById("emailSettingsModal").classList.add("show");
-    }
-
-    function closeEmailSettingsModal() {
-      document.getElementById("emailSettingsModal").classList.remove("show");
-    }
-
-    function saveEmailSettings() {
-      var inp = document.getElementById("mailerWebhookUrl");
-      if (!inp) return;
-      var val = inp.value.trim();
-      if (val) {
-        localStorage.setItem("meti_mailer_webhook", val);
-        GAS_MAILER_URL = val;
-      }
-      alert("✔ Email Service Webhook settings saved!");
-      closeEmailSettingsModal();
-    }
-
-    function sendTestEmail() {
-      var eIn = document.getElementById("testEmailInput");
-      var msg = document.getElementById("testEmailMsg");
-      var btn = document.getElementById("btnSendTestEmail");
-      var email = eIn ? eIn.value.trim() : "";
-
-      if (!email || !email.includes("@")) {
-        msg.style.color = "var(--error)";
-        msg.textContent = "Please enter a valid test email address.";
-        return;
-      }
-
-      btn.disabled = true;
-      btn.textContent = "Sending...";
-      msg.style.color = "var(--primary)";
-      msg.textContent = "Dispatching test verification email...";
-
-      var testCode = String(Math.floor(100000 + Math.random() * 900000));
-      dispatchResetEmail(email, "Islam Yasser", "admin", testCode);
-
-      setTimeout(function() {
-        btn.disabled = false;
-        btn.textContent = "إرسال تجربة";
-        msg.style.color = "var(--success)";
-        msg.textContent = "✔ Test email dispatched with code [" + testCode + "]! Check inbox (and spam).";
-      }, 1500);
-    }
-
 
     function rejectResetRequest(userId, username) {
       if (!confirm("Reject and block password reset request for @" + username + "?\nThis protects the account from unauthorized resets.")) return;
 
-      tursoQuery("UPDATE dashboard_users SET reset_status = 'none', reset_code = '', reset_requested_at = '' WHERE id = ?;", [userId], function(err) {
-        if (err) {
+      apiFetch("/api/users/" + userId + "/reject-reset", { method: "POST" })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (!data.ok) throw new Error(data.message || "Failed to reject reset");
+          alert("🛡️ Reset request for @" + username + " has been rejected and cleared.");
+          loadUsersList();
+        })
+        .catch(function(err) {
           alert("Failed to reject reset: " + err.message);
-          return;
-        }
-        alert("🛡️ Reset request for @" + username + " has been rejected and cleared.");
-        loadUsersList();
-      });
+        });
     }
 
     function deleteUser(id, username) {
       if (!confirm("Are you sure you want to delete user: " + username + "?")) return;
-      tursoQuery("DELETE FROM dashboard_users WHERE id = ?;", [id], function(err, res) {
-        if (err) {
+      apiFetch("/api/users/" + id, { method: "DELETE" })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (!data.ok) throw new Error(data.message || "Failed to delete user");
+          loadUsersList();
+        })
+        .catch(function(err) {
           alert("Failed to delete user: " + err.message);
-          return;
-        }
-        loadUsersList();
-      });
+        });
     }
-
     // Generate default PIN for user invite form
     setTimeout(generateNewUserPin, 500);
     // Auto-init on page load
@@ -4879,41 +4586,32 @@ function fetchLiveDataOnly() {
   var sync = document.getElementById("syncStatus");
   if (sync) sync.textContent = "⚡ Loading from database...";
 
-  var batch = [
-    { sql: "SELECT COUNT(*) FROM task_submissions;" },
-    { sql: "SELECT id, timestamp, shift, unit, pc_no, labeler_name, national_id, yubikey_email, qtc_name, task_id, pass, modality, queue_name, object_count, stage, created_at, task_link FROM task_submissions ORDER BY id DESC LIMIT 5000;" }
-  ];
+  apiFetch("/api/tasks?limit=5000")
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (!data.ok) throw new Error(data.message || "Failed to load tasks");
+      if (sync) sync.textContent = "● Live Edge Synced (" + new Date().toLocaleTimeString("en-US", {timeZone:"Africa/Cairo"}) + ")";
+      _totalDbCount = data.total || 0;
+      _allSubmissions = (data.tasks || []).map(mapSubmissionRow);
 
-  tursoBatchQuery(batch, function(err, results) {
-    if (err) {
-      if (sync) sync.textContent = "Database sync error: " + err.message;
-      return;
-    }
-    if (sync) sync.textContent = "● Live Edge Synced (" + new Date().toLocaleTimeString("en-US", {timeZone:"Africa/Cairo"}) + ")";
+      _allSubmissions.forEach(function(s) {
+        if (s.queue_name && !_allQueuesList.includes(s.queue_name)) {
+          _allQueuesList.push(s.queue_name);
+        }
+        if (s.qtc_name && !_allQTCList.includes(s.qtc_name)) {
+          _allQTCList.push(s.qtc_name);
+        }
+      });
+      populateQueueDropdowns();
+      populateQTCDropdowns();
 
-    if (results && results[0] && results[0].rows && results[0].rows[0]) {
-      var cntVal = results[0].rows[0][0] ? results[0].rows[0][0].value : 0;
-      _totalDbCount = parseInt(cntVal, 10) || 0;
-    }
-
-    var rows = (results && results[1] && results[1].rows) ? results[1].rows : [];
-    _allSubmissions = rows.map(mapSubmissionRow);
-
-    _allSubmissions.forEach(function(s) {
-      if (s.queue_name && !_allQueuesList.includes(s.queue_name)) {
-        _allQueuesList.push(s.queue_name);
-      }
-      if (s.qtc_name && !_allQTCList.includes(s.qtc_name)) {
-        _allQTCList.push(s.qtc_name);
-      }
+      calculateKPIs();
+      _currentPage = 1;
+      applyFilters();
+    })
+    .catch(function(err) {
+      if (sync) sync.textContent = "API error: " + err.message;
     });
-    populateQueueDropdowns();
-    populateQTCDropdowns();
-
-    calculateKPIs();
-    _currentPage = 1;
-    applyFilters();
-  });
 }
 
 function fetchLiveData() {
@@ -4935,46 +4633,39 @@ function loadMoreRecords() {
     btn.innerHTML = '<span>⏳ Loading...</span>';
   }
 
-  var minId = _allSubmissions.reduce(function(min, r) {
-    var num = parseInt(r.id, 10);
-    return (!isNaN(num) && num < min) ? num : min;
-  }, Infinity);
-
-  var sql = (minId !== Infinity)
-    ? "SELECT id, timestamp, shift, unit, pc_no, labeler_name, national_id, yubikey_email, qtc_name, task_id, pass, modality, queue_name, object_count, stage, created_at, task_link FROM task_submissions WHERE id < ? ORDER BY id DESC LIMIT 5000;"
-    : "SELECT id, timestamp, shift, unit, pc_no, labeler_name, national_id, yubikey_email, qtc_name, task_id, pass, modality, queue_name, object_count, stage, created_at, task_link FROM task_submissions ORDER BY id DESC LIMIT 5000;";
-
-  var args = (minId !== Infinity) ? [minId] : [];
-
-  tursoQuery(sql, args, function(err, res) {
-    _isLoadingMore = false;
-    if (btn) {
-      btn.disabled = false;
-      btn.innerHTML = '<span>📥 Load Next 5,000</span>';
-    }
-
-    if (err) {
-      alert("Error loading more records: " + err.message);
-      return;
-    }
-
-    var rows = (res && res.rows) ? res.rows : [];
-    if (!rows.length) {
-      alert("All records in database are already loaded!");
-      return;
-    }
-
-    var newItems = rows.map(mapSubmissionRow);
-    var existingIds = new Set(_allSubmissions.map(function(s) { return String(s.id); }));
-    newItems.forEach(function(item) {
-      if (!existingIds.has(String(item.id))) {
-        _allSubmissions.push(item);
+  var nextPage = Math.floor(_allSubmissions.length / 2000) + 1;
+  apiFetch("/api/tasks?page=" + nextPage + "&limit=2000")
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      _isLoadingMore = false;
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<span>📥 Load Next 2,000</span>';
       }
+      if (!data.ok) throw new Error(data.message || "Failed to load tasks");
+      var tasks = data.tasks || [];
+      if (!tasks.length) {
+        alert("All records in database are already loaded!");
+        return;
+      }
+      var newItems = tasks.map(mapSubmissionRow);
+      var existingIds = new Set(_allSubmissions.map(function(s) { return String(s.id); }));
+      newItems.forEach(function(item) {
+        if (!existingIds.has(String(item.id))) {
+          _allSubmissions.push(item);
+        }
+      });
+      calculateKPIs();
+      applyFilters();
+    })
+    .catch(function(err) {
+      _isLoadingMore = false;
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<span>📥 Load Next 2,000</span>';
+      }
+      alert("Error loading more records: " + err.message);
     });
-
-    calculateKPIs();
-    applyFilters();
-  });
 }
 
 async function streamAllDatabaseRecords() {
@@ -4989,40 +4680,22 @@ async function streamAllDatabaseRecords() {
   if (container) container.style.display = "block";
   if (btn) btn.disabled = true;
 
+  var page = 1;
   while (!_stopStreamingFlag) {
-    var minId = _allSubmissions.reduce(function(min, r) {
-      var num = parseInt(r.id, 10);
-      return (!isNaN(num) && num < min) ? num : min;
-    }, Infinity);
-
-    var sql = (minId !== Infinity)
-      ? "SELECT id, timestamp, shift, unit, pc_no, labeler_name, national_id, yubikey_email, qtc_name, task_id, pass, modality, queue_name, object_count, stage, created_at, task_link FROM task_submissions WHERE id < ? ORDER BY id DESC LIMIT 10000;"
-      : "SELECT id, timestamp, shift, unit, pc_no, labeler_name, national_id, yubikey_email, qtc_name, task_id, pass, modality, queue_name, object_count, stage, created_at, task_link FROM task_submissions ORDER BY id DESC LIMIT 10000;";
-
-    var args = (minId !== Infinity) ? [minId] : [];
-
     try {
-      var res = await new Promise(function(resolve, reject) {
-        tursoQuery(sql, args, function(err, result) {
-          if (err) reject(err);
-          else resolve(result);
-        });
-      });
-
-      var rows = (res && res.rows) ? res.rows : [];
-      if (!rows.length) {
-        break; // reached end of data
-      }
+      var res = await apiFetch("/api/tasks?page=" + page + "&limit=2000");
+      var data = await res.json();
+      if (!data.ok || !data.tasks || !data.tasks.length) break;
 
       var existingIds = new Set(_allSubmissions.map(function(s) { return String(s.id); }));
-      rows.forEach(function(r) {
+      data.tasks.forEach(function(r) {
         var item = mapSubmissionRow(r);
         if (!existingIds.has(String(item.id))) {
           _allSubmissions.push(item);
         }
       });
 
-      var target = _totalDbCount || 52000;
+      var target = data.total || _totalDbCount || 52000;
       var pct = Math.min(100, Math.round((_allSubmissions.length / target) * 100));
       if (bar) bar.style.width = pct + "%";
       if (label) label.textContent = "Loading database: " + _allSubmissions.length.toLocaleString() + " / " + target.toLocaleString() + " records (" + pct + "%)...";
@@ -5030,9 +4703,8 @@ async function streamAllDatabaseRecords() {
       calculateKPIs();
       renderTable();
 
-      if (rows.length < 10000) break;
-
-      // Yield event loop
+      if (data.tasks.length < 2000 || _allSubmissions.length >= target) break;
+      page++;
       await new Promise(function(r) { setTimeout(r, 60); });
     } catch(err) {
       console.warn("Streaming batch error:", err);
@@ -5070,34 +4742,33 @@ function searchFullDatabase() {
   var sync = document.getElementById("syncStatus");
   if (sync) sync.textContent = "🔍 Searching full database...";
 
-  var pattern = "%" + q + "%";
-  var sql = "SELECT id, timestamp, shift, unit, pc_no, labeler_name, national_id, yubikey_email, qtc_name, task_id, pass, modality, queue_name, object_count, stage, created_at, task_link FROM task_submissions WHERE task_id LIKE ? OR labeler_name LIKE ? OR national_id LIKE ? OR pc_no LIKE ? OR yubikey_email LIKE ? ORDER BY id DESC LIMIT 1000;";
-
-  tursoQuery(sql, [pattern, pattern, pattern, pattern, pattern], function(err, res) {
-    if (sync) sync.textContent = "● Live Edge Synced (" + new Date().toLocaleTimeString("en-US", {timeZone:"Africa/Cairo"}) + ")";
-    if (err) {
-      alert("Database search error: " + err.message);
-      return;
-    }
-
-    var rows = (res && res.rows) ? res.rows : [];
-    if (!rows.length) {
-      alert("No records found in database matching: " + q);
-      return;
-    }
-
-    var newItems = rows.map(mapSubmissionRow);
-    var existingIds = new Set(_allSubmissions.map(function(s) { return String(s.id); }));
-    newItems.forEach(function(item) {
-      if (!existingIds.has(String(item.id))) {
-        _allSubmissions.unshift(item);
+  apiFetch("/api/tasks?search=" + encodeURIComponent(q) + "&limit=1000")
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (sync) sync.textContent = "● Live Edge Synced (" + new Date().toLocaleTimeString("en-US", {timeZone:"Africa/Cairo"}) + ")";
+      if (!data.ok) throw new Error(data.message || "Search failed");
+      var tasks = data.tasks || [];
+      if (!tasks.length) {
+        alert("No records found in database matching: " + q);
+        return;
       }
-    });
 
-    _currentPage = 1;
-    calculateKPIs();
-    applyFilters();
-  });
+      var newItems = tasks.map(mapSubmissionRow);
+      var existingIds = new Set(_allSubmissions.map(function(s) { return String(s.id); }));
+      newItems.forEach(function(item) {
+        if (!existingIds.has(String(item.id))) {
+          _allSubmissions.unshift(item);
+        }
+      });
+
+      _currentPage = 1;
+      calculateKPIs();
+      applyFilters();
+    })
+    .catch(function(err) {
+      if (sync) sync.textContent = "Search error: " + err.message;
+      alert("Database search error: " + err.message);
+    });
 }
 
 // 25-second continuous background polling for live submissions

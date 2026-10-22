@@ -1,0 +1,15 @@
+{
+  "name": "meeg-secure-backend",
+  "version": "1.0.0",
+  "description": "Unified secure backend for MEEG Operations Workspace",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "node --test test/*.test.js"
+  },
+  "devDependencies": {
+    "wrangler": "^3.114.0"
+  }
+}

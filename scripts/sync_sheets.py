@@ -1,7 +1,11 @@
 import json, urllib.request, re, urllib.parse, time, os
 
 TURSO_URL = os.environ.get('TURSO_URL', 'https://meti-tasks-islamyasser424-design.aws-eu-west-1.turso.io/v2/pipeline')
-TURSO_TOKEN = os.environ.get('TURSO_TOKEN', 'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3OTI1NjMzNDUsImlkIjoiMDFhMTVkMTctNWIwMS03ZGIyLWE5NDItN2Q1NDA1NWZhNjE1Iiwia2lkIjoid3ZJZENGejZKbkhZV3k4cGJWUkQ4bFVSZjNsOURtdjczY0ZiTGVKYmVXdyIsInJpZCI6IjE4NTk2YzM5LTFjZDgtNDk3Ny1hMmEwLTE4ODVlOWU3Yjg4MSJ9.6DYE3efGgX6Hiw_GptXugwhY3DGBlnsIVDWO9vCLgouLJ6ck7hwDaIyzkuv6CpZcIvLNlTNVK54bruXDYJ0UBA')
+TURSO_TOKEN = os.environ.get('TURSO_TOKEN', '')
+
+if not TURSO_TOKEN:
+    # Read from local env or raise error if in CI
+    print("Warning: TURSO_TOKEN environment variable not set. Please set TURSO_TOKEN.")
 
 def execute_pipeline(requests, retries=4):
     payload = json.dumps({'requests': requests}).encode('utf-8')

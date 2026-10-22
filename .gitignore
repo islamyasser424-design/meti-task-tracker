@@ -16,6 +16,8 @@ __pycache__/
 *.py[cod]
 *$py.class
 *.env
+.env
+.env.*
 .venv/
 env/
 venv/
@@ -25,3 +27,6 @@ ENV/
 *.log
 *.tmp
 temp/
+backups/
+.wrangler/
+node_modules/

@@ -1,0 +1,7 @@
+name = "meeg-secure-api"
+main = "src/index.js"
+compatibility_date = "2026-10-22"
+
+# Configure routes/custom domain after deploying. Do not store secrets here.
+[vars]
+ALLOWED_ORIGIN = "https://islamyasser424-design.github.io"
