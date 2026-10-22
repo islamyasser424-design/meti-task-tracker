@@ -3768,301 +3768,337 @@ function renderQueueTrendChart(containerId, rows){
 // ============================================================
 // PAGE: GM REPORT (Queue Operations Table matching user sheet)
 // ============================================================
+
+function gmQueueReport(rows, universe = rows) {
+  const idx = name => hdrs ? hdrs.findIndex(h => h.trim().toLowerCase() === name.toLowerCase()) : -1;
+  const qi = idx('Queue Name');
+  const mi = idx('Modality');
+  const pi = idx('Pass');
+  const ni = idx('National Id');
+  const li = idx('Labeler Name');
+  const sti = idx('Stage');
+
+  const groups = new Map();
+
+  const getModality = r => {
+    const raw = mi >= 0 ? String(r[mi] || '').trim() : '';
+    const key = raw.toLowerCase().replace(/[\s_-]+/g, '');
+    if (key === 'lidar') return 'Lidar';
+    if (key === 'laneline' || key === 'lane') return 'Lane Line';
+    return raw || 'Unspecified';
+  };
+
+  const checkRelabel = (qName, r) => {
+    const qLower = String(qName || '').toLowerCase();
+    const stLower = sti >= 0 ? String(r[sti] || '').toLowerCase() : '';
+    const modLower = mi >= 0 ? String(r[mi] || '').toLowerCase() : '';
+    return qLower.includes('relabel') || stLower.includes('relabel') || modLower.includes('relabel');
+  };
+
+  function group(r) {
+    const name = qi < 0 ? '' : String(r[qi] || '').trim();
+    if (!name) return null;
+    const mod = getModality(r);
+    const isRelabel = checkRelabel(name, r);
+    const key = JSON.stringify([name, mod, isRelabel]);
+    if (!groups.has(key)) {
+      groups.set(key, {
+        name,
+        mod,
+        isRelabel,
+        fp: 0,
+        qa: 0,
+        fpIds: new Set(),
+        qaIds: new Set(),
+        missing: 0
+      });
+    }
+    return groups.get(key);
+  }
+
+  universe.forEach(group);
+
+  rows.forEach(r => {
+    const g = group(r);
+    if (!g) return;
+    const pass = pi < 0 ? '' : String(r[pi] || '').trim().toUpperCase();
+    if (pass !== 'FP' && pass !== 'QA') return;
+    const key = pass.toLowerCase();
+    g[key]++;
+
+    // De-duplicate unique labelers
+    let id = ni < 0 ? '' : String(r[ni] || '').trim()
+      .replace(/[٠-٩]/g, c => String(c.charCodeAt(0) - 1632))
+      .replace(/[۰-۹]/g, c => String(c.charCodeAt(0) - 1776))
+      .replace(/\.0+$/, '').replace(/[\s-]/g, '');
+
+    if (/^\d{14}$/.test(id)) {
+      g[key + 'Ids'].add(id);
+    } else {
+      const name = li >= 0 ? String(r[li] || '').trim().toLowerCase() : '';
+      if (name) {
+        g[key + 'Ids'].add('NAME_' + name);
+      } else {
+        g.missing++;
+      }
+    }
+  });
+
+  return {
+    hasQueue: qi >= 0,
+    hasPass: pi >= 0,
+    groups: [...groups.values()].sort((a, b) => a.name.localeCompare(b.name) || a.mod.localeCompare(b.mod))
+  };
+}
+
 function renderGmReport(){
   const page = $('uxGmReport');
   if(!page || page.hidden) return;
 
   const baseRows = rowsInView();
-  const idx = name => hdrs.findIndex(h => h.trim().toLowerCase() === name.toLowerCase());
-  const qi = idx('queue name');
-  const si = idx('shift');
-  const fi = hdrs.findIndex(h => ['floor', 'unit'].includes(h.trim().toLowerCase()));
-  const mi = idx('modality');
-  const li = idx('labeler name');
+  const sourceUniverse = (typeof rawRows !== 'undefined' && rawRows.length) ? rawRows : baseRows;
+  const report = gmQueueReport(baseRows, sourceUniverse);
 
-  // Filter rows
-  const filteredRows = baseRows.filter(r => {
-    const shift = si >= 0 ? String(r[si] || '').trim() : '';
-    const floor = fi >= 0 ? deriveFloor(r[fi]) : 'Unknown';
-    const mod = mi < 0 ? '' : String(r[mi] || '').toLowerCase().replace(/[\s_-]+/g, '');
-    const d = rDate(r);
+  // Filter groups
+  let visibleGroups = report.groups;
 
-    if (gmReportFilters.shift && shift !== gmReportFilters.shift) return false;
-    if (gmReportFilters.floor && floor !== gmReportFilters.floor) return false;
-    if (gmReportFilters.modality && gmReportFilters.modality !== 'all') {
-      const isLidar = mod === 'lidar';
-      const isLane = mod === 'laneline' || mod === 'lane';
-      if (gmReportFilters.modality === 'lidar' && !isLidar) return false;
-      if (gmReportFilters.modality === 'laneline' && !isLane) return false;
-    }
-    if (gmReportFilters.from && d && d < gmReportFilters.from) return false;
-    if (gmReportFilters.to && d && d > gmReportFilters.to) return false;
-    return true;
-  });
-
-  // Master queue list
-  const masterQueueSet = new Set();
-  if (Array.isArray(window.liveQueuesList)) {
-    window.liveQueuesList.forEach(q => {
-      const qn = String(q.name || q.queue_name || q || '').trim();
-      if (qn) masterQueueSet.add(qn);
-    });
+  // Zero-submissions toggle (hidden by default matching reference image)
+  if (gmReportFilters.hideZero !== false) {
+    visibleGroups = visibleGroups.filter(g => g.fp > 0 || g.qa > 0);
   }
-  rawRows.forEach(r => {
-    const qn = qi >= 0 ? String(r[qi] || '').trim() : '';
-    if (qn) masterQueueSet.add(qn);
-  });
-  filteredRows.forEach(r => {
-    const qn = qi >= 0 ? String(r[qi] || '').trim() : '';
-    if (qn) masterQueueSet.add(qn);
-  });
 
-  const allQueuesList = [...masterQueueSet].sort();
+  // Modality filter
+  if (gmReportFilters.modality && gmReportFilters.modality !== 'all') {
+    if (gmReportFilters.modality === 'relabel') {
+      visibleGroups = visibleGroups.filter(g => g.isRelabel);
+    } else if (gmReportFilters.modality === 'lidar') {
+      visibleGroups = visibleGroups.filter(g => g.mod === 'Lidar' && !g.isRelabel);
+    } else if (gmReportFilters.modality === 'laneline') {
+      visibleGroups = visibleGroups.filter(g => g.mod === 'Lane Line' && !g.isRelabel);
+    }
+  }
 
-  // Aggregate stats per queue
-  const queueStatsList = [];
-  let grandTotalFpTasks = 0;
-  let grandTotalQaTasks = 0;
-  const grandFpLabelers = new Set();
-  const grandQaLabelers = new Set();
-
-  allQueuesList.forEach((qName, i) => {
-    const qRows = filteredRows.filter(r => qi >= 0 && String(r[qi] || '').trim() === qName);
-    const fpRows = qRows.filter(r => isModPass(r, 'any', 'FP'));
-    const qaRows = qRows.filter(r => isModPass(r, 'any', 'QA'));
-
-    const fpLabSet = new Set();
-    fpRows.forEach(r => {
-      const lab = li >= 0 ? String(r[li] || '').trim() : '';
-      if (lab) { fpLabSet.add(lab); grandFpLabelers.add(lab); }
-    });
-    const fpLabCount = fpLabSet.size;
-    const fpTaskCount = fpRows.length;
-    grandTotalFpTasks += fpTaskCount;
-
-    const qaLabSet = new Set();
-    qaRows.forEach(r => {
-      const lab = li >= 0 ? String(r[li] || '').trim() : '';
-      if (lab) { qaLabSet.add(lab); grandQaLabelers.add(lab); }
-    });
-    const qaLabCount = qaLabSet.size;
-    const qaTaskCount = qaRows.length;
-    grandTotalQaTasks += qaTaskCount;
-
-    const totalTasks = fpTaskCount + qaTaskCount;
-
-    queueStatsList.push({
-      index: i + 1,
-      queue: qName,
-      fpLabelers: fpLabCount,
-      fpTasks: fpTaskCount,
-      qaLabelers: qaLabCount,
-      qaTasks: qaTaskCount,
-      totalTasks: totalTasks
-    });
-  });
-
-  // Search filter
+  // Search query
   const qSearch = (gmReportFilters.query || '').toLowerCase().trim();
-  let displayedQueues = queueStatsList;
   if (qSearch) {
-    displayedQueues = displayedQueues.filter(item => item.queue.toLowerCase().includes(qSearch));
+    visibleGroups = visibleGroups.filter(g => g.name.toLowerCase().includes(qSearch));
   }
 
   // Sort
-  displayedQueues.sort((a, b) => {
-    const col = gmReportFilters.sortCol || 'id';
-    let va = col === 'id' ? a.index : col === 'queue' ? a.queue : a[col];
-    let vb = col === 'id' ? b.index : col === 'queue' ? b.queue : b[col];
-    if (typeof va === 'string') return gmReportFilters.sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
+  const sortCol = gmReportFilters.sortCol || 'name';
+  const sortAsc = gmReportFilters.sortAsc !== undefined ? gmReportFilters.sortAsc : (sortCol === 'name');
+  visibleGroups.sort((a, b) => {
+    let va = (sortCol === 'name') ? a.name : (sortCol === 'fpLabelers') ? a.fpIds.size : (sortCol === 'fp') ? a.fp : (sortCol === 'qaLabelers') ? a.qaIds.size : a.qa;
+    let vb = (sortCol === 'name') ? b.name : (sortCol === 'fpLabelers') ? b.fpIds.size : (sortCol === 'fp') ? b.fp : (sortCol === 'qaLabelers') ? b.qaIds.size : b.qa;
+    if (typeof va === 'string') return sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
     va = Number(va) || 0; vb = Number(vb) || 0;
-    return gmReportFilters.sortAsc ? (va - vb) : (vb - va);
+    return sortAsc ? (va - vb) : (vb - va);
   });
 
-  const distinctShifts = [...new Set(baseRows.map(r => si >= 0 ? String(r[si] || '').trim() : '').filter(Boolean))].sort();
-  const distinctFloors = [...new Set(baseRows.map(r => fi >= 0 ? deriveFloor(r[fi]) : '').filter(Boolean))].sort();
-  const activeQueuesCount = queueStatsList.filter(q => q.totalTasks > 0).length;
+  // Calculate grand totals across visible queues
+  let grandTotalFp = 0;
+  let grandTotalQa = 0;
+  const grandFpIds = new Set();
+  const grandQaIds = new Set();
+  let totalMissing = 0;
+
+  visibleGroups.forEach(g => {
+    grandTotalFp += g.fp;
+    grandTotalQa += g.qa;
+    g.fpIds.forEach(id => grandFpIds.add(id));
+    g.qaIds.forEach(id => grandQaIds.add(id));
+    totalMissing += g.missing;
+  });
+
+  const activeDateDisplay = globalUnifiedFilters.date 
+    ? globalUnifiedFilters.date 
+    : (globalUnifiedFilters.from && globalUnifiedFilters.to)
+      ? (globalUnifiedFilters.from + ' → ' + globalUnifiedFilters.to)
+      : (cairoToday() + ' (All Dates)');
 
   page.innerHTML = `
     <div class="ux-overview">
       <div class="ux-heading">
         <div>
-          <div class="ux-eyebrow">Operational Queue Sheet Tracking</div>
-          <h2>📊 GM Report — Queues &amp; Passes</h2>
-          <p>Submission counts and distinct labelers broken down by First Pass (FP) and QA Review per queue.</p>
+          <div class="ux-eyebrow">Queue activity · FP / QA</div>
+          <h2>📊 GM Report — Daily Queue Activity</h2>
+          <p>${esc(activeDateDisplay)}</p>
         </div>
-        ${renderHeaderControlsHTML('gm')}
+        <div class="ux-tools">
+          ${renderHeaderControlsHTML('gm')}
+          <button class="btn btn-c" id="gmExportCsvBtn" title="Export GM Report to CSV">↓ Export CSV</button>
+        </div>
       </div>
 
       ${renderUniversalFilterBar('gm_report')}
 
-      <!-- KPI Summary Cards -->
-      <div class="ux-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 20px;">
-        <div class="kpi-mini-card" style="--tone: #3b82f6;">
-          <div class="kpi-title"><span>Total Queues Listed</span><span style="color:#3b82f6;">●</span></div>
-          <div class="kpi-val">${allQueuesList.length.toLocaleString()}</div>
-          <div class="kpi-sub">${activeQueuesCount} active with submissions</div>
+      <!-- Main Queue Daily Summary Card (Matching Reference UI) -->
+      <section class="daily-queue-card">
+        <div class="daily-queue-card-head">
+          <div>
+            <h3>Queue daily summary</h3>
+            <p>Unique Labelers use valid National Id, once per Queue + Modality + Pass. Queues with zero FP and QA submissions are hidden.</p>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <label style="font-size: 12px; color: var(--text-soft); display: flex; align-items: center; gap: 6px; cursor: pointer;">
+              <input type="checkbox" id="gmHideZeroToggle" ${gmReportFilters.hideZero !== false ? 'checked' : ''}>
+              إخفاء الكيوهات الصفرية (Hide zero activity)
+            </label>
+          </div>
         </div>
-        <div class="kpi-mini-card" style="--tone: #10b981;">
-          <div class="kpi-title"><span>FP Submitted Tasks</span><span style="color:#10b981;">●</span></div>
-          <div class="kpi-val">${grandTotalFpTasks.toLocaleString()}</div>
-          <div class="kpi-sub">${grandFpLabelers.size} unique FP labelers</div>
-        </div>
-        <div class="kpi-mini-card" style="--tone: #8b5cf6;">
-          <div class="kpi-title"><span>QA Submitted Tasks</span><span style="color:#8b5cf6;">●</span></div>
-          <div class="kpi-val">${grandTotalQaTasks.toLocaleString()}</div>
-          <div class="kpi-sub">${grandQaLabelers.size} unique QA labelers</div>
-        </div>
-        <div class="kpi-mini-card" style="--tone: #df8b24;">
-          <div class="kpi-title"><span>Total Submissions</span><span style="color:#df8b24;">●</span></div>
-          <div class="kpi-val">${(grandTotalFpTasks + grandTotalQaTasks).toLocaleString()}</div>
-          <div class="kpi-sub">FP + QA combined production</div>
-        </div>
-      </div>
 
-      <!-- Filter Bar -->
-      <div class="ux-panel" style="margin-bottom: 18px; padding: 14px 18px;">
-        <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end;">
-          <div style="flex: 2; min-width: 220px;">
-            <label style="font-size: 11px; font-weight: 600; color: var(--text-soft); display: block; margin-bottom: 4px;">🔍 Search Queue Name</label>
-            <input type="text" id="gmSearchInput" placeholder="Filter by queue name..." value="${esc(gmReportFilters.query)}" style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-3); color: var(--text); font-size: 12px;">
+        <!-- Filter Toolbar -->
+        <div class="daily-toolbar-row">
+          <div class="daily-search-box">
+            <input type="text" id="gmSearchInput" class="daily-search-input" placeholder="🔍 Search queue name..." value="${esc(gmReportFilters.query || '')}">
           </div>
-          <div style="min-width: 140px;">
-            <label style="font-size: 11px; font-weight: 600; color: var(--text-soft); display: block; margin-bottom: 4px;">Shift</label>
-            <select id="gmShiftSelect" style="width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-3); color: var(--text); font-size: 12px;">
-              <option value="">All Shifts</option>
-              ${distinctShifts.map(s => `<option value="${esc(s)}" ${gmReportFilters.shift === s ? 'selected' : ''}>${esc(s)}</option>`).join('')}
-            </select>
-          </div>
-          <div style="min-width: 150px;">
-            <label style="font-size: 11px; font-weight: 600; color: var(--text-soft); display: block; margin-bottom: 4px;">Floor (Unit)</label>
-            <select id="gmFloorSelect" style="width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-3); color: var(--text); font-size: 12px;">
-              <option value="">All Floors</option>
-              ${distinctFloors.map(f => `<option value="${esc(f)}" ${gmReportFilters.floor === f ? 'selected' : ''}>${esc(f)}</option>`).join('')}
-            </select>
-          </div>
-          <div style="min-width: 130px;">
-            <label style="font-size: 11px; font-weight: 600; color: var(--text-soft); display: block; margin-bottom: 4px;">Modality</label>
-            <select id="gmModSelect" style="width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-3); color: var(--text); font-size: 12px;">
-              <option value="all" ${gmReportFilters.modality === 'all' ? 'selected' : ''}>All Modalities</option>
-              <option value="lidar" ${gmReportFilters.modality === 'lidar' ? 'selected' : ''}>Lidar</option>
-              <option value="laneline" ${gmReportFilters.modality === 'laneline' ? 'selected' : ''}>Lane Line</option>
-            </select>
-          </div>
-          <div style="display: flex; gap: 8px; align-items: center; margin-left: auto;">
-            <button class="btn btn-c" id="gmExportCsvBtn" style="padding: 8px 14px; font-size: 12px; font-weight: 600;">↓ Export CSV</button>
-            <button class="btn" id="gmResetBtn" style="padding: 8px 12px; font-size: 12px;">✕ Reset</button>
+          <div class="daily-mod-pills">
+            <button type="button" class="daily-pill-btn ${(!gmReportFilters.modality || gmReportFilters.modality === 'all') ? 'active' : ''}" data-gm-mod="all">All Queues (${visibleGroups.length})</button>
+            <button type="button" class="daily-pill-btn ${gmReportFilters.modality === 'lidar' ? 'active' : ''}" data-gm-mod="lidar">📡 Lidar</button>
+            <button type="button" class="daily-pill-btn ${gmReportFilters.modality === 'laneline' ? 'active' : ''}" data-gm-mod="laneline">🛣️ Lane Line</button>
+            <button type="button" class="daily-pill-btn ${gmReportFilters.modality === 'relabel' ? 'active' : ''}" data-gm-mod="relabel">🔄 Relabeling</button>
           </div>
         </div>
-      </div>
 
-      <!-- Main GM Report Table (Styled strictly matching Image 4) -->
-      <div class="ux-panel" style="padding: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow);">
-        <div style="overflow-x: auto; max-height: 70vh;">
-          <table class="gm-report-table" style="width: 100%; border-collapse: collapse; font-size: 12px; text-align: left;">
+        <!-- Table matching screenshot exactly -->
+        <div class="daily-table-wrap">
+          <table class="daily-queue-table">
             <thead>
-              <tr style="background: #4a90e2; color: #ffffff; border-bottom: 2px solid #2563eb; position: sticky; top: 0; z-index: 2;">
-                <th style="padding: 10px 8px; width: 50px; text-align: center; border-right: 1px solid rgba(255,255,255,0.2); cursor: pointer;" data-sort="id">#</th>
-                <th style="padding: 10px 14px; min-width: 380px; border-right: 1px solid rgba(255,255,255,0.2); cursor: pointer;" data-sort="queue">Queue</th>
-                <th style="padding: 10px 12px; width: 160px; text-align: center; border-right: 1px solid rgba(255,255,255,0.2); cursor: pointer;" data-sort="fpLabelers">Num Of Labeler (FP)</th>
-                <th style="padding: 10px 12px; width: 190px; text-align: center; border-right: 1px solid rgba(255,255,255,0.2); cursor: pointer;" data-sort="fpTasks">Num of Submitted Tasks (FP)</th>
-                <th style="padding: 10px 12px; width: 160px; text-align: center; border-right: 1px solid rgba(255,255,255,0.2); cursor: pointer;" data-sort="qaLabelers">Num Of Labeler (QA)</th>
-                <th style="padding: 10px 12px; width: 190px; text-align: center; cursor: pointer;" data-sort="qaTasks">Num of Submitted Tasks (QA)</th>
+              <tr>
+                <th class="sortable" data-sort="name">QUEUE ${sortCol==='name'?(sortAsc?'▲':'▼'):''}</th>
+                <th class="sortable" data-sort="fpLabelers">UNIQUE LABELERS (FP) ${sortCol==='fpLabelers'?(sortAsc?'▲':'▼'):''}</th>
+                <th class="sortable" data-sort="fp">TOTAL SUBMIT (FP) ${sortCol==='fp'?(sortAsc?'▲':'▼'):''}</th>
+                <th class="sortable" data-sort="qaLabelers">UNIQUE LABELERS (QA) ${sortCol==='qaLabelers'?(sortAsc?'▲':'▼'):''}</th>
+                <th class="sortable" data-sort="qa">TOTAL SUBMIT (QA) ${sortCol==='qa'?(sortAsc?'▲':'▼'):''}</th>
               </tr>
             </thead>
             <tbody>
-              ${displayedQueues.map(item => {
-                const isActive = item.totalTasks > 0;
-                const idxStyle = isActive
-                  ? 'background: #00e676; color: #000000; font-weight: 800;'
-                  : 'background: var(--bg-3); color: var(--text-soft);';
+              ${visibleGroups.map(g => {
+                let badges = '';
+                if (g.isRelabel) {
+                  badges += '<span class="daily-mod daily-relabel">(Relabeling)</span> ';
+                }
+                if (g.mod === 'Lidar') {
+                  badges += '<span class="daily-mod daily-lidar">(Lidar)</span>';
+                } else if (g.mod === 'Lane Line') {
+                  badges += '<span class="daily-mod daily-lane">(Lane Line)</span>';
+                } else if (g.mod && g.mod !== 'Unspecified') {
+                  badges += '<span class="daily-mod daily-lidar">(' + esc(g.mod) + ')</span>';
+                }
+
                 return `
-                  <tr style="border-bottom: 1px solid var(--border); transition: background 0.15s;" onmouseover="this.style.background='var(--accent-light)'" onmouseout="this.style.background='transparent'">
-                    <td style="padding: 7px 8px; text-align: center; border-right: 1px solid var(--border); ${idxStyle}">${item.index}</td>
-                    <td style="padding: 7px 14px; font-weight: 600; border-right: 1px solid var(--border); font-family: var(--font); color: var(--text);">${esc(item.queue)}</td>
-                    <td style="padding: 7px 12px; text-align: center; font-weight: 700; border-right: 1px solid var(--border); ${item.fpLabelers > 0 ? 'color: #10b981;' : 'color: var(--muted);'}">${item.fpLabelers.toLocaleString()}</td>
-                    <td style="padding: 7px 12px; text-align: center; font-weight: 700; border-right: 1px solid var(--border); ${item.fpTasks > 0 ? 'color: var(--primary);' : 'color: var(--muted);'}">${item.fpTasks.toLocaleString()}</td>
-                    <td style="padding: 7px 12px; text-align: center; font-weight: 700; border-right: 1px solid var(--border); ${item.qaLabelers > 0 ? 'color: #8b5cf6;' : 'color: var(--muted);'}">${item.qaLabelers.toLocaleString()}</td>
-                    <td style="padding: 7px 12px; text-align: center; font-weight: 700; ${item.qaTasks > 0 ? 'color: #ec4899;' : 'color: var(--muted);'}">${item.qaTasks.toLocaleString()}</td>
+                  <tr class="daily-queue-row">
+                    <td class="daily-queue-cell">
+                      <span class="daily-queue-name">${esc(g.name)}</span>
+                      ${badges}
+                    </td>
+                    <td class="daily-num-cell">${g.fpIds.size.toLocaleString()}</td>
+                    <td class="daily-num-cell highlight-fp">${g.fp.toLocaleString()}</td>
+                    <td class="daily-num-cell">${g.qaIds.size.toLocaleString()}</td>
+                    <td class="daily-num-cell highlight-qa">${g.qa.toLocaleString()}</td>
                   </tr>
                 `;
               }).join('')}
+              ${!visibleGroups.length ? '<tr><td colspan="5" class="ux-empty" style="text-align:center; padding:36px;">No queue submissions match the current filters.</td></tr>' : ''}
             </tbody>
             <tfoot>
-              <tr style="background: var(--bg-2); font-weight: 800; border-top: 2px solid var(--border); position: sticky; bottom: 0; z-index: 2;">
-                <td colspan="2" style="padding: 10px 14px; text-align: right; border-right: 1px solid var(--border); letter-spacing: 1px; color: var(--accent);">TOTAL:</td>
-                <td style="padding: 10px 12px; text-align: center; border-right: 1px solid var(--border); color: #10b981; font-size: 13px;">${grandFpLabelers.size.toLocaleString()}</td>
-                <td style="padding: 10px 12px; text-align: center; border-right: 1px solid var(--border); color: var(--primary); font-size: 13px;">${grandTotalFpTasks.toLocaleString()}</td>
-                <td style="padding: 10px 12px; text-align: center; border-right: 1px solid var(--border); color: #8b5cf6; font-size: 13px;">${grandQaLabelers.size.toLocaleString()}</td>
-                <td style="padding: 10px 12px; text-align: center; color: #ec4899; font-size: 13px;">${grandTotalQaTasks.toLocaleString()}</td>
+              <tr class="daily-total-row">
+                <td style="padding:14px 18px; font-weight:800; color:var(--text);">
+                  TOTAL (${visibleGroups.length} queues):
+                </td>
+                <td class="daily-num-cell"><b>${grandFpIds.size.toLocaleString()}</b></td>
+                <td class="daily-num-cell highlight-fp"><b>${grandTotalFp.toLocaleString()}</b></td>
+                <td class="daily-num-cell"><b>${grandQaIds.size.toLocaleString()}</b></td>
+                <td class="daily-num-cell highlight-qa"><b>${grandTotalQa.toLocaleString()}</b></td>
               </tr>
             </tfoot>
           </table>
-          ${!displayedQueues.length ? '<div class="ux-empty" style="padding: 30px; text-align: center;">No queues found matching your filter criteria.</div>' : ''}
         </div>
-      </div>
+
+        <p class="an-context" style="margin-top:14px; font-size:11px; color:var(--muted);">
+          ${totalMissing > 0 ? (totalMissing + ' FP/QA entries have missing or non-standard National ID; included in submit totals, de-duplicated by name. ') : ''}
+          Unique Labelers use valid National Id, once per Queue + Modality + Pass. Queues with zero FP and QA submissions are hidden.
+        </p>
+      </section>
     </div>
   `;
 
-  bindHeaderControls(page, 'gm'); bindUniversalFilterBar(page, 'gm_report');
+  bindHeaderControls(page, 'gm');
+  bindUniversalFilterBar(page, 'gm_report');
 
-  const searchInp = page.querySelector('#gmSearchInput');
-  if (searchInp) {
-    searchInp.oninput = (e) => {
+  // Search input binding
+  const searchInput = page.querySelector('#gmSearchInput');
+  if (searchInput) {
+    searchInput.oninput = (e) => {
       gmReportFilters.query = e.target.value;
       renderGmReport();
-      const inp = page.querySelector('#gmSearchInput');
-      if (inp) { inp.focus(); inp.selectionStart = inp.selectionEnd = inp.value.length; }
+      const refocused = page.querySelector('#gmSearchInput');
+      if (refocused) {
+        refocused.focus();
+        refocused.selectionStart = refocused.selectionEnd = refocused.value.length;
+      }
     };
   }
 
-  const shiftSel = page.querySelector('#gmShiftSelect');
-  if (shiftSel) {
-    shiftSel.onchange = (e) => { gmReportFilters.shift = e.target.value; renderGmReport(); };
-  }
-
-  const floorSel = page.querySelector('#gmFloorSelect');
-  if (floorSel) {
-    floorSel.onchange = (e) => { gmReportFilters.floor = e.target.value; renderGmReport(); };
-  }
-
-  const modSel = page.querySelector('#gmModSelect');
-  if (modSel) {
-    modSel.onchange = (e) => { gmReportFilters.modality = e.target.value; renderGmReport(); };
-  }
-
-  const resetBtn = page.querySelector('#gmResetBtn');
-  if (resetBtn) {
-    resetBtn.onclick = () => {
-      Object.assign(gmReportFilters, { query: '', shift: '', floor: '', modality: 'all', from: '', to: '' });
-      renderGmReport();
-    };
-  }
-
-  const exportBtn = page.querySelector('#gmExportCsvBtn');
-  if (exportBtn) {
-    exportBtn.onclick = () => {
-      const headers = ['#', 'Queue', 'Num Of Labeler (FP)', 'Num of Submitted Tasks (FP)', 'Num Of Labeler (QA)', 'Num of Submitted Tasks (QA)'];
-      const rows = displayedQueues.map(q => [q.index, q.queue, q.fpLabelers, q.fpTasks, q.qaLabelers, q.qaTasks]);
-      rows.push(['TOTAL', '', grandFpLabelers.size, grandTotalFpTasks, grandQaLabelers.size, grandTotalQaTasks]);
-      const csv = [headers, ...rows].map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\r\n');
-      downloadBlob(new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' }), 'GM_Report_Queues_' + cairoToday() + '.csv');
-    };
-  }
-
-  page.querySelectorAll('th[data-sort]').forEach(th => {
-    th.onclick = () => {
-      const col = th.dataset.sort;
-      if (gmReportFilters.sortCol === col) gmReportFilters.sortAsc = !gmReportFilters.sortAsc;
-      else { gmReportFilters.sortCol = col; gmReportFilters.sortAsc = true; }
+  // Modality pills binding
+  page.querySelectorAll('[data-gm-mod]').forEach(btn => {
+    btn.onclick = () => {
+      gmReportFilters.modality = btn.dataset.gmMod;
       renderGmReport();
     };
   });
+
+  // Zero-toggle binding
+  const zeroToggle = page.querySelector('#gmHideZeroToggle');
+  if (zeroToggle) {
+    zeroToggle.onchange = (e) => {
+      gmReportFilters.hideZero = e.target.checked;
+      renderGmReport();
+    };
+  }
+
+  // Table header sorting binding
+  page.querySelectorAll('th.sortable[data-sort]').forEach(th => {
+    th.onclick = () => {
+      const col = th.dataset.sort;
+      if (gmReportFilters.sortCol === col) {
+        gmReportFilters.sortAsc = !gmReportFilters.sortAsc;
+      } else {
+        gmReportFilters.sortCol = col;
+        gmReportFilters.sortAsc = (col === 'name');
+      }
+      renderGmReport();
+    };
+  });
+
+  // Export CSV binding
+  const exportBtn = page.querySelector('#gmExportCsvBtn');
+  if (exportBtn) {
+    exportBtn.onclick = () => {
+      if (!visibleGroups.length) {
+        showToast('No queue rows to export');
+        return;
+      }
+      const cell = v => '"' + String(v ?? '').replace(/^[=+@\-\t\r]/, "'$&").replace(/"/g, '""') + '"';
+      const csvHeaders = ['Queue Name', 'Modality', 'Is Relabeling', 'Unique Labelers (FP)', 'Total Submit (FP)', 'Unique Labelers (QA)', 'Total Submit (QA)', 'Total Submissions'];
+      const csvRows = visibleGroups.map(g => [
+        g.name,
+        g.mod,
+        g.isRelabel ? 'Yes' : 'No',
+        g.fpIds.size,
+        g.fp,
+        g.qaIds.size,
+        g.qa,
+        g.fp + g.qa
+      ]);
+      const csvContent = [csvHeaders, ...csvRows].map(r => r.map(cell).join(',')).join('\r\n');
+      downloadBlob(new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8' }), 'MEEG_GM_Queue_Report_' + cairoToday() + '.csv');
+      showToast('✓ GM Report exported to CSV');
+    };
+  }
 }
 
-// ============================================================
-// PAGE: SHIFT COMPARISON (Detailed across Floors, QTCs, Labelers)
-// ============================================================
+
 function renderShiftComparison(){
   const page = $('uxShiftComparison');
   if(!page || page.hidden) return;

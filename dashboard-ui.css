@@ -1676,3 +1676,237 @@ html[data-theme="dark"] #meegGlobalTooltip .tip-chip {
   cursor: pointer;
   padding: 0 4px;
 }
+
+
+/* ============================================================
+   GM REPORT — QUEUE DAILY SUMMARY (Matching Reference Screenshot)
+   ============================================================ */
+.daily-queue-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg, 14px);
+  padding: 22px 24px;
+  box-shadow: var(--shadow);
+  margin-top: 18px;
+}
+
+.daily-queue-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.daily-queue-card-head h3 {
+  margin: 0 0 6px;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.daily-queue-card-head p {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--text-soft);
+}
+
+.daily-toolbar-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  background: var(--bg-2);
+  border-radius: 10px;
+  border: 1px solid var(--border);
+}
+
+.daily-search-box {
+  flex: 1;
+  min-width: 240px;
+  position: relative;
+}
+
+.daily-search-input {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-3);
+  color: var(--text);
+  font-size: 12.5px;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.daily-search-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-glow);
+}
+
+.daily-mod-pills {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.daily-pill-btn {
+  padding: 5px 12px;
+  border-radius: 8px;
+  font-size: 11.5px;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  background: var(--bg-3);
+  color: var(--text-soft);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.daily-pill-btn:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.daily-pill-btn.active {
+  background: var(--primary);
+  color: #ffffff;
+  border-color: var(--primary);
+}
+
+.daily-table-wrap {
+  overflow-x: auto;
+  max-height: 72vh;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg-3);
+}
+
+.daily-queue-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+  text-align: left;
+}
+
+.daily-queue-table th {
+  position: sticky;
+  top: 0;
+  background: var(--bg-2);
+  z-index: 2;
+  padding: 12px 16px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  border-bottom: 2px solid var(--border);
+  white-space: nowrap;
+  user-select: none;
+}
+
+.daily-queue-table th.sortable {
+  cursor: pointer;
+}
+
+.daily-queue-table th.sortable:hover {
+  color: var(--primary);
+}
+
+.daily-queue-table th:not(:first-child),
+.daily-queue-table td:not(:first-child) {
+  text-align: center;
+}
+
+.daily-queue-row {
+  border-bottom: 1px solid var(--border);
+  transition: background 0.15s ease;
+}
+
+.daily-queue-row:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.daily-queue-cell {
+  padding: 12px 18px;
+  font-family: var(--font);
+  font-size: 12px;
+  color: var(--text);
+  min-width: 380px;
+  max-width: 750px;
+  word-break: break-word;
+}
+
+.daily-queue-name {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: #e2e8f0;
+  margin-right: 8px;
+}
+
+.daily-num-cell {
+  padding: 12px 16px;
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.daily-num-cell.highlight-fp {
+  color: var(--primary-light, #14b8a6);
+}
+
+.daily-num-cell.highlight-qa {
+  color: #a78bfa;
+}
+
+.daily-mod {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  letter-spacing: 0.2px;
+  vertical-align: middle;
+}
+
+.daily-lidar {
+  background: rgba(139, 92, 246, 0.18);
+  color: #c4b5fd;
+  border: 1px solid rgba(139, 92, 246, 0.4);
+}
+
+.daily-lane {
+  background: rgba(20, 184, 166, 0.18);
+  color: #5eead4;
+  border: 1px solid rgba(20, 184, 166, 0.4);
+}
+
+.daily-relabel {
+  background: rgba(245, 158, 11, 0.18);
+  color: #fcd34d;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+}
+
+.daily-total-row {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  background: var(--bg-2);
+  border-top: 2px solid var(--primary);
+  font-weight: 800;
+}
+
+.daily-total-row td {
+  padding: 14px 18px;
+  font-size: 13px;
+}
