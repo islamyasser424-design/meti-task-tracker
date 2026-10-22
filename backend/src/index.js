@@ -768,11 +768,20 @@ export default {
         // Check for duplicate task ID and pass
         const dupCheck = await db(
           env,
-          "SELECT id FROM task_submissions WHERE task_id = ? AND (pass = ? OR ? = '') LIMIT 1",
+          "SELECT id, timestamp, labeler_name FROM task_submissions WHERE task_id = ? AND (pass = ? OR ? = '') LIMIT 1",
           [task_id, pass, pass]
         );
         if (dupCheck.length > 0) {
-          return json({ error: "duplicate_task", message: "Task ID already submitted!" }, 409, corsHeaders);
+          const existingRow = dupCheck[0] || {};
+          return json({
+            error: "duplicate_task",
+            message: "Task ID already submitted!",
+            existing: {
+              id: existingRow.id,
+              timestamp: existingRow.timestamp,
+              labeler: existingRow.labeler_name
+            }
+          }, 409, corsHeaders);
         }
 
         try {
