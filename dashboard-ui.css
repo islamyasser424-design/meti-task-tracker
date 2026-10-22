@@ -1138,3 +1138,282 @@ html[data-theme="dark"] #meegGlobalTooltip .tip-chip {
   color: #f8fafc !important;
   border-color: #374151 !important;
 }
+
+/* ============================================================ */
+/* MEEG WORKSPACE 2.0 ADVANCED ANALYTICS ENHANCEMENTS */
+/* ============================================================ */
+
+.ux-grid-12 {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 22px;
+}
+.ux-grid-8 {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 20px;
+}
+.ux-grid-10 {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.ux-grid-6 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+@media (max-width: 1200px) {
+  .ux-grid-12, .ux-grid-8, .ux-grid-10 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 900px) {
+  .ux-grid-12, .ux-grid-8, .ux-grid-10, .ux-grid-6 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 600px) {
+  .ux-grid-12, .ux-grid-8, .ux-grid-10, .ux-grid-6 {
+    grid-template-columns: 1fr;
+  }
+}
+
+.kpi-mini-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.kpi-mini-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-hover);
+}
+.kpi-mini-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--tone, var(--primary));
+}
+.kpi-title {
+  color: var(--text-soft);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.kpi-val {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 8px 0 4px;
+  letter-spacing: -0.5px;
+}
+.kpi-sub {
+  font-size: 11px;
+  color: var(--muted);
+}
+.kpi-growth {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 6px;
+  width: fit-content;
+}
+.kpi-growth.positive {
+  background: rgba(16, 185, 129, 0.12);
+  color: var(--success);
+}
+.kpi-growth.negative {
+  background: rgba(239, 68, 68, 0.12);
+  color: var(--danger);
+}
+
+/* Target Simulator Styles */
+.target-sim-box {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 22px;
+  margin-top: 24px;
+  box-shadow: var(--shadow);
+}
+.sim-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.sim-forecast-badge {
+  background: rgba(2, 132, 199, 0.12);
+  color: var(--accent);
+  border: 1px solid rgba(2, 132, 199, 0.3);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  text-transform: uppercase;
+}
+.sim-inputs-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 14px;
+  margin-bottom: 20px;
+}
+.sim-inputs-grid label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.sim-inputs-grid input, .sim-inputs-grid select {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-3);
+  color: var(--text);
+  font: 13px var(--font);
+}
+.sim-results-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  background: var(--bg-1);
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid var(--border-light);
+}
+.sim-res-card {
+  display: flex;
+  flex-direction: column;
+}
+.sim-res-card span {
+  font-size: 11px;
+  color: var(--text-soft);
+}
+.sim-res-card strong {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--primary);
+  margin-top: 4px;
+}
+
+/* Section Switcher (Page 6 Quality vs Daily) */
+.section-switch-wrap {
+  display: inline-flex;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 4px;
+  gap: 4px;
+  margin-bottom: 22px;
+}
+.section-switch-btn {
+  background: transparent;
+  border: none;
+  padding: 8px 18px;
+  border-radius: 8px;
+  font: 600 13px var(--font);
+  color: var(--text-soft);
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.section-switch-btn.active {
+  background: var(--bg-3);
+  color: var(--primary);
+  box-shadow: var(--shadow-sm);
+  font-weight: 700;
+}
+
+/* Heatmap & Matrix Styles */
+.heatmap-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  margin-top: 14px;
+}
+.heatmap-table th, .heatmap-table td {
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  text-align: center;
+}
+.heatmap-table th {
+  background: var(--bg-2);
+  color: var(--text-soft);
+  font-weight: 600;
+}
+.heatmap-cell {
+  font-weight: 700;
+  border-radius: 6px;
+  transition: opacity 0.2s;
+}
+
+/* Quality Tier Badges */
+.tier-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 800;
+  font-family: var(--mono);
+}
+.tier-high {
+  color: var(--success);
+  background: rgba(16, 185, 129, 0.12);
+  border: 1.5px solid rgba(16, 185, 129, 0.4);
+}
+.tier-mid {
+  color: var(--warning);
+  background: rgba(245, 158, 11, 0.12);
+  border: 1.5px solid rgba(245, 158, 11, 0.4);
+}
+.tier-low {
+  color: var(--danger);
+  background: rgba(239, 68, 68, 0.12);
+  border: 1.5px solid rgba(239, 68, 68, 0.4);
+}
+
+/* Comparison View Cards */
+.cmp-stat-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border-light);
+  font-size: 12px;
+}
+.cmp-stat-row:last-child {
+  border-bottom: none;
+}
+.cmp-delta {
+  font-weight: 700;
+  font-family: var(--mono);
+}

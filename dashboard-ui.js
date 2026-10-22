@@ -298,6 +298,184 @@ window.addEventListener('keydown', e => {
  }
 });
 
+
+// ============================================================
+// MEEG ENTERPRISE ANALYTICS FOUNDATION HELPERS
+// ============================================================
+
+function deriveFloor(unit) {
+  if (!unit) return 'Floor 01';
+  const u = String(unit).trim();
+  const lower = u.toLowerCase();
+  if (lower.includes('4th') || lower.includes('fourth') || lower.includes('floor 4') || lower.includes('floor 04') || lower.includes('room 4') || /4\d\d/.test(u)) return 'Floor 04';
+  if (lower.includes('3rd') || lower.includes('third') || lower.includes('floor 3') || lower.includes('floor 03') || lower.includes('room 3') || /3\d\d/.test(u)) return 'Floor 03';
+  if (lower.includes('2nd') || lower.includes('second') || lower.includes('floor 2') || lower.includes('floor 02') || lower.includes('room 2') || /2\d\d/.test(u)) return 'Floor 02';
+  if (lower.includes('1st') || lower.includes('first') || lower.includes('floor 1') || lower.includes('floor 01') || lower.includes('room 1') || /1\d\d/.test(u)) return 'Floor 01';
+  if (lower.includes('floor')) return u;
+  return 'Floor 01';
+}
+
+function maskEmployeeId(rawId, pcOrName) {
+  const str = String(rawId || '').trim()
+    .replace(/[٠-٩]/g, c => String(c.charCodeAt(0) - 1632))
+    .replace(/[۰-۹]/g, c => String(c.charCodeAt(0) - 1776))
+    .replace(/\.0+$/, '').replace(/[\s-]/g, '');
+  if (/^\d{14}$/.test(str)) {
+    return 'EMP-***' + str.slice(-4);
+  }
+  if (str && str.length >= 4) {
+    return 'EMP-***' + str.slice(-4);
+  }
+  if (pcOrName) {
+    return 'PC-' + String(pcOrName).replace(/[^a-zA-Z0-9]/g, '').slice(0, 4).toUpperCase();
+  }
+  return 'EMP-—';
+}
+
+function isModPass(r, targetMod, targetPass) {
+  const mi = hdrs.findIndex(h => h.toLowerCase() === 'modality');
+  const pi = hdrs.findIndex(h => h.toLowerCase() === 'pass');
+  const mod = mi < 0 ? '' : String(r[mi] || '').toLowerCase().replace(/[\s_-]+/g, '');
+  const pass = pi < 0 ? '' : String(r[pi] || '').trim().toUpperCase();
+  const normalizedMod = (mod === 'lidar') ? 'lidar' : (mod === 'laneline' || mod === 'lane') ? 'laneline' : mod;
+  return normalizedMod === targetMod.toLowerCase() && pass === targetPass.toUpperCase();
+}
+
+function getQualityStore() {
+  if (window.qualityStore && Object.keys(window.qualityStore).length) return window.qualityStore;
+  try {
+    const raw = localStorage.getItem('meeg_quality_store_v1') || localStorage.getItem('qualityStore');
+    if (raw) {
+      window.qualityStore = JSON.parse(raw);
+      return window.qualityStore;
+    }
+  } catch(e) {}
+  return window.qualityStore || {};
+}
+
+function getLabelerQuality(labelerName, email) {
+  const qs = getQualityStore();
+  const keys = Object.keys(qs);
+  if (!keys.length) return null;
+  const lLower = (labelerName || '').trim().toLowerCase();
+  const eLower = (email || '').trim().toLowerCase();
+  let count = 0, sumTotal = 0, sumAttr = 0, sumTva = 0, sumArt = 0;
+  keys.forEach(aid => {
+    const q = qs[aid];
+    const info = (window.idInfo && window.idInfo[aid]) || {};
+    const matchName = info.name && info.name.toLowerCase() === lLower;
+    const matchEmail = (q.email && q.email.toLowerCase() === eLower) || (info.email && info.email.toLowerCase() === eLower);
+    if (matchName || matchEmail) {
+      const tot = typeof window.qNum === 'function' ? window.qNum(q.totalAccuracy) : parseFloat(q.totalAccuracy);
+      const att = typeof window.qNum === 'function' ? window.qNum(q.attribute) : parseFloat(q.attribute);
+      const tva = typeof window.qNum === 'function' ? window.qNum(q.tvaF1) : parseFloat(q.tvaF1);
+      const art = typeof window.qNum === 'function' ? window.qNum(q.artifacts) : parseFloat(q.artifacts);
+      if (tot !== null && !isNaN(tot)) { sumTotal += tot; count++; }
+      if (att !== null && !isNaN(att)) sumAttr += att;
+      if (tva !== null && !isNaN(tva)) sumTva += tva;
+      if (art !== null && !isNaN(art)) sumArt += art;
+    }
+  });
+  if (!count) return null;
+  return {
+    count,
+    totalAccuracy: sumTotal / count,
+    attribute: sumAttr / count,
+    tvaF1: sumTva / count,
+    artifacts: sumArt / count
+  };
+}
+
+function getQtcQuality(qtcName) {
+  const qs = getQualityStore();
+  const keys = Object.keys(qs);
+  if (!keys.length) return null;
+  const qLower = (qtcName || '').trim().toLowerCase();
+  let count = 0, sumTotal = 0;
+  keys.forEach(aid => {
+    const q = qs[aid];
+    const info = (window.idInfo && window.idInfo[aid]) || {};
+    const matchQtc = info.qtc && info.qtc.toLowerCase().includes(qLower);
+    if (matchQtc) {
+      const tot = typeof window.qNum === 'function' ? window.qNum(q.totalAccuracy) : parseFloat(q.totalAccuracy);
+      if (tot !== null && !isNaN(tot)) { sumTotal += tot; count++; }
+    }
+  });
+  if (!count) return null;
+  return { count, totalAccuracy: sumTotal / count };
+}
+
+function openDrilldownModal({ title, subtitle, badge, columns, rows }) {
+  let modal = document.getElementById('uxDrilldownModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'uxDrilldownModal';
+    modal.style.cssText = 'display:none; position:fixed; inset:0; background:rgba(15,23,42,0.65); backdrop-filter:blur(4px); z-index:99999; align-items:center; justify-content:center; padding:18px;';
+    modal.onclick = (e) => { if (e.target === modal) modal.style.display = 'none'; };
+    document.body.appendChild(modal);
+  }
+
+  modal.innerHTML = '<div style="background:var(--card); border:1px solid var(--border); border-radius:16px; width:100%; max-width:920px; max-height:86vh; display:flex; flex-direction:column; box-shadow:var(--shadow-hover); overflow:hidden;">'
+    + '<div style="padding:16px 20px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; gap:12px; background:var(--bg-2);">'
+      + '<div>'
+        + '<div style="display:flex; align-items:center; gap:8px;">'
+          + '<h3 style="margin:0; font-size:16px; font-weight:700; color:var(--text);">' + esc(title) + '</h3>'
+          + (badge ? '<span class="q-badge" style="background:var(--primary); color:#fff; font-size:10px;">' + esc(badge) + '</span>' : '')
+        + '</div>'
+        + (subtitle ? '<p style="margin:4px 0 0; font-size:12px; color:var(--text-soft);">' + esc(subtitle) + '</p>' : '')
+      + '</div>'
+      + '<button type="button" class="btn" id="closeDrilldownModalBtn" style="font-size:18px; line-height:1; padding:4px 10px; cursor:pointer;">&times;</button>'
+    + '</div>'
+    + '<div style="padding:12px 20px; border-bottom:1px solid var(--border-light); display:flex; justify-content:space-between; align-items:center; gap:10px; background:var(--bg-1);">'
+      + '<input type="text" id="drilldownSearch" placeholder="🔍 Search records..." style="padding:6px 12px; border-radius:8px; border:1px solid var(--border); font-size:12px; width:260px; background:var(--bg-3); color:var(--text);">'
+      + '<span class="ux-note" id="drilldownCount">' + rows.length.toLocaleString() + ' total records</span>'
+    + '</div>'
+    + '<div style="padding:16px 20px; overflow-y:auto; flex:1;" id="drilldownBody">'
+      + '<div class="perf-table">'
+        + '<table id="drilldownTable">'
+          + '<thead><tr>' + columns.map(c => '<th>' + esc(c) + '</th>').join('') + '</tr></thead>'
+          + '<tbody>'
+            + rows.slice(0, 100).map(r => '<tr>' + r.map(cell => '<td>' + cell + '</td>').join('') + '</tr>').join('')
+          + '</tbody>'
+        + '</table>'
+        + (rows.length > 100 ? '<div style="text-align:center; padding:12px; font-size:12px; color:var(--muted);">Showing first 100 of ' + rows.length.toLocaleString() + ' records</div>' : '')
+        + (!rows.length ? '<div class="ux-empty">No detailed records found.</div>' : '')
+      + '</div>'
+    + '</div>'
+  + '</div>';
+
+  modal.style.display = 'flex';
+  const closeBtn = modal.querySelector('#closeDrilldownModalBtn');
+  if (closeBtn) closeBtn.onclick = () => { modal.style.display = 'none'; };
+
+  const searchInput = modal.querySelector('#drilldownSearch');
+  if (searchInput) {
+    searchInput.oninput = (e) => {
+      const q = e.target.value.toLowerCase().trim();
+      const filtered = q ? rows.filter(r => r.some(cell => String(cell).toLowerCase().includes(q))) : rows;
+      const tbody = modal.querySelector('#drilldownTable tbody');
+      if (tbody) {
+        tbody.innerHTML = filtered.slice(0, 100).map(r => '<tr>' + r.map(cell => '<td>' + cell + '</td>').join('') + '</tr>').join('');
+      }
+      const countEl = modal.querySelector('#drilldownCount');
+      if (countEl) countEl.textContent = filtered.length.toLocaleString() + ' matching records';
+    };
+  }
+}
+
+const targetSimState = {
+  dailyTarget: 50,
+  shiftTarget: 25,
+  modality: 'all',
+  workHours: 8,
+  workforceSize: 120
+};
+
+let dailyReportSection = 'quality'; // 'quality' or 'daily'
+let dailyReportDateA = '';
+let dailyReportDateB = '';
+let dailyReportCompareMode = false;
+
 const queuesFilters={query:'',shift:'',floor:'',category:'',sortCol:'totalSubmit',sortAsc:false,page:0,pageSize:25};
 const queuesChartFilters={queue:'all',stage:'all',from:'',to:'',day:''};
 const qtcFloorFilters={query:'',qtc:'',floor:'',shift:'',category:'',sortCol:'totalSubmit',sortAsc:false,page:0,pageSize:25};
@@ -586,86 +764,409 @@ function renderCategoryCardsHTML(summary,activeCategory='',scope='overview'){
 }
 
 function renderOverview(){
-if(root.hidden)return;
-const rows=rowsInView(),days=daily(rows),last=days.slice(-21),max=Math.max(1,...last.map(p=>p[1]));
-const catSummary=getCategorySummary(rows);
-const metrics=[
- ['Submissions',window._firstDataReady||rawRows.length?catSummary.overall.tasks:null,'Rows matching your current filters. One row counts as one submission.','#0d9488'],
- ['Active labelers',window._firstDataReady||rawRows.length?catSummary.overall.uniqueLabelers:uniq(rows,'Labeler Name'),'Distinct labelers in the current selection.','#0a9d8c'],
- ['Avg submit / labeler',window._firstDataReady||rawRows.length?catSummary.overall.avgSubmit:null,'Average submission tasks per unique labeler.','#df8b24'],
- ['Active queues',uniq(rows,'Queue Name'),'Distinct non-empty queues in the current selection.','#df5c99']
-];
-overview.innerHTML='<div class="ux-heading"><div><div class="ux-eyebrow">Performance at a glance</div><h2>Productivity dashboard</h2><p>Explore your team’s output, one insight at a time.</p></div><div class="ux-tools">'+renderHeaderControlsHTML('ov')+'<button class="btn" id="uxCSV">↓ CSV</button><button class="btn" id="uxPrint">Print</button></div></div><div class="ux-grid">'+metrics.map(([label,value,note,tone],i)=>'<article class="ux-kpi" style="--tone:'+tone+'"><div class="ux-flipper"><div class="ux-face"><span class="ux-label" title="'+note+'">'+label+'</span><button class="ux-flip" data-flip="'+i+'" aria-label="Show '+label+' details" aria-expanded="false">↗</button><strong '+(value===null?'':'data-count="'+value+'"')+'>'+ (value===null?'—':value.toLocaleString())+'</strong><span class="ux-note">'+(value===null?(window._firstDataReady?'Column unavailable':'Waiting for data'):'Current filtered selection')+'</span>'+(i===0?spark(last):'<span class="ux-note" style="margin-top:auto;color:'+tone+'">'+(rows.length?'Live data · filtered view':'No matching data')+'</span>')+'</div><div class="ux-face ux-back" inert><b>'+label+'</b><p>'+note+'</p><span class="ux-note">'+(value===null?'Required column is missing.':'No previous-period comparison is assumed.')+'</span><button class="btn" data-unflip="'+i+'">Back</button></div></div></article>').join('')+'</div>'
-+renderCategoryCardsHTML(catSummary,'','overview')
-+'<div class="ux-panels"><section class="ux-panel"><h3>Submission activity</h3><p>Latest 21 dates with activity. Select a bar to drill into that date.</p><div class="ux-bars">'+(last.length?last.map(([d,c])=>'<button class="ux-bar" style="height:'+Math.max(5,c/max*100)+'%" data-date="'+d+'" data-count="'+c+'" aria-label="'+d+', '+c+' submissions. Filter by this date."></button>').join(''):'<div class="ux-empty">No dated submissions match your selection. Adjust or clear the filters.</div>')+'</div><details><summary>View chart values</summary>'+last.map(([d,c])=>'<p>'+d+' · '+c.toLocaleString()+'</p>').join('')+'</details></section><section class="ux-panel"><h3>Personal submission target</h3><p>A target for this filtered selection, saved on this browser.</p><label class="ux-note">Target rows<input class="ux-target" id="uxTarget" type="number" min="1" step="1" placeholder="Set your target" value="'+(target||'')+'"></label><div id="uxProgress"></div></section></div><div class="ux-view-tabs" role="tablist" aria-label="Dashboard view"><button class="btn" role="tab" data-view="summary">Summary</button><button class="btn" role="tab" data-view="details">Details & tables</button><button class="btn" role="tab" data-view="both">Expanded view</button><button class="btn" id="uxCompare">Compare periods</button></div>';
-if(selD.size&&$('uxFrom')){const dates=[...selD].sort();$('uxFrom').value=dates[0];$('uxTo').value=dates[dates.length-1];}
-bindHeaderControls(overview,'ov');
-overview.querySelectorAll('[data-flip]').forEach(b=>b.onclick=()=>flip(b.dataset.flip,true));overview.querySelectorAll('[data-unflip]').forEach(b=>b.onclick=()=>flip(b.dataset.unflip,false));
-function flip(i,on){const card=overview.querySelectorAll('.ux-kpi')[i];card.classList.toggle('flipped',on);card.querySelector('.ux-face:not(.ux-back)').inert=on;card.querySelector('.ux-back').inert=!on;card.querySelector('[data-flip]').setAttribute('aria-expanded',String(on));card.querySelector(on?'[data-unflip]':'[data-flip]').focus();}
-overview.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{view=b.dataset.view;applyView();});
-overview.querySelectorAll('[data-date]').forEach(b=>b.onclick=()=>{selD.clear();selWeeks.clear();selD.add(b.dataset.date);view='both';buildStrip();applyAll();});
-overview.querySelectorAll('.an-cat-card[data-cat]').forEach(card=>{
- const cat=card.dataset.cat;
- card.onclick=()=>{analysisFilters.category=cat;location.hash='analysis-overview';};
- card.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();card.onclick();}};
-});
+  if(root.hidden) return;
+  const rows = rowsInView();
+  const catSummary = getCategorySummary(rows);
+  const activeLabelers = uniq(rows, 'Labeler Name') || 0;
+  const activeQtcs = uniq(rows, 'QTC Name') || 0;
+  const activeQueues = uniq(rows, 'Queue Name') || 0;
+  const totalSubmissions = rows.length;
+  const avgSubmit = activeLabelers ? (totalSubmissions / activeLabelers).toFixed(1) : '0';
 
-overview.querySelectorAll('.ux-bar').forEach(b => {
- const d = b.dataset.date;
- const count = Number(b.dataset.count || 0);
- const pct = Math.max(1, max) ? ((count / max) * 100).toFixed(1) : '0';
- MeegTooltip.attach(b, () => ({
-  title: d,
-  badge: 'Activity',
-  desc: 'Daily task submissions volume',
-  rows: [
-   { label: 'Submissions', value: count.toLocaleString(), color: 'var(--accent)' },
-   { label: '% of Peak Day', value: pct + '%', color: '#15b8a6' }
-  ],
-  note: 'Click to filter entire dashboard to this date'
- }));
-});
+  const lidarFP = rows.filter(r => isModPass(r, 'lidar', 'FP')).length;
+  const lidarQA = rows.filter(r => isModPass(r, 'lidar', 'QA')).length;
+  const laneFP = rows.filter(r => isModPass(r, 'laneline', 'FP')).length;
+  const laneQA = rows.filter(r => isModPass(r, 'laneline', 'QA')).length;
+  const totalQA = lidarQA + laneQA;
+  const totalFP = lidarFP + laneFP;
+  const totalLidar = lidarFP + lidarQA;
+  const totalLane = laneFP + laneQA;
+  const qaSharePct = totalSubmissions ? ((totalQA / totalSubmissions) * 100).toFixed(1) + '%' : '0%';
 
-overview.querySelectorAll('.ux-kpi').forEach((kpi, idx) => {
- const [lbl, val, note, tone] = metrics[idx] || [];
- const lblEl = kpi.querySelector('.ux-label');
- if (lblEl && note) {
-  lblEl.removeAttribute('title');
-  MeegTooltip.attach(lblEl, () => ({
-   title: lbl,
-   badge: 'KPI Metric',
-   desc: note,
-   rows: [
-    { label: 'Current Value', value: val === null ? '—' : val.toLocaleString(), color: tone }
-   ],
-   note: 'Click ↗ on card to flip for details'
-  }));
- }
-});
+  // Daily submission dates & Cairo growth %
+  const dateMap = new Map();
+  rows.forEach(r => { const d = rDate(r); if (d) dateMap.set(d, (dateMap.get(d) || 0) + 1); });
+  const sortedDates = [...dateMap.keys()].sort();
+  const activeDays = Math.max(1, sortedDates.length);
+  const queueVelocity = (totalSubmissions / (activeDays * 18)).toFixed(1);
 
-const ovCatDefs = [['Lidar FP','lidarFP','#0d9488'],['Lidar QA','lidarQA','#15b8a6'],['Lane Line FP','laneFP','#ed9a35'],['Lane Line QA','laneQA','#e9689e']];
-overview.querySelectorAll('.an-cat-card[data-cat]').forEach(card => {
- const cat = card.dataset.cat;
- const d = ovCatDefs.find(x => x[1] === cat) || ['All Submissions', '', '#0d9488'];
- const m = catSummary ? (cat ? catSummary[cat] : catSummary.overall) : null;
- if (m) {
-  MeegTooltip.attach(card, () => ({
-   title: d[0],
-   badge: cat ? 'Work Stage' : 'All Work',
-   desc: 'Calculated from 14-digit National IDs',
-   rows: [
-    { label: 'Total Tasks', value: m.tasks.toLocaleString(), color: d[2] },
-    { label: 'Total Unique QTC', value: (m.uniqueQtc ?? '—').toLocaleString(), color: '#ed9a35' },
-    { label: 'Unique Labelers', value: (m.uniqueLabelers ?? '—').toLocaleString(), color: '#15b8a6' },
-    { label: 'Avg Submit / Labeler', value: m.avgSubmit, color: '#f59e0b' }
-   ],
-   note: 'Click to inspect in Analysis Overview'
-  }));
- }
-});
-if($('uxRange'))$('uxRange').onclick=()=>{const from=$('uxFrom').value,to=$('uxTo').value;if(!from||!to||from>to){showToast('Choose a valid start and end date.');return;}selD.clear();selWeeks.clear();const dates=(sOpts._dates||[]).filter(d=>d>=from&&d<=to);if(!dates.length){selD.add(from);}else dates.forEach(d=>selD.add(d));buildStrip();applyAll();};
-$('uxTarget').onchange=e=>{target=Math.max(0,Math.floor(Number(e.target.value)||0));try{localStorage.setItem('meeg_personal_target',String(target));}catch(e){}progress(rows.length);};
-$('uxCSV').onclick=exportCSV;$('uxPrint').onclick=()=>window.print();$('uxCompare').onclick=()=>{if(!cmpMode)toggleCompare();$('cmpBar').scrollIntoView({behavior:reduced()?'instant':'smooth'});};progress(rows.length);applyView();animate();
+  let growthPct = '0.0';
+  let isPositiveGrowth = true;
+  if (sortedDates.length >= 2) {
+    const latestDate = sortedDates[sortedDates.length - 1];
+    const prevDate = sortedDates[sortedDates.length - 2];
+    const latestC = dateMap.get(latestDate) || 0;
+    const prevC = dateMap.get(prevDate) || 0;
+    if (prevC > 0) {
+      const g = ((latestC - prevC) / prevC) * 100;
+      growthPct = (g >= 0 ? '+' : '') + g.toFixed(1);
+      isPositiveGrowth = g >= 0;
+    }
+  }
+
+  // Today vs Yesterday
+  const cToday = cairoToday();
+  const cYesterday = _addDays(cToday, -1);
+  const todayTasks = dateMap.get(cToday) || 0;
+  const yestTasks = dateMap.get(cYesterday) || 0;
+
+  // Last 7 days
+  const last7Start = _addDays(cToday, -6);
+  let last7Total = 0;
+  dateMap.forEach((cnt, d) => { if (d >= last7Start && d <= cToday) last7Total += cnt; });
+  const last7Avg = Math.round(last7Total / 7);
+
+  // Top rankings
+  const qMap = new Map();
+  const qtcMap = new Map();
+  const labMap = new Map();
+  const qi = hdrs.findIndex(h => h.toLowerCase() === 'queue name');
+  const qcI = hdrs.findIndex(h => h.toLowerCase() === 'qtc name');
+  const li = hdrs.findIndex(h => h.toLowerCase() === 'labeler name');
+
+  rows.forEach(r => {
+    if (qi >= 0 && r[qi]) qMap.set(r[qi], (qMap.get(r[qi]) || 0) + 1);
+    if (qcI >= 0 && r[qcI]) qtcMap.set(r[qcI], (qtcMap.get(r[qcI]) || 0) + 1);
+    if (li >= 0 && r[li]) labMap.set(r[li], (labMap.get(r[li]) || 0) + 1);
+  });
+
+  const topQueues = [...qMap.entries()].sort((a,b) => b[1] - a[1]).slice(0, 10);
+  const topQtcs = [...qtcMap.entries()].sort((a,b) => b[1] - a[1]).slice(0, 10);
+  const topLabelers = [...labMap.entries()].sort((a,b) => b[1] - a[1]).slice(0, 10);
+
+  // Shift & Floor distribution
+  const si = hdrs.findIndex(h => h.toLowerCase() === 'shift');
+  const fi = hdrs.findIndex(h => ['floor', 'unit'].includes(h.toLowerCase()));
+  const shiftMap = new Map();
+  const floorMap = new Map();
+  rows.forEach(r => {
+    if (si >= 0 && r[si]) shiftMap.set(r[si], (shiftMap.get(r[si]) || 0) + 1);
+    if (fi >= 0 && r[fi]) {
+      const fl = deriveFloor(r[fi]);
+      floorMap.set(fl, (floorMap.get(fl) || 0) + 1);
+    }
+  });
+
+  // Hourly distribution (00 to 23)
+  const tsIdx = hdrs.findIndex(h => ['timestamp', 'created at', 'date'].includes(h.toLowerCase()));
+  const hourCounts = new Array(24).fill(0);
+  rows.forEach(r => {
+    if (tsIdx >= 0 && r[tsIdx]) {
+      const m = String(r[tsIdx]).match(/(\d{1,2}):\d{2}/);
+      if (m) {
+        const h = parseInt(m[1], 10);
+        if (h >= 0 && h < 24) hourCounts[h]++;
+      }
+    }
+  });
+  const maxHour = Math.max(1, ...hourCounts);
+
+  // Daily trend last 21 points
+  const last21 = sortedDates.slice(-21).map(d => [d, dateMap.get(d) || 0]);
+  const maxDay = Math.max(1, ...last21.map(p => p[1]));
+
+  // 12 KPI Cards Definitions
+  const kpiDefs = [
+    { title: 'Total Submissions', val: totalSubmissions.toLocaleString(), sub: 'Selected period output', tone: '#0d9488' },
+    { title: 'Active Labelers', val: activeLabelers.toLocaleString(), sub: 'Unique contributors', tone: '#0a9d8c' },
+    { title: 'Active QTCs', val: activeQtcs.toLocaleString(), sub: 'Distinct QA reviewers', tone: '#df8b24' },
+    { title: 'Active Queues', val: activeQueues.toLocaleString(), sub: 'Operational queues', tone: '#df5c99' },
+    { title: 'Avg Submissions / Labeler', val: avgSubmit, sub: 'Average output per person', tone: '#3b82f6' },
+    { title: 'QA Submission Share', val: qaSharePct, sub: 'Volume share · not quality score', tone: '#8b5cf6' },
+    { title: 'Lidar FP Submissions', val: lidarFP.toLocaleString(), sub: 'First pass Lidar volume', tone: '#0d9488' },
+    { title: 'Lidar QA Submissions', val: lidarQA.toLocaleString(), sub: 'Quality review Lidar volume', tone: '#14b8a6' },
+    { title: 'Lane Line FP Submissions', val: laneFP.toLocaleString(), sub: 'First pass Lane Line volume', tone: '#f59e0b' },
+    { title: 'Lane Line QA Submissions', val: laneQA.toLocaleString(), sub: 'Quality review Lane Line', tone: '#ec4899' },
+    { title: 'Daily Productivity Growth', val: (growthPct + '%'), isGrowth: true, pos: isPositiveGrowth, sub: 'Latest day vs previous day', tone: '#10b981' },
+    { title: 'Queue Velocity', val: (queueVelocity + ' /hr'), sub: 'Submissions per operating hr', tone: '#6366f1' }
+  ];
+
+  overview.innerHTML = '<div class="ux-heading">'
+    + '<div>'
+      + '<div class="ux-eyebrow">Enterprise Operations · Executive Intelligence</div>'
+      + '<h2>Executive Overview</h2>'
+      + '<p>Holistic view of workforce activity, throughput velocity, and modality performance.</p>'
+    + '</div>'
+    + '<div class="ux-tools">'
+      + renderHeaderControlsHTML('ov')
+      + '<button class="btn" id="uxCSV">↓ Export CSV</button>'
+      + '<button class="btn" id="uxPrint">🖨️ Print Report</button>'
+    + '</div>'
+  + '</div>'
+
+  // Freshness & Operational Comparison Banner
+  + '<div class="ux-panel" style="margin-bottom:20px; padding:14px 20px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:14px; background:var(--bg-2); border-left:4px solid var(--primary);">'
+    + '<div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">'
+      + '<span style="display:flex; align-items:center; gap:6px; font-weight:700; font-size:12px; color:var(--text);"><span style="color:var(--success); font-size:10px;">🟢</span> Live Turso DB · Africa/Cairo</span>'
+      + '<span class="ux-note">Today: <b>' + todayTasks.toLocaleString() + '</b> tasks</span>'
+      + '<span class="ux-note">Yesterday: <b>' + yestTasks.toLocaleString() + '</b> tasks</span>'
+      + '<span class="ux-note">Last 7 Days: <b>' + last7Total.toLocaleString() + '</b> tasks (~' + last7Avg.toLocaleString() + '/day)</span>'
+    + '</div>'
+    + '<div style="display:flex; gap:8px;">'
+      + '<button class="btn btn-c" id="ovDrilldownBtn" style="font-size:12px; padding:5px 12px;">🔍 Drill-down Records</button>'
+      + '<button class="btn" id="uxCompare" style="font-size:12px; padding:5px 12px;">⚖️ Compare Periods</button>'
+    + '</div>'
+  + '</div>'
+
+  // 12 KPI Grid
+  + '<div class="ux-grid-12">'
+    + kpiDefs.map(k => '<div class="kpi-mini-card" style="--tone:' + k.tone + '">'
+      + '<div class="kpi-title"><span>' + esc(k.title) + '</span><span style="color:' + k.tone + '">●</span></div>'
+      + (k.isGrowth
+        ? '<div style="display:flex; align-items:baseline; gap:8px; margin:8px 0 4px;"><span class="kpi-val" style="margin:0;">' + k.val + '</span><span class="kpi-growth ' + (k.pos ? 'positive' : 'negative') + '">' + (k.pos ? '▲ Growth' : '▼ Decline') + '</span></div>'
+        : '<div class="kpi-val">' + k.val + '</div>')
+      + '<div class="kpi-sub">' + esc(k.sub) + '</div>'
+    + '</div>').join('')
+  + '</div>'
+
+  // Modality & Category Breakdown Cards
+  + renderCategoryCardsHTML(catSummary, '', 'overview')
+
+  // Top Charts Grid: Daily Trend & Hourly Production
+  + '<div class="ux-panels" style="margin-top:20px;">'
+    // Chart 1: Daily Submission Trend Line
+    + '<section class="ux-panel" style="flex:1.6;">'
+      + '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">'
+        + '<div><h3 style="margin:0 0 4px;">📈 Daily Submission Trend</h3><p style="margin:0;">Recent 21 active dates. Select a bar/point to filter.</p></div>'
+        + '<span class="ux-note">' + last21.length + ' active days</span>'
+      + '</div>'
+      + '<div class="ux-bars">'
+        + (last21.length
+          ? last21.map(([d, c]) => '<button class="ux-bar" style="height:' + Math.max(6, (c / maxDay) * 100) + '%;" data-date="' + d + '" data-count="' + c + '" aria-label="' + d + ': ' + c + ' submissions"></button>').join('')
+          : '<div class="ux-empty">No dated submissions in current view.</div>')
+      + '</div>'
+      + '<div style="display:flex; justify-content:space-between; margin-top:8px; font-size:11px; color:var(--text-soft);">'
+        + '<span>' + (last21.length ? last21[0][0] : '') + '</span>'
+        + '<span>Peak: ' + maxDay.toLocaleString() + ' tasks</span>'
+        + '<span>' + (last21.length ? last21[last21.length - 1][0] : '') + '</span>'
+      + '</div>'
+    + '</section>'
+
+    // Chart 2: Hourly Production Distribution (00 to 23)
+    + '<section class="ux-panel" style="flex:1;">'
+      + '<h3>⏱️ Hourly Production (24h Distribution)</h3>'
+      + '<p>Submission volume across operating hours of the day.</p>'
+      + '<div style="display:flex; align-items:flex-end; gap:2px; height:140px; margin-top:14px; padding-bottom:18px; position:relative; border-bottom:1px solid var(--border);">'
+        + hourCounts.map((cnt, h) => '<div title="' + String(h).padStart(2,'0') + ':00 · ' + cnt.toLocaleString() + ' tasks" style="flex:1; height:' + Math.max(3, (cnt / maxHour) * 100) + '%; background:' + (cnt === maxHour ? 'var(--primary)' : 'rgba(13,148,136,0.4)') + '; border-radius:2px 2px 0 0; transition:height 0.2s;"></div>').join('')
+      + '</div>'
+      + '<div style="display:flex; justify-content:space-between; font-size:10px; color:var(--text-soft); margin-top:6px;">'
+        + '<span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>23:00</span>'
+      + '</div>'
+    + '</section>'
+  + '</div>'
+
+  // Mid Charts Grid: Modality Donut, Pass Donut, Shift & Floor comparison
+  + '<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:16px; margin-top:20px;">'
+    // Chart 3 & 4: Modality & Pass Visual Distribution
+    + '<div class="ux-panel">'
+      + '<h3>📦 Modality & Pass Share</h3>'
+      + '<p>Distribution across work types and validation stages.</p>'
+      + '<div style="display:flex; flex-direction:column; gap:12px; margin-top:14px;">'
+        + '<div>'
+          + '<div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px;"><b>Lidar vs Lane Line</b><span>' + (totalSubmissions ? ((totalLidar/totalSubmissions)*100).toFixed(1) : 0) + '% / ' + (totalSubmissions ? ((totalLane/totalSubmissions)*100).toFixed(1) : 0) + '%</span></div>'
+          + '<div style="display:flex; height:12px; border-radius:6px; overflow:hidden; background:var(--border);">'
+            + '<div style="width:' + (totalSubmissions ? (totalLidar/totalSubmissions)*100 : 50) + '%; background:#0d9488;"></div>'
+            + '<div style="width:' + (totalSubmissions ? (totalLane/totalSubmissions)*100 : 50) + '%; background:#ed9a35;"></div>'
+          + '</div>'
+          + '<div style="display:flex; justify-content:space-between; font-size:11px; color:var(--text-soft); margin-top:3px;">'
+            + '<span><span style="color:#0d9488">●</span> Lidar: ' + totalLidar.toLocaleString() + '</span>'
+            + '<span><span style="color:#ed9a35">●</span> Lane Line: ' + totalLane.toLocaleString() + '</span>'
+          + '</div>'
+        + '</div>'
+        + '<div style="margin-top:6px;">'
+          + '<div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px;"><b>First Pass vs QA</b><span>' + (totalSubmissions ? ((totalFP/totalSubmissions)*100).toFixed(1) : 0) + '% / ' + (totalSubmissions ? ((totalQA/totalSubmissions)*100).toFixed(1) : 0) + '%</span></div>'
+          + '<div style="display:flex; height:12px; border-radius:6px; overflow:hidden; background:var(--border);">'
+            + '<div style="width:' + (totalSubmissions ? (totalFP/totalSubmissions)*100 : 50) + '%; background:#3b82f6;"></div>'
+            + '<div style="width:' + (totalSubmissions ? (totalQA/totalSubmissions)*100 : 50) + '%; background:#8b5cf6;"></div>'
+          + '</div>'
+          + '<div style="display:flex; justify-content:space-between; font-size:11px; color:var(--text-soft); margin-top:3px;">'
+            + '<span><span style="color:#3b82f6">●</span> FP: ' + totalFP.toLocaleString() + '</span>'
+            + '<span><span style="color:#8b5cf6">●</span> QA: ' + totalQA.toLocaleString() + '</span>'
+          + '</div>'
+        + '</div>'
+      + '</div>'
+    + '</div>'
+
+    // Chart 5: Shift Productivity
+    + '<div class="ux-panel">'
+      + '<h3>☀️ Shift Productivity Comparison</h3>'
+      + '<p>Volume of submissions contributed by each shift.</p>'
+      + '<div style="display:flex; flex-direction:column; gap:8px; margin-top:12px;">'
+        + ([...shiftMap.entries()].sort((a,b)=>b[1]-a[1]).map(([s, cnt]) => {
+          const maxS = Math.max(1, ...shiftMap.values());
+          const pct = ((cnt / Math.max(1, totalSubmissions)) * 100).toFixed(1);
+          return '<div>'
+            + '<div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:3px;"><span>' + esc(s) + '</span><b>' + cnt.toLocaleString() + ' (' + pct + '%)</b></div>'
+            + '<div style="height:8px; border-radius:4px; background:var(--border); overflow:hidden;">'
+              + '<div style="height:100%; width:' + ((cnt/maxS)*100) + '%; background:var(--primary);"></div>'
+            + '</div>'
+          + '</div>';
+        }).join('') || '<div class="ux-empty">No shift data available.</div>')
+      + '</div>'
+    + '</div>'
+
+    // Chart 6: Floor Productivity (Floor 01, Floor 02, Floor 03, Floor 04)
+    + '<div class="ux-panel">'
+      + '<h3>🏢 Floor Productivity Comparison</h3>'
+      + '<p>Throughput by floor based on operational room mapping.</p>'
+      + '<div style="display:flex; flex-direction:column; gap:8px; margin-top:12px;">'
+        + (['Floor 01', 'Floor 02', 'Floor 03', 'Floor 04'].map(fl => {
+          const cnt = floorMap.get(fl) || 0;
+          const maxF = Math.max(1, ...floorMap.values());
+          const pct = totalSubmissions ? ((cnt / totalSubmissions) * 100).toFixed(1) : 0;
+          return '<div>'
+            + '<div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:3px;"><span>' + fl + '</span><b>' + cnt.toLocaleString() + ' (' + pct + '%)</b></div>'
+            + '<div style="height:8px; border-radius:4px; background:var(--border); overflow:hidden;">'
+              + '<div style="height:100%; width:' + ((cnt/maxF)*100) + '%; background:#df8b24;"></div>'
+            + '</div>'
+          + '</div>';
+        }).join(''))
+      + '</div>'
+    + '</div>'
+  + '</div>'
+
+  // Bottom Rankings: Top 10 Queues, Top 10 QTCs, Top 10 Labelers
+  + '<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:16px; margin-top:20px;">'
+    // Chart 7: Top 10 Queues
+    + '<div class="ux-panel">'
+      + '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">'
+        + '<h3 style="margin:0;">🗂️ Top 10 Queues</h3>'
+        + '<span class="ux-note">By Submissions</span>'
+      + '</div>'
+      + '<div style="display:flex; flex-direction:column; gap:6px;">'
+        + (topQueues.map(([q, cnt], idx) => {
+          const maxQ = topQueues[0][1] || 1;
+          return '<div style="padding:4px 0; border-bottom:1px solid var(--border-light);">'
+            + '<div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:2px;">'
+              + '<span style="font-weight:600; text-overflow:ellipsis; overflow:hidden; white-space:nowrap; max-width:200px;">' + (idx+1) + '. ' + esc(q) + '</span>'
+              + '<b style="color:var(--primary);">' + cnt.toLocaleString() + '</b>'
+            + '</div>'
+            + '<div style="height:5px; border-radius:3px; background:var(--border); overflow:hidden;">'
+              + '<div style="height:100%; width:' + ((cnt/maxQ)*100) + '%; background:var(--primary);"></div>'
+            + '</div>'
+          + '</div>';
+        }).join('') || '<div class="ux-empty">No queue data.</div>')
+      + '</div>'
+    + '</div>'
+
+    // Chart 8: Top 10 QTCs
+    + '<div class="ux-panel">'
+      + '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">'
+        + '<h3 style="margin:0;">👥 Top 10 QTC Teams</h3>'
+        + '<span class="ux-note">By Team Output</span>'
+      + '</div>'
+      + '<div style="display:flex; flex-direction:column; gap:6px;">'
+        + (topQtcs.map(([qc, cnt], idx) => {
+          const maxQC = topQtcs[0][1] || 1;
+          return '<div style="padding:4px 0; border-bottom:1px solid var(--border-light);">'
+            + '<div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:2px;">'
+              + '<span style="font-weight:600; text-overflow:ellipsis; overflow:hidden; white-space:nowrap; max-width:200px;">' + (idx+1) + '. ' + esc(qc) + '</span>'
+              + '<b style="color:#df8b24;">' + cnt.toLocaleString() + '</b>'
+            + '</div>'
+            + '<div style="height:5px; border-radius:3px; background:var(--border); overflow:hidden;">'
+              + '<div style="height:100%; width:' + ((cnt/maxQC)*100) + '%; background:#df8b24;"></div>'
+            + '</div>'
+          + '</div>';
+        }).join('') || '<div class="ux-empty">No QTC data.</div>')
+      + '</div>'
+    + '</div>'
+
+    // Chart 9: Top 10 Labelers
+    + '<div class="ux-panel">'
+      + '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">'
+        + '<h3 style="margin:0;">🏆 Top 10 Labelers</h3>'
+        + '<span class="ux-note">By Total Submits</span>'
+      + '</div>'
+      + '<div style="display:flex; flex-direction:column; gap:6px;">'
+        + (topLabelers.map(([lab, cnt], idx) => {
+          const maxL = topLabelers[0][1] || 1;
+          return '<div style="padding:4px 0; border-bottom:1px solid var(--border-light);">'
+            + '<div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:2px;">'
+              + '<span style="font-weight:600; text-overflow:ellipsis; overflow:hidden; white-space:nowrap; max-width:200px;">' + (idx < 3 ? ['🥇','🥈','🥉'][idx] + ' ' : (idx+1) + '. ') + esc(lab) + '</span>'
+              + '<b style="color:#0a9d8c;">' + cnt.toLocaleString() + '</b>'
+            + '</div>'
+            + '<div style="height:5px; border-radius:3px; background:var(--border); overflow:hidden;">'
+              + '<div style="height:100%; width:' + ((cnt/maxL)*100) + '%; background:#0a9d8c;"></div>'
+            + '</div>'
+          + '</div>';
+        }).join('') || '<div class="ux-empty">No labeler data.</div>')
+      + '</div>'
+    + '</div>'
+  + '</div>'
+
+  // Personal Target Progress Box
+  + '<div class="ux-panel" style="margin-top:20px;">'
+    + '<h3>🎯 Personal Submission Target</h3>'
+    + '<p>Set a custom target for the current selection, saved on your local browser.</p>'
+    + '<div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin-top:12px;">'
+      + '<label class="ux-note" style="display:flex; align-items:center; gap:8px;">Target Rows:<input class="ux-target" id="uxTarget" type="number" min="1" step="1" placeholder="e.g. 500" value="' + (target || '') + '" style="padding:6px 12px; border-radius:8px; border:1px solid var(--border); width:140px;"></label>'
+      + '<div id="uxProgress" style="flex:1; min-width:200px;"></div>'
+    + '</div>'
+  + '</div>';
+
+  bindHeaderControls(overview, 'ov');
+
+  // Event handlers
+  $('uxCSV').onclick = exportCSV;
+  $('uxPrint').onclick = () => window.print();
+  $('uxCompare').onclick = () => { if (!cmpMode) toggleCompare(); $('cmpBar').scrollIntoView({ behavior: reduced() ? 'instant' : 'smooth' }); };
+  $('ovDrilldownBtn').onclick = () => {
+    const cols = ['Task ID', 'Timestamp', 'Labeler Name', 'Employee ID', 'Shift', 'Unit', 'QTC Name', 'Queue Name', 'Modality', 'Pass'];
+    const ni = hdrs.findIndex(h => h.toLowerCase() === 'national id');
+    const ti = hdrs.findIndex(h => ['task id', 'id'].includes(h.toLowerCase()));
+    const drillRows = rows.map(r => [
+      ti >= 0 ? esc(r[ti]) : '—',
+      tsIdx >= 0 ? esc(r[tsIdx]) : '—',
+      li >= 0 ? esc(r[li]) : '—',
+      maskEmployeeId(ni >= 0 ? r[ni] : '', r[li]),
+      si >= 0 ? esc(r[si]) : '—',
+      fi >= 0 ? esc(r[fi]) : '—',
+      qcI >= 0 ? esc(r[qcI]) : '—',
+      qi >= 0 ? esc(r[qi]) : '—',
+      esc(r[hdrs.findIndex(h => h.toLowerCase() === 'modality')] || ''),
+      esc(r[hdrs.findIndex(h => h.toLowerCase() === 'pass')] || '')
+    ]);
+    openDrilldownModal({
+      title: 'Current Selection Records',
+      subtitle: 'Drill-down view of ' + rows.length.toLocaleString() + ' filtered submissions (National IDs masked)',
+      badge: 'Live Data',
+      columns: cols,
+      rows: drillRows
+    });
+  };
+
+  overview.querySelectorAll('.an-cat-card[data-cat]').forEach(card => {
+    const cat = card.dataset.cat;
+    card.onclick = () => { analysisFilters.category = cat; location.hash = 'analysis-overview'; };
+  });
+
+  overview.querySelectorAll('.ux-bar').forEach(b => {
+    const d = b.dataset.date;
+    const count = Number(b.dataset.count || 0);
+    const pct = Math.max(1, maxDay) ? ((count / maxDay) * 100).toFixed(1) : '0';
+    MeegTooltip.attach(b, () => ({
+      title: d,
+      badge: 'Daily Volume',
+      desc: 'Operational submissions for this date',
+      rows: [
+        { label: 'Submissions', value: count.toLocaleString(), color: 'var(--accent)' },
+        { label: '% of Peak Day', value: pct + '%', color: '#15b8a6' }
+      ],
+      note: 'Click to filter entire dashboard to this date'
+    }));
+    b.onclick = () => {
+      selD.clear(); selWeeks.clear(); selD.add(d); buildStrip(); applyAll();
+    };
+  });
+
+  $('uxTarget').onchange = e => {
+    target = Math.max(0, Math.floor(Number(e.target.value) || 0));
+    try { localStorage.setItem('meeg_personal_target', String(target)); } catch(e){}
+    progress(rows.length);
+  };
+
+  progress(rows.length);
+  applyView();
 }
 function progress(count){const pct=target?count/target*100:0;$('uxProgress').innerHTML=target?'<div class="ux-track" role="progressbar" aria-label="Submission target" aria-valuenow="'+Math.min(100,Math.round(pct))+'" aria-valuemin="0" aria-valuemax="100"><div class="ux-fill" style="width:'+Math.min(100,pct)+'%"></div></div><b>'+Math.round(pct)+'%</b><p>'+count.toLocaleString()+' of '+target.toLocaleString()+' submissions</p>':'<p style="margin-top:18px">Set a target to see your progress.</p>';}
 function exportCSV(){const rows=rowsInView();if(!rows.length){showToast('No matching rows to export.');return;}const cell=v=>'"'+String(v??'').replace(/^[=+@\-\t\r]/,"'$&").replace(/"/g,'""')+'"';const csv=[hdrs,...rows].map(r=>r.map(cell).join(',')).join('\r\n');downloadBlob(new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'}),'MEEG_filtered_'+cairoToday()+'.csv');}
@@ -820,79 +1321,306 @@ function enableAnalysisFlips(rows){
 }
 
 function renderAnalysis(){
-if(analysis.hidden)return;
- const base=rowsInView(),a=analysisAggregate(base,analysisFilters),catSummary=getCategorySummary(a.selected),labelerMetrics=labelerSubmissionMetrics(a.selected),si=hdrs.findIndex(h=>h.toLowerCase()==='shift');
- const shifts=[...new Set(base.map(r=>si>=0?String(r[si]||'').trim():'').filter(Boolean))].sort();const top=a.points.length?[...a.points].sort((a,b)=>b[1]-a[1])[0]:null;
- const palette=['#0d9488','#15b8a6','#ed9a35','#e9689e','#459ce8','#9ca53c','#b77bdb','#7689a3'];
- analysis.innerHTML='<div class="ux-overview"><div class="ux-heading"><div><div class="ux-eyebrow">Team output · live insights</div><h2>Analysis Overview</h2><p>Submission trends and shift contribution · one row = one submit</p></div>'+renderHeaderControlsHTML('an')+'</div><div class="ux-panel an-filters"><label>From<input id="anFrom" type="date" value="'+analysisFilters.from+'"></label><label>To<input id="anTo" type="date" value="'+analysisFilters.to+'"></label><label>Modality<select id="anMod"><option value="all">All modalities</option><option value="lane">Lane Line</option></select></label><label>Shift<select id="anShift"><option value="">All shifts</option>'+shifts.map(s=>'<option>'+esc(s)+'</option>').join('')+'</select></label><button class="btn btn-c" id="anApply">Apply filters</button><button class="btn" id="anReset">Reset</button><button class="btn" id="anDashboard">Dashboard filters ↗</button></div><p class="an-context">Uses current dashboard filters'+(activeLoc&&!activeLoc.startsWith('__')?' · '+esc(activeLoc):'')+'. These filters narrow that selection.</p>'
-  +renderCategoryCardsHTML(catSummary,analysisFilters.category,'analysis')
-  +'<div class="ux-panels"><section class="ux-panel"><div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:12px"><div><h3 style="margin:0 0 4px">Submit by date · Area Trend</h3><p style="margin:0">Hover for details or click a date to filter. Select stage below.</p></div><div class="an-chart-cat-tabs" id="anChartCatTabs">'
-   +[
-     {key:'all',label:'All Stages (Total)',color:'#0d9488'},
-     {key:'lidarFP',label:'Lidar FP',color:'#0d9488'},
-     {key:'lidarQA',label:'Lidar QA',color:'#15b8a6'},
-     {key:'laneFP',label:'Lane Line FP',color:'#ed9a35'},
-     {key:'laneQA',label:'Lane Line QA',color:'#e9689e'}
-   ].map(t=>'<button class="an-chart-tab '+(t.key===(analysisFilters.chartCategory||'all')?'active':'')+'" style="--tab-color:'+t.color+'" data-tab-cat="'+t.key+'">'+t.label+'</button>').join('')
-   +'</div></div><div id="anLine" class="an-line"></div><p>'+(a.undated?a.undated+' submissions without a valid date are excluded from this chart.':'Date follows the dashboard timestamp column.')+'</p><details><summary>View daily values</summary><div class="an-values">'+a.points.map(([d,c])=>'<p>'+d+' · '+c.toLocaleString()+'</p>').join('')+'</div></details></section><section class="ux-panel"><h3>Submit share by shift</h3><p>Share of '+a.selected.length.toLocaleString()+' filtered submissions.</p><div id="anDonut" class="an-donut"></div><div id="anLegend" class="an-legend"></div></section></div></div>';
- bindHeaderControls(analysis,'an');
- analysis.querySelectorAll('.an-cat-card[data-cat]').forEach(card=>{
-  const cat=card.dataset.cat;
-  card.onclick=()=>{
-   analysisFilters.category=analysisFilters.category===cat?'':cat;
-   renderAnalysis();
-  };
-  card.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();card.onclick();}};
- });
- enableAnalysisFlips(a.selected);
-  analysis.querySelectorAll('[data-tab-cat]').forEach(btn=>{
-   btn.onclick=()=>{
-    analysisFilters.chartCategory=btn.dataset.tabCat;
-    renderAnalysis();
-   };
-  });
- const oldFilterBar=analysis.querySelector('.an-filters');oldFilterBar.replaceWith(createListSlicers());
- const resetBar=document.createElement('div');resetBar.className='an-selection-toolbar';
- const resetButton=document.createElement('button');resetButton.className='btn';resetButton.textContent='Clear all filters';resetButton.onclick=()=>{Object.assign(analysisFilters,{from:'',to:'',modality:'all',shift:'',unit:'',qtc:'',category:''});clearAll();refreshOpenSlicers();};
- const catLabel={'lidarFP':'Lidar FP','lidarQA':'Lidar QA','laneFP':'Lane Line FP','laneQA':'Lane Line QA'}[analysisFilters.category]||analysisFilters.category;
- const selectionText=document.createElement('span');selectionText.className='ux-note';selectionText.textContent=[analysisFilters.from&&('Date: '+analysisFilters.from+(analysisFilters.to!==analysisFilters.from?' → '+analysisFilters.to:'')),analysisFilters.shift,analysisFilters.unit,analysisFilters.qtc,catLabel].filter(Boolean).join(' · ')||'Select multiple values · changes apply immediately';resetBar.append(selectionText,resetButton);analysis.querySelector('.an-context').replaceWith(resetBar);
- if(!a.selected.length){$('anLine').innerHTML='<div class="ux-empty">'+(window._firstDataReady?'No submissions match these filters.':'Waiting for dashboard data…')+'</div>';$('anDonut').innerHTML='<div class="ux-empty">No shift distribution available.</div>';addAnalysisCharts(a);return;}
- if(!a.points.length)$('anLine').innerHTML='<div class="ux-empty">No valid dates available.</div>';
- else{
- const chartCat=analysisFilters.chartCategory||'all';
-  const catColorMap={all:'#0d9488',lidarFP:'#0d9488',lidarQA:'#15b8a6',laneFP:'#ed9a35',laneQA:'#e9689e'};
-  const strokeColor=catColorMap[chartCat]||'#0d9488';
-  let catRows=a.selected;
-  if(chartCat!=='all'){
-   const mi=hdrs.findIndex(h=>h.toLowerCase()==='modality');
-   const pi=hdrs.findIndex(h=>h.toLowerCase()==='pass');
-   catRows=a.selected.filter(r=>{
-    const mod=mi<0?'':String(r[mi]||'').toLowerCase().replace(/[\s_-]+/g,'');
-    const pass=pi<0?'':String(r[pi]||'').trim().toUpperCase();
-    const prefix=mod==='lidar'?'lidar':(mod==='laneline'||mod==='lane')?'lane':'';
-    return (prefix+pass)===chartCat;
-   });
-  }
-  const catDates=new Map();
-  catRows.forEach(r=>{const d=rDate(r);if(d)catDates.set(d,(catDates.get(d)||0)+1);});
-  const chartPoints=a.points.map(([d])=>[d,catDates.get(d)||0]);
+  if(analysis.hidden) return;
+  const base = rowsInView();
+  const a = analysisAggregate(base, analysisFilters);
+  const catSummary = getCategorySummary(a.selected);
+  const si = hdrs.findIndex(h => h.toLowerCase() === 'shift');
+  const fi = hdrs.findIndex(h => ['floor', 'unit'].includes(h.toLowerCase()));
+  const qi = hdrs.findIndex(h => h.toLowerCase() === 'queue name');
+  const qcI = hdrs.findIndex(h => h.toLowerCase() === 'qtc name');
+  const li = hdrs.findIndex(h => h.toLowerCase() === 'labeler name');
 
-  const W=760,H=280,L=55,R=20,T=20,B=45,max=Math.max(1,...chartPoints.map(p=>p[1]));const x=i=>L+(chartPoints.length===1?(W-L-R)/2:i/(chartPoints.length-1)*(W-L-R)),y=v=>H-B-v/max*(H-T-B);
-  let svg='<svg viewBox="0 0 '+W+' '+H+'" role="group" aria-label="Daily submission area chart">';
-  svg+='<defs><linearGradient id="anAreaGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="'+strokeColor+'" stop-opacity="0.38"/><stop offset="100%" stop-color="'+strokeColor+'" stop-opacity="0.02"/></linearGradient></defs>';
-  for(let i=0;i<5;i++){const value=max*i/4,yy=y(value);svg+='<line x1="'+L+'" x2="'+(W-R)+'" y1="'+yy+'" y2="'+yy+'" stroke="var(--border)" stroke-dasharray="3 3"/><text x="'+(L-9)+'" y="'+(yy+4)+'" text-anchor="end">'+Number(value.toFixed(1)).toLocaleString()+'</text>';}
-  if(chartPoints.length>1){
-   const polyPoints=[L+','+(H-B),...chartPoints.map((p,i)=>x(i)+','+y(p[1])),(chartPoints.length===1?L:x(chartPoints.length-1))+','+(H-B)].join(' ');
-   svg+='<polygon fill="url(#anAreaGrad)" points="'+polyPoints+'"/>';
+  const shifts = [...new Set(base.map(r => si >= 0 ? String(r[si] || '').trim() : '').filter(Boolean))].sort();
+
+  // Metrics calculation
+  const lidarFP = a.selected.filter(r => isModPass(r, 'lidar', 'FP')).length;
+  const lidarQA = a.selected.filter(r => isModPass(r, 'lidar', 'QA')).length;
+  const laneFP = a.selected.filter(r => isModPass(r, 'laneline', 'FP')).length;
+  const laneQA = a.selected.filter(r => isModPass(r, 'laneline', 'QA')).length;
+
+  const totalLidar = lidarFP + lidarQA;
+  const totalLane = laneFP + laneQA;
+  const totalFP = lidarFP + laneFP;
+  const totalQA = lidarQA + laneQA;
+  const totalSelected = a.selected.length;
+
+  const uniqueLabelers = uniq(a.selected, 'Labeler Name') || 0;
+  const uniqueQtcs = uniq(a.selected, 'QTC Name') || 0;
+  const avgSubmit = uniqueLabelers ? (totalSelected / uniqueLabelers).toFixed(1) : '0';
+
+  const lidarPct = totalSelected ? ((totalLidar / totalSelected) * 100).toFixed(1) : '0';
+  const lanePct = totalSelected ? ((totalLane / totalSelected) * 100).toFixed(1) : '0';
+
+  // Lidar sub-aggregations
+  const lidarRows = a.selected.filter(r => {
+    const mi = hdrs.findIndex(h => h.toLowerCase() === 'modality');
+    return mi >= 0 && String(r[mi] || '').toLowerCase().replace(/[\s_-]+/g,'') === 'lidar';
+  });
+  const lidarQueueMap = new Map();
+  const lidarShiftMap = new Map();
+  const lidarFloorMap = new Map();
+  const lidarLabMap = new Map();
+  const lidarQtcMap = new Map();
+  lidarRows.forEach(r => {
+    if (qi >= 0 && r[qi]) lidarQueueMap.set(r[qi], (lidarQueueMap.get(r[qi]) || 0) + 1);
+    if (si >= 0 && r[si]) lidarShiftMap.set(r[si], (lidarShiftMap.get(r[si]) || 0) + 1);
+    if (fi >= 0 && r[fi]) { const fl = deriveFloor(r[fi]); lidarFloorMap.set(fl, (lidarFloorMap.get(fl) || 0) + 1); }
+    if (li >= 0 && r[li]) lidarLabMap.set(r[li], (lidarLabMap.get(r[li]) || 0) + 1);
+    if (qcI >= 0 && r[qcI]) lidarQtcMap.set(r[qcI], (lidarQtcMap.get(r[qcI]) || 0) + 1);
+  });
+
+  // Lane Line sub-aggregations
+  const laneRows = a.selected.filter(r => {
+    const mi = hdrs.findIndex(h => h.toLowerCase() === 'modality');
+    const m = String(r[mi] || '').toLowerCase().replace(/[\s_-]+/g,'');
+    return m === 'laneline' || m === 'lane';
+  });
+  const laneQueueMap = new Map();
+  const laneShiftMap = new Map();
+  const laneFloorMap = new Map();
+  const laneLabMap = new Map();
+  const laneQtcMap = new Map();
+  laneRows.forEach(r => {
+    if (qi >= 0 && r[qi]) laneQueueMap.set(r[qi], (laneQueueMap.get(r[qi]) || 0) + 1);
+    if (si >= 0 && r[si]) laneShiftMap.set(r[si], (laneShiftMap.get(r[si]) || 0) + 1);
+    if (fi >= 0 && r[fi]) { const fl = deriveFloor(r[fi]); laneFloorMap.set(fl, (laneFloorMap.get(fl) || 0) + 1); }
+    if (li >= 0 && r[li]) laneLabMap.set(r[li], (laneLabMap.get(r[li]) || 0) + 1);
+    if (qcI >= 0 && r[qcI]) laneQtcMap.set(r[qcI], (laneQtcMap.get(r[qcI]) || 0) + 1);
+  });
+
+  // Verified Quality Analysis Data from qualityStore
+  const qs = getQualityStore();
+  const qsEntries = Object.entries(qs);
+  let qAssessments = 0, qSumTot = 0, qSumAtt = 0, qSumTva = 0, qSumArt = 0;
+  qsEntries.forEach(([aid, q]) => {
+    const tot = typeof window.qNum === 'function' ? window.qNum(q.totalAccuracy) : parseFloat(q.totalAccuracy);
+    const att = typeof window.qNum === 'function' ? window.qNum(q.attribute) : parseFloat(q.attribute);
+    const tva = typeof window.qNum === 'function' ? window.qNum(q.tvaF1) : parseFloat(q.tvaF1);
+    const art = typeof window.qNum === 'function' ? window.qNum(q.artifacts) : parseFloat(q.artifacts);
+    if (tot !== null && !isNaN(tot)) { qSumTot += tot; qAssessments++; }
+    if (att !== null && !isNaN(att)) qSumAtt += att;
+    if (tva !== null && !isNaN(tva)) qSumTva += tva;
+    if (art !== null && !isNaN(art)) qSumArt += art;
+  });
+
+  const avgTotAcc = qAssessments ? (qSumTot / qAssessments) : null;
+  const avgAttAcc = qAssessments ? (qSumAtt / qAssessments) : null;
+  const avgTva = qAssessments ? (qSumTva / qAssessments) : null;
+  const avgArt = qAssessments ? (qSumArt / qAssessments).toFixed(1) : '—';
+
+  // 8 KPI Cards
+  const kpiCards = [
+    { title: 'Total Lidar Submissions', val: totalLidar.toLocaleString(), sub: 'FP + QA Lidar Tasks', tone: '#0d9488' },
+    { title: 'Total Lane Line Submissions', val: totalLane.toLocaleString(), sub: 'FP + QA Lane Line Tasks', tone: '#ed9a35' },
+    { title: 'Total FP Submissions', val: totalFP.toLocaleString(), sub: 'All First Pass Tasks', tone: '#3b82f6' },
+    { title: 'Total QA Submissions', val: totalQA.toLocaleString(), sub: 'All QA Review Tasks', tone: '#8b5cf6' },
+    { title: 'Unique Labelers', val: uniqueLabelers.toLocaleString(), sub: 'Active in selection', tone: '#0a9d8c' },
+    { title: 'Unique QTCs', val: uniqueQtcs.toLocaleString(), sub: 'Supervising reviewers', tone: '#df8b24' },
+    { title: 'Avg Submissions / Labeler', val: avgSubmit, sub: 'Average productivity', tone: '#10b981' },
+    { title: 'Modality Share %', val: (lidarPct + '% / ' + lanePct + '%'), sub: 'Lidar vs Lane Line share', tone: '#df5c99' }
+  ];
+
+  analysis.innerHTML = '<div class="ux-overview">'
+    + '<div class="ux-heading">'
+      + '<div>'
+        + '<div class="ux-eyebrow">Modality & Attribute Operations</div>'
+        + '<h2>Modality & Attribute Analysis</h2>'
+        + '<p>Deep operational distribution across Lidar, Lane Line, and verified quality assessments.</p>'
+      + '</div>'
+      + renderHeaderControlsHTML('an')
+    + '</div>'
+
+    + '<div id="anSlicers"></div>'
+
+    // 8 KPI Grid
+    + '<div class="ux-grid-8" style="margin-top:16px;">'
+      + kpiCards.map(k => '<div class="kpi-mini-card" style="--tone:' + k.tone + '">'
+        + '<div class="kpi-title"><span>' + esc(k.title) + '</span><span style="color:' + k.tone + '">●</span></div>'
+        + '<div class="kpi-val">' + k.val + '</div>'
+        + '<div class="kpi-sub">' + esc(k.sub) + '</div>'
+      + '</div>').join('')
+    + '</div>'
+
+    // Category cards row
+    + renderCategoryCardsHTML(catSummary, analysisFilters.category, 'analysis')
+
+    // SECTION 1 & 2: Lidar Deep Dive & Lane Line Deep Dive
+    + '<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(340px, 1fr)); gap:18px; margin-top:20px;">'
+      // Lidar Box
+      + '<div class="ux-panel" style="border-top:4px solid #0d9488;">'
+        + '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">'
+          + '<h3 style="margin:0; color:#0d9488;">📡 Lidar Modality Analysis</h3>'
+          + '<span class="q-badge" style="background:#0d9488; color:#fff;">' + totalLidar.toLocaleString() + ' tasks</span>'
+        + '</div>'
+        + '<div style="display:flex; gap:12px; margin-bottom:14px; background:var(--bg-2); padding:10px 14px; border-radius:10px;">'
+          + '<div style="flex:1;"><b>FP:</b> ' + lidarFP.toLocaleString() + '</div>'
+          + '<div style="flex:1;"><b>QA:</b> ' + lidarQA.toLocaleString() + '</div>'
+          + '<div style="flex:1;"><b>QA Share:</b> ' + (totalLidar ? ((lidarQA/totalLidar)*100).toFixed(1) : 0) + '%</div>'
+        + '</div>'
+        + '<h4 style="font-size:12px; margin:10px 0 4px; color:var(--text-soft);">Top 5 Lidar Queues</h4>'
+        + '<div style="display:flex; flex-direction:column; gap:4px; font-size:12px;">'
+          + ([...lidarQueueMap.entries()].sort((a,b)=>b[1]-a[1]).slice(0,5).map(([q,c])=>'<div style="display:flex; justify-content:space-between; padding:3px 0; border-bottom:1px solid var(--border-light);"><span style="text-overflow:ellipsis; overflow:hidden; white-space:nowrap; max-width:220px;">' + esc(q) + '</span><b>' + c.toLocaleString() + '</b></div>').join('') || '<span class="ux-note">No Lidar queue data</span>')
+        + '</div>'
+        + '<h4 style="font-size:12px; margin:12px 0 4px; color:var(--text-soft);">Top 5 Lidar Labelers</h4>'
+        + '<div style="display:flex; flex-direction:column; gap:4px; font-size:12px;">'
+          + ([...lidarLabMap.entries()].sort((a,b)=>b[1]-a[1]).slice(0,5).map(([l,c])=>'<div style="display:flex; justify-content:space-between; padding:3px 0; border-bottom:1px solid var(--border-light);"><span style="text-overflow:ellipsis; overflow:hidden; white-space:nowrap; max-width:220px;">' + esc(l) + '</span><b style="color:#0d9488;">' + c.toLocaleString() + '</b></div>').join('') || '<span class="ux-note">No Lidar labelers</span>')
+        + '</div>'
+      + '</div>'
+
+      // Lane Line Box
+      + '<div class="ux-panel" style="border-top:4px solid #ed9a35;">'
+        + '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">'
+          + '<h3 style="margin:0; color:#ed9a35;">🛣️ Lane Line Modality Analysis</h3>'
+          + '<span class="q-badge" style="background:#ed9a35; color:#fff;">' + totalLane.toLocaleString() + ' tasks</span>'
+        + '</div>'
+        + '<div style="display:flex; gap:12px; margin-bottom:14px; background:var(--bg-2); padding:10px 14px; border-radius:10px;">'
+          + '<div style="flex:1;"><b>FP:</b> ' + laneFP.toLocaleString() + '</div>'
+          + '<div style="flex:1;"><b>QA:</b> ' + laneQA.toLocaleString() + '</div>'
+          + '<div style="flex:1;"><b>QA Share:</b> ' + (totalLane ? ((laneQA/totalLane)*100).toFixed(1) : 0) + '%</div>'
+        + '</div>'
+        + '<h4 style="font-size:12px; margin:10px 0 4px; color:var(--text-soft);">Top 5 Lane Line Queues</h4>'
+        + '<div style="display:flex; flex-direction:column; gap:4px; font-size:12px;">'
+          + ([...laneQueueMap.entries()].sort((a,b)=>b[1]-a[1]).slice(0,5).map(([q,c])=>'<div style="display:flex; justify-content:space-between; padding:3px 0; border-bottom:1px solid var(--border-light);"><span style="text-overflow:ellipsis; overflow:hidden; white-space:nowrap; max-width:220px;">' + esc(q) + '</span><b>' + c.toLocaleString() + '</b></div>').join('') || '<span class="ux-note">No Lane Line queue data</span>')
+        + '</div>'
+        + '<h4 style="font-size:12px; margin:12px 0 4px; color:var(--text-soft);">Top 5 Lane Line Labelers</h4>'
+        + '<div style="display:flex; flex-direction:column; gap:4px; font-size:12px;">'
+          + ([...laneLabMap.entries()].sort((a,b)=>b[1]-a[1]).slice(0,5).map(([l,c])=>'<div style="display:flex; justify-content:space-between; padding:3px 0; border-bottom:1px solid var(--border-light);"><span style="text-overflow:ellipsis; overflow:hidden; white-space:nowrap; max-width:220px;">' + esc(l) + '</span><b style="color:#ed9a35;">' + c.toLocaleString() + '</b></div>').join('') || '<span class="ux-note">No Lane Line labelers</span>')
+        + '</div>'
+      + '</div>'
+    + '</div>'
+
+    // SECTION 3: Attribute & Quality Analysis
+    + '<div class="ux-panel" style="margin-top:20px;">'
+      + '<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:14px;">'
+        + '<div>'
+          + '<h3 style="margin:0;">⭐ Attribute & Verified Quality Analysis</h3>'
+          + '<p style="margin:2px 0 0;">Quality accuracy metrics derived strictly from verified assessment records in the Export tab.</p>'
+        + '</div>'
+        + '<div class="q-badge" style="background:rgba(16,185,129,0.12); color:var(--success); border:1px solid rgba(16,185,129,0.3); font-size:11px; padding:4px 10px;">'
+          + 'Verified Records Only · No raw volume proxy'
+        + '</div>'
+      + '</div>'
+
+      // Quality KPI Metrics Grid
+      + '<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px; margin-bottom:16px;">'
+        + '<div style="background:var(--bg-2); padding:12px; border-radius:10px; border:1px solid var(--border);"><span class="ux-note">Total Assessed Tasks</span><div style="font-size:20px; font-weight:700; color:var(--primary); margin-top:2px;">' + qAssessments.toLocaleString() + '</div></div>'
+        + '<div style="background:var(--bg-2); padding:12px; border-radius:10px; border:1px solid var(--border);"><span class="ux-note">Verified Total Accuracy</span><div style="font-size:20px; font-weight:700; color:var(--success); margin-top:2px;">' + (typeof window.qFmt === 'function' ? window.qFmt(avgTotAcc) : (avgTotAcc ? (avgTotAcc*100).toFixed(1)+'%' : '—')) + '</div></div>'
+        + '<div style="background:var(--bg-2); padding:12px; border-radius:10px; border:1px solid var(--border);"><span class="ux-note">Attribute Accuracy</span><div style="font-size:20px; font-weight:700; color:var(--accent); margin-top:2px;">' + (typeof window.qFmt === 'function' ? window.qFmt(avgAttAcc) : (avgAttAcc ? (avgAttAcc*100).toFixed(1)+'%' : '—')) + '</div></div>'
+        + '<div style="background:var(--bg-2); padding:12px; border-radius:10px; border:1px solid var(--border);"><span class="ux-note">TVA F1 Score</span><div style="font-size:20px; font-weight:700; color:#df8b24; margin-top:2px;">' + (typeof window.qFmt === 'function' ? window.qFmt(avgTva) : (avgTva ? (avgTva*100).toFixed(1)+'%' : '—')) + '</div></div>'
+        + '<div style="background:var(--bg-2); padding:12px; border-radius:10px; border:1px solid var(--border);"><span class="ux-note">Avg Artifacts</span><div style="font-size:20px; font-weight:700; color:var(--danger); margin-top:2px;">' + avgArt + '</div></div>'
+      + '</div>'
+    + '</div>'
+
+    // Charts: Modality Trends & Shift Share
+    + '<div class="ux-panels" style="margin-top:20px;">'
+      + '<section class="ux-panel">'
+        + '<div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:12px;">'
+          + '<div><h3>Daily Submission Area Trend</h3><p>Select category tab below to filter trend.</p></div>'
+          + '<div class="an-chart-cat-tabs" id="anChartCatTabs">'
+            + [
+              {key:'all',label:'All Stages (Total)',color:'#0d9488'},
+              {key:'lidarFP',label:'Lidar FP',color:'#0d9488'},
+              {key:'lidarQA',label:'Lidar QA',color:'#15b8a6'},
+              {key:'laneFP',label:'Lane Line FP',color:'#ed9a35'},
+              {key:'laneQA',label:'Lane Line QA',color:'#e9689e'}
+            ].map(t=>'<button class="an-chart-tab '+(t.key===(analysisFilters.chartCategory||'all')?'active':'')+'" style="--tab-color:'+t.color+'" data-tab-cat="'+t.key+'">'+t.label+'</button>').join('')
+          + '</div>'
+        + '</div>'
+        + '<div id="anLine" class="an-line"></div>'
+      + '</section>'
+      + '<section class="ux-panel">'
+        + '<h3>Shift Submission Distribution</h3>'
+        + '<p>Share of ' + a.selected.length.toLocaleString() + ' filtered submissions.</p>'
+        + '<div id="anDonut" class="an-donut"></div>'
+        + '<div id="anLegend" class="an-legend"></div>'
+      + '</section>'
+    + '</div>'
+  + '</div>';
+
+  bindHeaderControls(analysis, 'an');
+  const slicerContainer = analysis.querySelector('#anSlicers');
+  if (slicerContainer) slicerContainer.appendChild(createListSlicers());
+
+  // Category card filter click
+  analysis.querySelectorAll('.an-cat-card[data-cat]').forEach(card => {
+    const cat = card.dataset.cat;
+    card.onclick = () => {
+      analysisFilters.category = analysisFilters.category === cat ? '' : cat;
+      renderAnalysis();
+    };
+  });
+
+  // Chart category tabs
+  analysis.querySelectorAll('[data-tab-cat]').forEach(btn => {
+    btn.onclick = () => {
+      analysisFilters.chartCategory = btn.dataset.tabCat;
+      renderAnalysis();
+    };
+  });
+
+  // Render SVG Area Line chart
+  const palette = ['#0d9488', '#15b8a6', '#ed9a35', '#e9689e', '#459ce8', '#9ca53c', '#b77bdb', '#7689a3'];
+  if (!a.selected.length) {
+    $('anLine').innerHTML = '<div class="ux-empty">No submissions match these filters.</div>';
+    $('anDonut').innerHTML = '<div class="ux-empty">No shift distribution available.</div>';
+    return;
   }
-  svg+='<polyline fill="none" stroke="'+strokeColor+'" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" points="'+chartPoints.map((p,i)=>x(i)+','+y(p[1])).join(' ')+'"/>';
-  chartPoints.forEach(([d,c],i)=>{svg+='<circle tabindex="0" role="img" aria-label="'+d+': '+c+' submissions" cx="'+x(i)+'" cy="'+y(c)+'" r="4.5" fill="'+strokeColor+'" stroke="var(--bg-3)" stroke-width="1.5"><title>'+d+' ('+chartCat+'): '+c.toLocaleString()+' submissions</title></circle>';if(i===0||i===chartPoints.length-1||(chartPoints.length>3&&i===Math.floor(chartPoints.length/2)))svg+='<text x="'+x(i)+'" y="'+(H-12)+'" text-anchor="'+(i===0?'start':i===chartPoints.length-1?'end':'middle')+'">'+d+'</text>';});$('anLine').innerHTML=svg+'</svg>';
- }
- let offset=0;const circumference=2*Math.PI*70;let ring='<svg viewBox="0 0 200 200" role="group" aria-label="Shift submission share donut chart"><circle cx="100" cy="100" r="70" fill="none" stroke="var(--border)" stroke-width="26"/>';
- a.shifts.forEach(([s,c],i)=>{const length=c/a.selected.length*circumference;ring+='<circle tabindex="0" role="img" aria-label="'+esc(s)+': '+c+' submissions, '+(c/a.selected.length*100).toFixed(1)+' percent" cx="100" cy="100" r="70" fill="none" stroke="'+palette[i%palette.length]+'" stroke-width="26" stroke-dasharray="'+length+' '+(circumference-length)+'" stroke-dashoffset="'+(-offset)+'" transform="rotate(-90 100 100)"><title>'+esc(s)+' · '+c.toLocaleString()+' · '+(c/a.selected.length*100).toFixed(1)+'%</title></circle>';offset+=length;});
- $('anDonut').innerHTML=ring+'<text x="100" y="99" text-anchor="middle" class="an-total">'+a.selected.length.toLocaleString()+'</text><text x="100" y="120" text-anchor="middle">Submissions</text></svg>';
- $('anLegend').innerHTML=a.shifts.map(([s,c],i)=>'<div><span style="background:'+palette[i%palette.length]+'" class="an-dot"></span><span>'+esc(s)+'</span><b>'+c.toLocaleString()+'</b><span>'+(c/a.selected.length*100).toFixed(1)+'%</span></div>').join('');
- addAnalysisCharts(a);
+
+  const chartCat = analysisFilters.chartCategory || 'all';
+  const catColorMap = { all: '#0d9488', lidarFP: '#0d9488', lidarQA: '#15b8a6', laneFP: '#ed9a35', laneQA: '#e9689e' };
+  const strokeColor = catColorMap[chartCat] || '#0d9488';
+  let catRows = a.selected;
+  if (chartCat !== 'all') {
+    const mi = hdrs.findIndex(h => h.toLowerCase() === 'modality');
+    const pi = hdrs.findIndex(h => h.toLowerCase() === 'pass');
+    catRows = a.selected.filter(r => {
+      const mod = mi < 0 ? '' : String(r[mi] || '').toLowerCase().replace(/[\s_-]+/g, '');
+      const pass = pi < 0 ? '' : String(r[pi] || '').trim().toUpperCase();
+      const prefix = mod === 'lidar' ? 'lidar' : (mod === 'laneline' || mod === 'lane') ? 'lane' : '';
+      return (prefix + pass) === chartCat;
+    });
+  }
+
+  const catDates = new Map();
+  catRows.forEach(r => { const d = rDate(r); if (d) catDates.set(d, (catDates.get(d) || 0) + 1); });
+  const chartPoints = a.points.map(([d]) => [d, catDates.get(d) || 0]);
+
+  const W = 760, H = 260, L = 55, R = 20, T = 20, B = 45;
+  const max = Math.max(1, ...chartPoints.map(p => p[1]));
+  const x = i => L + (chartPoints.length === 1 ? (W - L - R) / 2 : (i / (chartPoints.length - 1)) * (W - L - R));
+  const y = v => H - B - (v / max) * (H - T - B);
+
+  let svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="group" aria-label="Daily submission area chart">';
+  svg += '<defs><linearGradient id="anAreaGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="' + strokeColor + '" stop-opacity="0.38"/><stop offset="100%" stop-color="' + strokeColor + '" stop-opacity="0.02"/></linearGradient></defs>';
+  for (let i = 0; i < 5; i++) {
+    const value = (max * i) / 4, yy = y(value);
+    svg += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + yy + '" y2="' + yy + '" stroke="var(--border)" stroke-dasharray="3 3"/><text x="' + (L - 9) + '" y="' + (yy + 4) + '" text-anchor="end">' + Number(value.toFixed(1)).toLocaleString() + '</text>';
+  }
+  if (chartPoints.length > 1) {
+    const polyPoints = [L + ',' + (H - B), ...chartPoints.map((p, i) => x(i) + ',' + y(p[1])), (chartPoints.length === 1 ? L : x(chartPoints.length - 1)) + ',' + (H - B)].join(' ');
+    svg += '<polygon fill="url(#anAreaGrad)" points="' + polyPoints + '"/>';
+  }
+  svg += '<polyline fill="none" stroke="' + strokeColor + '" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" points="' + chartPoints.map((p, i) => x(i) + ',' + y(p[1])).join(' ') + '"/>';
+  chartPoints.forEach(([d, c], i) => {
+    svg += '<circle tabindex="0" role="img" cx="' + x(i) + '" cy="' + y(c) + '" r="4.5" fill="' + strokeColor + '" stroke="var(--bg-3)" stroke-width="1.5"><title>' + d + ' (' + chartCat + '): ' + c.toLocaleString() + ' submissions</title></circle>';
+    if (i === 0 || i === chartPoints.length - 1 || (chartPoints.length > 3 && i === Math.floor(chartPoints.length / 2))) {
+      svg += '<text x="' + x(i) + '" y="' + (H - 12) + '" text-anchor="' + (i === 0 ? 'start' : i === chartPoints.length - 1 ? 'end' : 'middle') + '">' + d + '</text>';
+    }
+  });
+  $('anLine').innerHTML = svg + '</svg>';
+
+  // Render Donut
+  let offset = 0;
+  const circumference = 2 * Math.PI * 70;
+  let ring = '<svg viewBox="0 0 200 200" role="group" aria-label="Shift submission share donut chart"><circle cx="100" cy="100" r="70" fill="none" stroke="var(--border)" stroke-width="26"/>';
+  a.shifts.forEach(([s, c], i) => {
+    const length = (c / a.selected.length) * circumference;
+    ring += '<circle tabindex="0" role="img" cx="100" cy="100" r="70" fill="none" stroke="' + palette[i % palette.length] + '" stroke-width="26" stroke-dasharray="' + length + ' ' + (circumference - length) + '" stroke-dashoffset="' + (-offset) + '" transform="rotate(-90 100 100)"><title>' + esc(s) + ' · ' + c.toLocaleString() + ' · ' + ((c / a.selected.length) * 100).toFixed(1) + '%</title></circle>';
+    offset += length;
+  });
+  $('anDonut').innerHTML = ring + '<text x="100" y="99" text-anchor="middle" class="an-total">' + a.selected.length.toLocaleString() + '</text><text x="100" y="120" text-anchor="middle">Submissions</text></svg>';
+  $('anLegend').innerHTML = a.shifts.map(([s, c], i) => '<div><span style="background:' + palette[i % palette.length] + '" class="an-dot"></span><span>' + esc(s) + '</span><b>' + c.toLocaleString() + '</b><span>' + ((c / a.selected.length) * 100).toFixed(1) + '%</span></div>').join('');
 }
 
 /* Named local filter bookmarks, isolated by signed-in account. */
@@ -949,27 +1677,403 @@ function performanceData(rows,filters){
  return {columns,tasks,people:[...map.values()].sort((a,b)=>b.total-a.total||a.name.localeCompare(b.name)),invalid:tasks.filter(t=>t.objects===null).length};
 }
 function renderPerformance(){
- const page=$('uxPerformance');if(!page||page.hidden)return;
- const data=performanceData(rowsInView(),perfFilters);const selected=data.people.find(p=>p.person===perfFilters.person);const tasks=perfFilters.person?data.tasks.filter(t=>t.person===perfFilters.person):data.tasks;
- const pageSize=25,totalPages=Math.max(1,Math.ceil(tasks.length/pageSize));perfFilters.page=Math.min(perfFilters.page,totalPages-1);const visible=tasks.slice(perfFilters.page*pageSize,(perfFilters.page+1)*pageSize);
- page.innerHTML='<div class="ux-overview"><div class="ux-heading"><div><div class="ux-eyebrow">Objects analysis · task tracking</div><h2>Performance per Labelers</h2><p>Ranked by Object Count. One submission row = one task entry.</p></div>'+renderHeaderControlsHTML('perf')+'</div><div id="perfSlicers"></div><div class="ux-panel perf-controls"><label>From<input id="perfFrom" type="date"></label><label>To<input id="perfTo" type="date"></label><label>Category<select id="perfCategory"><option value="">All categories</option><option value="lidar FP">Lidar FP</option><option value="lidar QA">Lidar QA</option><option value="laneline FP">Lane Line FP</option><option value="laneline QA">Lane Line QA</option></select></label><label>Search<input id="perfQuery" placeholder="Labeler, QTC, shift or task ID"></label><button class="btn btn-c" id="perfApply">Apply</button><button class="btn" id="perfReset">Reset page filters</button></div><div class="ux-grid an-metrics" style="margin:20px 0">'+[['Total Objects',data.tasks.reduce((n,t)=>n+(t.objects??0),0)],['Labelers',data.people.length],['Task entries',data.tasks.length],['Largest task',data.tasks.find(t=>t.objects!==null)?.objects??'—']].map(([name,v])=>'<div class="ux-panel"><span class="ux-label">'+name+'</span><b class="an-value">'+(typeof v==='number'?v.toLocaleString():v)+'</b></div>').join('')+'</div><p class="an-context">Uses current Shift / Floor / QTC / Email filters. '+data.invalid+' entries have missing or invalid Object Count and are excluded from object totals. Labelers use National Id; missing IDs are grouped by exact normalized name.</p><section class="ux-panel"><h3>Labeler ranking · total objects ↓</h3><p>Select a labeler to inspect their largest tasks below.</p><div class="perf-table"><table><thead><tr><th data-perf-tip="rank">Rank</th><th data-perf-tip="labeler">Labeler</th><th data-perf-tip="totalObjects">Total Objects</th><th data-perf-tip="tasks">Tasks</th><th data-perf-tip="largestTask">Largest task</th><th data-perf-tip="shifts">Shifts</th><th data-perf-tip="qtcs">QTCs</th></tr></thead><tbody>'+data.people.map((p,i)=>'<tr><td>'+(i+1)+'</td><td><button class="perf-person" data-person-index="'+i+'">'+esc(p.name)+'</button>'+(p.fallback?'<small class="ux-note"> · matched by name</small>':'')+'</td><td>'+p.total.toLocaleString()+'</td><td>'+p.count.toLocaleString()+'</td><td>'+(p.largest===null?'—':p.largest.toLocaleString())+'</td><td>'+esc([...p.shifts].join(', '))+'</td><td>'+esc([...p.qtcs].join(', '))+'</td></tr>').join('')+'</tbody></table>'+(data.people.length?'':'<p class="ux-empty">No labelers match these filters.</p>')+'</div></section><section class="ux-panel" style="margin-top:20px" id="perfTasks"><div class="ux-heading"><div><h3>Largest tasks ↓'+(perfFilters.person?' · '+esc(selected?.name||'Selected labeler'):'')+'</h3><p>Shift, submitting QTC and day for each task.</p></div><button class="btn" id="perfAll">Show all labelers</button></div><div class="perf-table"><table><thead><tr><th>Labeler</th><th>Objects</th><th>Shift</th><th>Submitting QTC</th><th>Day</th><th>Modality</th><th>Pass</th><th>Task ID</th><th>Task</th></tr></thead><tbody>'+visible.map(t=>'<tr><td>'+esc(t.name)+'</td><td><b>'+(t.objects===null?'—':t.objects.toLocaleString())+'</b></td><td>'+esc(t.shift)+'</td><td>'+esc(t.qtc)+'</td><td>'+esc(t.date||'Unknown')+'</td><td>'+esc(t.mod)+'</td><td>'+esc(t.pass)+'</td><td>'+esc(t.id)+'</td><td>'+(/^https?:\/\//i.test(t.link)?'<a href="'+esc(t.link)+'" target="_blank" rel="noopener noreferrer">Open ↗</a>':'—')+'</td></tr>').join('')+'</tbody></table>'+(tasks.length?'':'<p class="ux-empty">No tasks match this selection.</p>')+'</div><div class="perf-pagination"><button class="btn" id="perfPrev">Previous</button><span>'+ (perfFilters.page+1)+' / '+totalPages+' · '+tasks.length.toLocaleString()+' task entries</span><button class="btn" id="perfNext">Next</button></div></section></div>';
- $('perfSlicers').appendChild(createListSlicers());$('perfFrom').value=perfFilters.from;$('perfTo').value=perfFilters.to;$('perfCategory').value=perfFilters.category;$('perfQuery').value=perfFilters.query;
- $('perfApply').onclick=()=>{const from=$('perfFrom').value,to=$('perfTo').value;if(from&&to&&from>to){showToast('Choose a valid date range.');return;}Object.assign(perfFilters,{from,to,day:from||to?'':perfFilters.day,week:from||to?'':perfFilters.week,category:$('perfCategory').value,query:$('perfQuery').value.trim(),person:'',page:0});renderPerformance();};$('perfQuery').onkeydown=e=>{if(e.key==='Enter')$('perfApply').click();};
- $('perfReset').onclick=()=>{Object.assign(perfFilters,{from:'',to:'',day:'',week:'',category:'',query:'',person:'',page:0});renderPerformance();};bindHeaderControls(page,'perf');
+  const page = $('uxPerformance');
+  if(!page || page.hidden) return;
 
- page.querySelectorAll('th[data-perf-tip]').forEach(th => {
-  const key = th.dataset.perfTip;
-  const info = PERF_HEADER_EXPLANATIONS[key];
-  if (info) {
-   MeegTooltip.attach(th, () => ({
-    title: info.title,
-    badge: 'Column Info',
-    desc: info.desc
-   }));
+  const rows = rowsInView();
+  const si = hdrs.findIndex(h => h.toLowerCase() === 'shift');
+  const fi = hdrs.findIndex(h => ['floor', 'unit'].includes(h.toLowerCase()));
+  const qcI = hdrs.findIndex(h => h.toLowerCase() === 'qtc name');
+  const li = hdrs.findIndex(h => h.toLowerCase() === 'labeler name');
+  const ni = hdrs.findIndex(h => h.toLowerCase() === 'national id');
+  const pcI = hdrs.findIndex(h => ['pc no', 'pc'].includes(h.toLowerCase()));
+  const mi = hdrs.findIndex(h => h.toLowerCase() === 'modality');
+  const pi = hdrs.findIndex(h => h.toLowerCase() === 'pass');
+  const ti = hdrs.findIndex(h => ['task id', 'id'].includes(h.toLowerCase()));
+
+  // Aggregate people
+  const peopleMap = new Map();
+  rows.forEach(r => {
+    const rawName = li >= 0 ? String(r[li] || '').trim() : '';
+    const rawId = ni >= 0 ? String(r[ni] || '').trim() : '';
+    const pc = pcI >= 0 ? String(r[pcI] || '').trim() : '';
+    const name = rawName || (rawId ? ('Labeler ' + rawId.slice(-4)) : 'Unknown Labeler');
+    const key = rawName ? rawName.toLowerCase() : rawId;
+    if (!key) return;
+
+    if (!peopleMap.has(key)) {
+      peopleMap.set(key, {
+        key,
+        name,
+        rawId,
+        maskedId: maskEmployeeId(rawId, pc || rawName),
+        shifts: new Set(),
+        units: new Set(),
+        floors: new Set(),
+        qtcs: new Set(),
+        dates: new Set(),
+        tasks: [],
+        total: 0,
+        lidarFP: 0,
+        lidarQA: 0,
+        laneFP: 0,
+        laneQA: 0
+      });
+    }
+
+    const p = peopleMap.get(key);
+    p.total++;
+    if (si >= 0 && r[si]) p.shifts.add(r[si]);
+    if (fi >= 0 && r[fi]) { p.units.add(r[fi]); p.floors.add(deriveFloor(r[fi])); }
+    if (qcI >= 0 && r[qcI]) p.qtcs.add(r[qcI]);
+    const d = rDate(r);
+    if (d) p.dates.add(d);
+
+    const mod = mi < 0 ? '' : String(r[mi] || '').toLowerCase().replace(/[\s_-]+/g, '');
+    const pass = pi < 0 ? '' : String(r[pi] || '').trim().toUpperCase();
+    const prefix = mod === 'lidar' ? 'lidar' : (mod === 'laneline' || mod === 'lane') ? 'lane' : '';
+    if (prefix && (pass === 'FP' || pass === 'QA')) {
+      const cat = prefix + pass;
+      if (cat === 'lidarFP') p.lidarFP++;
+      else if (cat === 'lidarQA') p.lidarQA++;
+      else if (cat === 'laneFP') p.laneFP++;
+      else if (cat === 'laneQA') p.laneQA++;
+    }
+
+    p.tasks.push({
+      id: ti >= 0 ? r[ti] : '—',
+      date: d || 'Unknown',
+      shift: si >= 0 ? r[si] : '—',
+      unit: fi >= 0 ? r[fi] : '—',
+      qtc: qcI >= 0 ? r[qcI] : '—',
+      mod: r[mi] || '—',
+      pass: r[pi] || '—'
+    });
+  });
+
+  const people = [...peopleMap.values()].map(p => {
+    const activeDays = Math.max(1, p.dates.size);
+    const avgPerDay = (p.total / activeDays).toFixed(1);
+    const avgPerHour = (p.total / (activeDays * 8)).toFixed(1);
+    const qData = getLabelerQuality(p.name, '');
+    const verifiedScore = qData && qData.totalAccuracy !== null ? qData.totalAccuracy : null;
+    const targetAch = targetSimState.dailyTarget > 0 ? Math.round((Number(avgPerDay) / targetSimState.dailyTarget) * 100) : null;
+
+    return {
+      ...p,
+      activeDays,
+      avgPerDay: Number(avgPerDay) || 0,
+      avgPerDayStr: avgPerDay,
+      avgPerHour: Number(avgPerHour) || 0,
+      avgPerHourStr: avgPerHour,
+      verifiedScore,
+      verifiedScoreStr: verifiedScore !== null ? (typeof window.qFmt === 'function' ? window.qFmt(verifiedScore) : (verifiedScore*100).toFixed(1)+'%') : '—',
+      targetAch,
+      targetAchStr: targetAch !== null ? targetAch + '%' : '—'
+    };
+  });
+
+  // Calculate 10 KPI Cards
+  const totalPeople = people.length;
+  const totalSubmits = rows.length;
+  const avgSubmit = totalPeople ? (totalSubmits / totalPeople).toFixed(1) : '0';
+
+  const counts = people.map(p => p.total).sort((a,b) => a - b);
+  const medianSubmit = counts.length ? (counts.length % 2 === 0 ? Math.round((counts[counts.length/2 - 1] + counts[counts.length/2]) / 2) : counts[Math.floor(counts.length/2)]) : 0;
+  const maxSubmit = counts.length ? counts[counts.length - 1] : 0;
+  const minSubmit = counts.length ? counts[0] : 0;
+
+  const lidarFPTot = people.reduce((s, p) => s + p.lidarFP, 0);
+  const lidarQATot = people.reduce((s, p) => s + p.lidarQA, 0);
+  const laneFPTot = people.reduce((s, p) => s + p.laneFP, 0);
+  const laneQATot = people.reduce((s, p) => s + p.laneQA, 0);
+
+  // Filter people by query
+  const qFilter = (perfFilters.query || '').toLowerCase().trim();
+  let filteredPeople = people.filter(p => {
+    if (perfFilters.category) {
+      if (perfFilters.category === 'lidarFP' && p.lidarFP === 0) return false;
+      if (perfFilters.category === 'lidarQA' && p.lidarQA === 0) return false;
+      if (perfFilters.category === 'laneFP' && p.laneFP === 0) return false;
+      if (perfFilters.category === 'laneQA' && p.laneQA === 0) return false;
+    }
+    if (qFilter) {
+      const mName = p.name.toLowerCase().includes(qFilter);
+      const mId = p.maskedId.toLowerCase().includes(qFilter);
+      const mShift = [...p.shifts].some(s => s.toLowerCase().includes(qFilter));
+      const mQtc = [...p.qtcs].some(q => q.toLowerCase().includes(qFilter));
+      if (!mName && !mId && !mShift && !mQtc) return false;
+    }
+    return true;
+  });
+
+  // Sort people
+  const sortCol = perfFilters.sortCol || 'total';
+  const sortAsc = !!perfFilters.sortAsc;
+  filteredPeople.sort((a, b) => {
+    let va = a[sortCol], vb = b[sortCol];
+    if (typeof va === 'string') return sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
+    va = Number(va) || 0; vb = Number(vb) || 0;
+    return sortAsc ? (va - vb) : (vb - va);
+  });
+
+  // Pagination
+  const pageSize = 25;
+  const totalPages = Math.max(1, Math.ceil(filteredPeople.length / pageSize));
+  perfFilters.page = Math.min(perfFilters.page || 0, totalPages - 1);
+  const visiblePeople = filteredPeople.slice(perfFilters.page * pageSize, (perfFilters.page + 1) * pageSize);
+
+  // Target Simulator Calculations
+  targetSimState.workforceSize = targetSimState.workforceSize || Math.max(1, totalPeople);
+  const simExpected = targetSimState.workforceSize * targetSimState.dailyTarget;
+  const simActual = totalSubmits;
+  const simAchPct = simExpected > 0 ? ((simActual / simExpected) * 100).toFixed(1) : 0;
+  const simRequired = Math.max(0, simExpected - simActual);
+  const simProjected = Math.round((simActual / Math.max(1, 4)) * targetSimState.workHours);
+  const simWorkforceReq = targetSimState.dailyTarget > 0 ? Math.ceil(simRequired / targetSimState.dailyTarget) : 0;
+
+  // 10 KPI Cards
+  const kpi10 = [
+    { title: 'Total Active Labelers', val: totalPeople.toLocaleString(), sub: 'Distinct contributors', tone: '#0a9d8c' },
+    { title: 'Total Submissions', val: totalSubmits.toLocaleString(), sub: 'Total task volume', tone: '#0d9488' },
+    { title: 'Average / Labeler', val: avgSubmit, sub: 'Mean throughput', tone: '#3b82f6' },
+    { title: 'Median Submissions', val: medianSubmit.toLocaleString(), sub: 'Median throughput', tone: '#8b5cf6' },
+    { title: 'Highest Count', val: maxSubmit.toLocaleString(), sub: 'Top individual submit', tone: '#10b981' },
+    { title: 'Lowest Count', val: minSubmit.toLocaleString(), sub: 'Minimum individual submit', tone: '#f59e0b' },
+    { title: 'Lidar FP Total', val: lidarFPTot.toLocaleString(), sub: 'Lidar first pass volume', tone: '#0d9488' },
+    { title: 'Lidar QA Total', val: lidarQATot.toLocaleString(), sub: 'Lidar QA volume', tone: '#14b8a6' },
+    { title: 'Lane Line FP Total', val: laneFPTot.toLocaleString(), sub: 'Lane Line first pass', tone: '#ed9a35' },
+    { title: 'Lane Line QA Total', val: laneQATot.toLocaleString(), sub: 'Lane Line QA volume', tone: '#ec4899' }
+  ];
+
+  page.innerHTML = '<div class="ux-overview">'
+    + '<div class="ux-heading">'
+      + '<div>'
+        + '<div class="ux-eyebrow">Workforce Performance · Capacity & Ranking</div>'
+        + '<h2>Performance per Labelers</h2>'
+        + '<p>Comprehensive individual metrics, target achievement, capacity forecasting, and fair evaluation.</p>'
+      + '</div>'
+      + renderHeaderControlsHTML('perf')
+    + '</div>'
+
+    + '<div id="perfSlicers"></div>'
+
+    // Controls
+    + '<div class="ux-panel perf-controls" style="margin-top:14px;">'
+      + '<label>Search Labeler / ID / Shift / QTC<input id="perfQuery" placeholder="Type labeler name, masked ID, QTC…" value="' + esc(perfFilters.query || '') + '"></label>'
+      + '<label>Category Filter<select id="perfCategory"><option value="">All Categories</option><option value="lidarFP" ' + (perfFilters.category==='lidarFP'?'selected':'') + '>Lidar FP</option><option value="lidarQA" ' + (perfFilters.category==='lidarQA'?'selected':'') + '>Lidar QA</option><option value="laneFP" ' + (perfFilters.category==='laneFP'?'selected':'') + '>Lane Line FP</option><option value="laneQA" ' + (perfFilters.category==='laneQA'?'selected':'') + '>Lane Line QA</option></select></label>'
+      + '<div style="margin-left:auto; display:flex; gap:8px; align-items:flex-end;">'
+        + '<button class="btn btn-c" id="perfExportCSV">↓ Export CSV (Masked IDs)</button>'
+        + '<button class="btn" id="perfReset">Reset Filters</button>'
+      + '</div>'
+    + '</div>'
+
+    // 10 KPI Grid
+    + '<div class="ux-grid-10" style="margin-top:16px;">'
+      + kpi10.map(k => '<div class="kpi-mini-card" style="--tone:' + k.tone + '">'
+        + '<div class="kpi-title"><span>' + esc(k.title) + '</span><span style="color:' + k.tone + '">●</span></div>'
+        + '<div class="kpi-val">' + k.val + '</div>'
+        + '<div class="kpi-sub">' + esc(k.sub) + '</div>'
+      + '</div>').join('')
+    + '</div>'
+
+    // TARGET SIMULATOR & CAPACITY FORECASTER
+    + '<div class="target-sim-box">'
+      + '<div class="sim-header">'
+        + '<div>'
+          + '<h3 style="margin:0; font-size:16px; font-weight:700;">🎯 Target Simulator & Capacity Forecaster</h3>'
+          + '<p style="margin:3px 0 0; font-size:12px; color:var(--text-soft);">Model scenario targets and estimate workforce requirements. Forecast calculations are clearly distinguished from actual observations.</p>'
+        + '</div>'
+        + '<span class="sim-forecast-badge">MODEL SIMULATION · FORECAST ONLY</span>'
+      + '</div>'
+      + '<div class="sim-inputs-grid">'
+        + '<label>Daily Target (tasks/person)<input type="number" id="simDaily" value="' + targetSimState.dailyTarget + '" min="1" step="5"></label>'
+        + '<label>Shift Target (tasks/shift)<input type="number" id="simShift" value="' + targetSimState.shiftTarget + '" min="1" step="5"></label>'
+        + '<label>Modality Focus<select id="simMod"><option value="all">All Modalities</option><option value="lidar">Lidar</option><option value="lane">Lane Line</option></select></label>'
+        + '<label>Working Hours<input type="number" id="simHours" value="' + targetSimState.workHours + '" min="1" max="24" step="1"></label>'
+        + '<label>Expected Workforce Size<input type="number" id="simWorkforce" value="' + targetSimState.workforceSize + '" min="1" step="5"></label>'
+      + '</div>'
+      + '<div class="sim-results-grid">'
+        + '<div class="sim-res-card"><span>Expected Submissions</span><strong>' + simExpected.toLocaleString() + '</strong></div>'
+        + '<div class="sim-res-card"><span>Current Achievement</span><strong style="color:' + (simAchPct >= 100 ? 'var(--success)' : '#df8b24') + ';">' + simAchPct + '%</strong></div>'
+        + '<div class="sim-res-card"><span>Required Submissions</span><strong style="color:var(--danger);">' + simRequired.toLocaleString() + '</strong></div>'
+        + '<div class="sim-res-card"><span>Projected End-of-Shift</span><strong style="color:var(--accent);">' + simProjected.toLocaleString() + '</strong></div>'
+        + '<div class="sim-res-card"><span>Addl. Workforce Needed</span><strong>' + simWorkforceReq.toLocaleString() + ' people</strong></div>'
+      + '</div>'
+    + '</div>'
+
+    // Fair Ranking Notice
+    + '<div class="ux-panel" style="margin-top:20px; padding:12px 18px; border-left:4px solid #f59e0b; background:rgba(245,158,11,0.06); font-size:12px; line-height:1.6; color:var(--text);">'
+      + '<b>⚖️ Fair Assessment & Compliance Notice:</b> Do not use raw submission counts alone for punitive employee rankings; account for task difficulty, verified quality, shift length, and data completeness. National IDs are permanently masked (<code>EMP-***XXXX</code>) across all tables and exports.'
+    + '</div>'
+
+    // MAIN LABELER TABLE
+    + '<section class="ux-panel" style="margin-top:20px;">'
+      + '<div class="ux-heading" style="margin-bottom:12px;">'
+        + '<div><h3>Labeler Performance Rankings (' + filteredPeople.length.toLocaleString() + ' labelers)</h3><p>Click any column header with ↕ to sort. Click labeler name to view detailed profile.</p></div>'
+        + '<span class="ux-note">Showing ' + (visiblePeople.length ? (perfFilters.page*pageSize+1) : 0) + ' – ' + Math.min((perfFilters.page+1)*pageSize, filteredPeople.length) + ' of ' + filteredPeople.length + ' labelers</span>'
+      + '</div>'
+      + '<div class="perf-table">'
+        + '<table>'
+          + '<thead><tr>'
+            + '<th style="width:40px;">Rank</th>'
+            + '<th data-sort="name">Labeler Name ↕</th>'
+            + '<th>Employee ID</th>'
+            + '<th>Shift(s)</th>'
+            + '<th>Floor</th>'
+            + '<th>QTC / Supervisor</th>'
+            + '<th data-sort="total" style="color:var(--primary);">Total Submit ↕</th>'
+            + '<th data-sort="lidarFP" style="color:#0d9488;">Lidar FP ↕</th>'
+            + '<th data-sort="lidarQA" style="color:#14b8a6;">Lidar QA ↕</th>'
+            + '<th data-sort="laneFP" style="color:#ed9a35;">Lane Line FP ↕</th>'
+            + '<th data-sort="laneQA" style="color:#ec4899;">Lane Line QA ↕</th>'
+            + '<th data-sort="activeDays">Active Days ↕</th>'
+            + '<th data-sort="avgPerDay">Avg / Day ↕</th>'
+            + '<th data-sort="avgPerHour">Avg / Hour ↕</th>'
+            + '<th>Verified Quality</th>'
+            + '<th>Target Ach. %</th>'
+          + '</tr></thead>'
+          + '<tbody>'
+            + visiblePeople.map((p, idx) => {
+              const rank = perfFilters.page * pageSize + idx + 1;
+              const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : ('#' + rank);
+              const tierClass = p.verifiedScore !== null ? (p.verifiedScore >= 0.95 ? 'tier-high' : p.verifiedScore >= 0.85 ? 'tier-mid' : 'tier-low') : '';
+              return '<tr>'
+                + '<td style="font-weight:700; color:var(--text-soft);">' + medal + '</td>'
+                + '<td><button class="perf-person" data-person-key="' + esc(p.key) + '" style="background:none; border:none; color:var(--primary); font-weight:700; cursor:pointer; text-decoration:underline;">' + esc(p.name) + '</button></td>'
+                + '<td><span class="q-badge" style="background:var(--bg-3); border:1px solid var(--border); font-family:var(--mono);">' + esc(p.maskedId) + '</span></td>'
+                + '<td>' + ([...p.shifts].slice(0,2).map(s=>'<span class="q-badge q-shift">' + esc(s) + '</span>').join('') || '—') + '</td>'
+                + '<td>' + ([...p.floors].join(', ') || 'Floor 01') + '</td>'
+                + '<td>' + ([...p.qtcs].slice(0,2).join(', ') || '—') + '</td>'
+                + '<td><strong style="color:var(--primary); font-size:14px;">' + p.total.toLocaleString() + '</strong></td>'
+                + '<td>' + p.lidarFP.toLocaleString() + '</td>'
+                + '<td>' + p.lidarQA.toLocaleString() + '</td>'
+                + '<td>' + p.laneFP.toLocaleString() + '</td>'
+                + '<td>' + p.laneQA.toLocaleString() + '</td>'
+                + '<td><b>' + p.activeDays + '</b></td>'
+                + '<td>' + p.avgPerDayStr + '</td>'
+                + '<td>' + p.avgPerHourStr + '</td>'
+                + '<td>' + (p.verifiedScore !== null ? '<span class="tier-badge ' + tierClass + '">' + p.verifiedScoreStr + '</span>' : '<span class="ux-note">—</span>') + '</td>'
+                + '<td><b style="color:' + (p.targetAch >= 100 ? 'var(--success)' : 'var(--text)') + ';">' + p.targetAchStr + '</b></td>'
+              + '</tr>';
+            }).join('')
+          + '</tbody>'
+        + '</table>'
+        + (!filteredPeople.length ? '<div class="ux-empty">No labelers match your filters.</div>' : '')
+      + '</div>'
+      + '<div class="perf-pagination" style="display:flex; justify-content:space-between; align-items:center; margin-top:14px;">'
+        + '<button class="btn" id="perfPrev" ' + (perfFilters.page === 0 ? 'disabled' : '') + '>Previous</button>'
+        + '<span class="ux-note">Page ' + (perfFilters.page + 1) + ' of ' + totalPages + '</span>'
+        + '<button class="btn" id="perfNext" ' + (perfFilters.page >= totalPages - 1 ? 'disabled' : '') + '>Next</button>'
+      + '</div>'
+    + '</section>'
+  + '</div>';
+
+  bindHeaderControls(page, 'perf');
+  const slicersEl = page.querySelector('#perfSlicers');
+  if (slicersEl) slicersEl.appendChild(createListSlicers());
+
+  // Search input
+  const qInput = page.querySelector('#perfQuery');
+  if (qInput) {
+    qInput.oninput = (e) => {
+      perfFilters.query = e.target.value;
+      perfFilters.page = 0;
+      renderPerformance();
+    };
   }
- });
- page.querySelectorAll('[data-person-index]').forEach(b=>b.onclick=()=>{perfFilters.person=data.people[Number(b.dataset.personIndex)].person;perfFilters.page=0;renderPerformance();$('perfTasks').scrollIntoView({behavior:reduced()?'instant':'smooth'});});
- $('perfAll').onclick=()=>{perfFilters.person='';perfFilters.page=0;renderPerformance();};$('perfPrev').disabled=perfFilters.page===0;$('perfNext').disabled=perfFilters.page>=totalPages-1;$('perfPrev').onclick=()=>{perfFilters.page--;renderPerformance();};$('perfNext').onclick=()=>{perfFilters.page++;renderPerformance();};
+
+  // Category select
+  const catSel = page.querySelector('#perfCategory');
+  if (catSel) {
+    catSel.onchange = (e) => {
+      perfFilters.category = e.target.value;
+      perfFilters.page = 0;
+      renderPerformance();
+    };
+  }
+
+  // Sorter clicks
+  page.querySelectorAll('th[data-sort]').forEach(th => {
+    th.style.cursor = 'pointer';
+    th.onclick = () => {
+      const col = th.dataset.sort;
+      if (perfFilters.sortCol === col) perfFilters.sortAsc = !perfFilters.sortAsc;
+      else { perfFilters.sortCol = col; perfFilters.sortAsc = false; }
+      renderPerformance();
+    };
+  });
+
+  // Simulator live bindings
+  const updateSim = () => {
+    targetSimState.dailyTarget = Number($('simDaily').value) || 50;
+    targetSimState.shiftTarget = Number($('simShift').value) || 25;
+    targetSimState.workHours = Number($('simHours').value) || 8;
+    targetSimState.workforceSize = Number($('simWorkforce').value) || totalPeople;
+    renderPerformance();
+  };
+  $('simDaily').onchange = updateSim;
+  $('simShift').onchange = updateSim;
+  $('simHours').onchange = updateSim;
+  $('simWorkforce').onchange = updateSim;
+
+  // Pagination buttons
+  $('perfPrev').onclick = () => { if (perfFilters.page > 0) { perfFilters.page--; renderPerformance(); } };
+  $('perfNext').onclick = () => { if (perfFilters.page < totalPages - 1) { perfFilters.page++; renderPerformance(); } };
+  $('perfReset').onclick = () => { perfFilters.query = ''; perfFilters.category = ''; perfFilters.page = 0; renderPerformance(); };
+
+  // Export CSV with masked IDs
+  $('perfExportCSV').onclick = () => {
+    const headers = ['Rank', 'Labeler Name', 'Employee ID (Masked)', 'Shifts', 'Floors', 'QTCs', 'Total Submits', 'Lidar FP', 'Lidar QA', 'Lane Line FP', 'Lane Line QA', 'Active Days', 'Avg / Day', 'Avg / Hour', 'Verified Quality', 'Target Ach %'];
+    const csvRows = filteredPeople.map((p, i) => [
+      i + 1,
+      p.name,
+      p.maskedId,
+      [...p.shifts].join('; '),
+      [...p.floors].join('; '),
+      [...p.qtcs].join('; '),
+      p.total,
+      p.lidarFP,
+      p.lidarQA,
+      p.laneFP,
+      p.laneQA,
+      p.activeDays,
+      p.avgPerDayStr,
+      p.avgPerHourStr,
+      p.verifiedScoreStr,
+      p.targetAchStr
+    ]);
+    const cell = v => '"' + String(v ?? '').replace(/^[=+@\-\t\r]/, "'$&").replace(/"/g, '""') + '"';
+    const csv = [headers, ...csvRows].map(r => r.map(cell).join(',')).join('\r\n');
+    downloadBlob(new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' }), 'MEEG_labelers_performance_' + cairoToday() + '.csv');
+    showToast('✓ Exported labelers performance with masked IDs');
+  };
+
+  // Labeler Profile Modal click
+  page.querySelectorAll('[data-person-key]').forEach(btn => {
+    btn.onclick = () => {
+      const k = btn.dataset.personKey;
+      const p = peopleMap.get(k);
+      if (!p) return;
+      const qData = getLabelerQuality(p.name, '');
+      const taskRows = p.tasks.map(t => [
+        t.id,
+        t.date,
+        t.shift,
+        t.unit,
+        t.qtc,
+        t.mod,
+        t.pass
+      ]);
+      openDrilldownModal({
+        title: p.name + ' · Detailed Profile',
+        subtitle: p.maskedId + ' · ' + p.total.toLocaleString() + ' total submissions across ' + p.activeDays + ' active days',
+        badge: qData ? 'Verified Quality: ' + (qData.totalAccuracy*100).toFixed(1)+'%' : 'Standard Contributor',
+        columns: ['Task ID', 'Date', 'Shift', 'Unit', 'QTC', 'Modality', 'Pass'],
+        rows: taskRows
+      });
+    };
+  });
 }
 
 function rankQcGroups(groups,category,lower){return groups.filter(g=>g.totals[category]>0).sort((a,b)=>(lower?a.totals[category]-b.totals[category]:b.totals[category]-a.totals[category])||a.name.localeCompare(b.name)).slice(0,15);}
@@ -1039,26 +2143,419 @@ function dailyQueueReport(rows,universe=rows){
  return {hasQueue:qi>=0,hasPass:pi>=0,hasNational:ni>=0,groups:[...groups.values()].sort((a,b)=>a.name.localeCompare(b.name)||a.mod.localeCompare(b.mod))};
 }
 function renderDailyReport(){
- const page=$('uxDaily');if(!page||page.hidden)return;
- if(!window._firstDataReady&&!hdrs.length){const error=$('mainContent')?.querySelector('.errbox');page.innerHTML='<div class="ux-overview"><div class="ux-heading"><h2>Daily Report</h2></div><div class="ux-panel"><h3>'+(error?'Data could not be loaded':'Waiting for source data')+'</h3><p>'+esc(error?error.textContent.replace('↻ Retry','').trim():'The report and slicer values will appear after the sheet finishes loading. You can choose a day from the calendar above.')+'</p><button class="btn btn-c" id="dailyRetry" style="margin-top:16px">↻ Retry data load</button></div></div>';$('dailyRetry').onclick=()=>loadData();return;}
-const report=dailyQueueReport(rowsInView(),rawRows);const days=[...selD].sort();
- page.innerHTML='<div class="ux-overview"><div class="ux-heading"><div><div class="ux-eyebrow">Queue activity · FP / QA</div><h2>Daily Report</h2><p>'+esc(days.length===1?days[0]:days.length?days[0]+' → '+days[days.length-1]:'All dates · choose a day from the shared date filter above')+'</p></div>'+renderHeaderControlsHTML('daily')+'</div><div id="dailyShift"></div><section class="ux-panel"><h3>Queue daily summary</h3><p>Unique Labelers use valid National Id, once per Queue + Modality + Pass. Queues with zero FP and QA submissions are hidden.</p><div class="perf-table daily-table"><table><thead><tr><th data-daily-tip="queue">Queue</th><th data-daily-tip="fpLabelers">Unique Labelers (FP)</th><th data-daily-tip="fpSubmits">Total Submit (FP)</th><th data-daily-tip="qaLabelers">Unique Labelers (QA)</th><th data-daily-tip="qaSubmits">Total Submit (QA)</th></tr></thead><tbody>'+report.groups.filter(g=>g.fp>0||g.qa>0).map(g=>'<tr><td>'+esc(g.name)+' <span class="daily-mod '+(g.mod==='Lidar'?'daily-lidar':'daily-lane')+'">('+esc(g.mod)+')</span></td><td>'+(report.hasNational?g.fpIds.size.toLocaleString():'—')+'</td><td>'+g.fp.toLocaleString()+'</td><td>'+(report.hasNational?g.qaIds.size.toLocaleString():'—')+'</td><td>'+g.qa.toLocaleString()+'</td></tr>').join('')+'</tbody></table>'+(!report.hasQueue||!report.hasPass?'<p class="ux-empty">Queue Name and Pass columns are required.</p>':report.groups.some(g=>g.fp>0||g.qa>0)?'':'<p class="ux-empty">No queue submissions match the current filters.</p>')+'</div><p class="an-context">'+report.groups.reduce((n,g)=>n+g.missing,0)+' FP/QA entries have missing or invalid National Id; included in submit totals, excluded from unique counts.</p></section></div>';
- const slicers=createListSlicers();[...slicers.children].slice(1).forEach(el=>el.remove());$('dailyShift').appendChild(slicers);bindHeaderControls(page,'daily');
+  const page = $('uxDaily');
+  if(!page || page.hidden) return;
 
- page.querySelectorAll('th[data-daily-tip]').forEach(th => {
-  const key = th.dataset.dailyTip;
-  const info = DAILY_HEADER_EXPLANATIONS[key];
-  if (info) {
-   MeegTooltip.attach(th, () => ({
-    title: info.title,
-    badge: 'Column Info',
-    desc: info.desc
-   }));
-  }
- });
+  const rows = rowsInView();
+  const cToday = cairoToday();
+  const dateA = dailyReportDateA || cToday;
+  const dateB = dailyReportDateB || _addDays(dateA, -1);
+
+  // SECTION A: Quality Analytics Aggregations
+  const qs = getQualityStore();
+  const qsEntries = Object.entries(qs);
+  let qTotal = 0, qSumTot = 0, qSumAtt = 0, qSumTva = 0, qSumArt = 0;
+  let tierHighCount = 0, tierMidCount = 0, tierLowCount = 0;
+  const qShiftMap = new Map();
+  const qQtcMap = new Map();
+  const qLabMap = new Map();
+
+  qsEntries.forEach(([aid, q]) => {
+    qTotal++;
+    const tot = typeof window.qNum === 'function' ? window.qNum(q.totalAccuracy) : parseFloat(q.totalAccuracy);
+    const att = typeof window.qNum === 'function' ? window.qNum(q.attribute) : parseFloat(q.attribute);
+    const tva = typeof window.qNum === 'function' ? window.qNum(q.tvaF1) : parseFloat(q.tvaF1);
+    const art = typeof window.qNum === 'function' ? window.qNum(q.artifacts) : parseFloat(q.artifacts);
+    if(tot !== null && !isNaN(tot)) {
+      qSumTot += tot;
+      if (tot >= 0.95) tierHighCount++;
+      else if (tot >= 0.85) tierMidCount++;
+      else tierLowCount++;
+    }
+    if(att !== null && !isNaN(att)) qSumAtt += att;
+    if(tva !== null && !isNaN(tva)) qSumTva += tva;
+    if(art !== null && !isNaN(art)) qSumArt += art;
+
+    const info = (window.idInfo && window.idInfo[aid]) || {};
+    const sh = info.shift || 'Overnight';
+    const qtc = info.qtc || 'Unassigned QTC';
+    const lab = info.name || q.email || 'Unassigned Labeler';
+
+    if(!qShiftMap.has(sh)) qShiftMap.set(sh, { count: 0, sum: 0 });
+    qShiftMap.get(sh).count++;
+    if(tot !== null && !isNaN(tot)) qShiftMap.get(sh).sum += tot;
+
+    if(!qQtcMap.has(qtc)) qQtcMap.set(qtc, { count: 0, sum: 0 });
+    qQtcMap.get(qtc).count++;
+    if(tot !== null && !isNaN(tot)) qQtcMap.get(qtc).sum += tot;
+
+    if(!qLabMap.has(lab)) qLabMap.set(lab, { count: 0, sum: 0, email: q.email || '' });
+    qLabMap.get(lab).count++;
+    if(tot !== null && !isNaN(tot)) qLabMap.get(lab).sum += tot;
+  });
+
+  const avgTot = qTotal ? (qSumTot / qTotal) : null;
+  const avgAtt = qTotal ? (qSumAtt / qTotal) : null;
+  const avgTva = qTotal ? (qSumTva / qTotal) : null;
+  const avgArt = qTotal ? (qSumArt / qTotal).toFixed(1) : '—';
+
+  // SECTION B: Daily Operational Breakdown for selected date
+  const selectedDateRows = rows.filter(r => rDate(r) === dateA);
+  const compareDateRows = rows.filter(r => rDate(r) === dateB);
+
+  const getDayStats = (rList) => {
+    const tot = rList.length;
+    const lab = uniq(rList, 'Labeler Name') || 0;
+    const qtc = uniq(rList, 'QTC Name') || 0;
+    const q = uniq(rList, 'Queue Name') || 0;
+    const lFP = rList.filter(r => isModPass(r, 'lidar', 'FP')).length;
+    const lQA = rList.filter(r => isModPass(r, 'lidar', 'QA')).length;
+    const lnFP = rList.filter(r => isModPass(r, 'laneline', 'FP')).length;
+    const lnQA = rList.filter(r => isModPass(r, 'laneline', 'QA')).length;
+    const vel = (tot / 18).toFixed(1);
+    return { tot, lab, qtc, q, lFP, lQA, lnFP, lnQA, vel };
+  };
+
+  const statsA = getDayStats(selectedDateRows);
+  const statsB = getDayStats(compareDateRows);
+  const dodGrowth = statsB.tot > 0 ? (((statsA.tot - statsB.tot) / statsB.tot) * 100).toFixed(1) : '0.0';
+
+  // Daily 6 breakdown tables for Date A
+  const si = hdrs.findIndex(h => h.toLowerCase() === 'shift');
+  const fi = hdrs.findIndex(h => ['floor', 'unit'].includes(h.toLowerCase()));
+  const qi = hdrs.findIndex(h => h.toLowerCase() === 'queue name');
+  const qcI = hdrs.findIndex(h => h.toLowerCase() === 'qtc name');
+  const li = hdrs.findIndex(h => h.toLowerCase() === 'labeler name');
+
+  const shiftDaily = new Map();
+  const floorDaily = new Map();
+  const queueDaily = new Map();
+  const qtcDaily = new Map();
+  const labelerDaily = new Map();
+
+  selectedDateRows.forEach(r => {
+    if(si >= 0 && r[si]) shiftDaily.set(r[si], (shiftDaily.get(r[si]) || 0) + 1);
+    if(fi >= 0 && r[fi]) { const fl = deriveFloor(r[fi]); floorDaily.set(fl, (floorDaily.get(fl) || 0) + 1); }
+    if(qi >= 0 && r[qi]) queueDaily.set(r[qi], (queueDaily.get(r[qi]) || 0) + 1);
+    if(qcI >= 0 && r[qcI]) qtcDaily.set(r[qcI], (qtcDaily.get(r[qcI]) || 0) + 1);
+    if(li >= 0 && r[li]) labelerDaily.set(r[li], (labelerDaily.get(r[li]) || 0) + 1);
+  });
+
+  // Render HTML
+  page.innerHTML = '<div class="ux-overview">'
+    + '<div class="ux-heading">'
+      + '<div>'
+        + '<div class="ux-eyebrow">Enterprise Operations · Comprehensive Reports</div>'
+        + '<h2>Quality & Daily Operational Report</h2>'
+        + '<p>Verified annotation quality scores and day-by-day operational production breakdowns.</p>'
+      + '</div>'
+      + renderHeaderControlsHTML('daily')
+    + '</div>'
+
+    // Segmented Section Toggle
+    + '<div class="section-switch-wrap">'
+      + '<button class="section-switch-btn ' + (dailyReportSection==='quality'?'active':'') + '" id="btnSecQuality">⭐ Section A — Quality Analytics</button>'
+      + '<button class="section-switch-btn ' + (dailyReportSection==='daily'?'active':'') + '" id="btnSecDaily">📅 Section B — Daily Operational Report</button>'
+    + '</div>'
+
+    // ============================================================
+    // SECTION A CONTENT: QUALITY ANALYTICS
+    // ============================================================
+    + '<div id="sectionA_Quality" style="display:' + (dailyReportSection==='quality'?'block':'none') + ';">'
+      + '<div class="ux-panel" style="margin-bottom:18px; padding:12px 18px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; background:var(--bg-2); border-left:4px solid var(--success);">'
+        + '<div><b>Verified Quality Knowledgebase:</b> Strictly derived from quality assessment records in the Export tab.</div>'
+        + '<div style="display:flex; gap:8px;">'
+          + '<button class="btn btn-c" id="qualityRefreshBtn" style="font-size:12px;">📥 Import / Refresh Quality</button>'
+          + '<button class="btn" id="qualityUnmatchedBtn" style="font-size:12px;">⚠️ Unmatched Records</button>'
+        + '</div>'
+      + '</div>'
+
+      // 8 Quality KPI Cards
+      + '<div class="ux-grid-8">'
+        + '<div class="kpi-mini-card" style="--tone:var(--primary);"><div class="kpi-title">Total Reviews</div><div class="kpi-val">' + qTotal.toLocaleString() + '</div><div class="kpi-sub">Assessed tasks</div></div>'
+        + '<div class="kpi-mini-card" style="--tone:var(--success);"><div class="kpi-title">Verified Accuracy</div><div class="kpi-val" style="color:var(--success);">' + (avgTot ? (avgTot*100).toFixed(1)+'%' : '—') + '</div><div class="kpi-sub">Weighted mean</div></div>'
+        + '<div class="kpi-mini-card" style="--tone:var(--accent);"><div class="kpi-title">Attribute Accuracy</div><div class="kpi-val">' + (avgAtt ? (avgAtt*100).toFixed(1)+'%' : '—') + '</div><div class="kpi-sub">Attribute precision</div></div>'
+        + '<div class="kpi-mini-card" style="--tone:#df8b24;"><div class="kpi-title">TVA F1 Score</div><div class="kpi-val">' + (avgTva ? (avgTva*100).toFixed(1)+'%' : '—') + '</div><div class="kpi-sub">Temporal volume</div></div>'
+        + '<div class="kpi-mini-card" style="--tone:var(--danger);"><div class="kpi-title">Artifacts Reported</div><div class="kpi-val">' + avgArt + '</div><div class="kpi-sub">Mean artifacts / task</div></div>'
+        + '<div class="kpi-mini-card" style="--tone:var(--success);"><div class="kpi-title">High Tier (≥95%)</div><div class="kpi-val" style="color:var(--success);">' + tierHighCount.toLocaleString() + '</div><div class="kpi-sub">' + (qTotal ? ((tierHighCount/qTotal)*100).toFixed(0) : 0) + '% of assessments</div></div>'
+        + '<div class="kpi-mini-card" style="--tone:var(--warning);"><div class="kpi-title">Mid Tier (85-94%)</div><div class="kpi-val" style="color:var(--warning);">' + tierMidCount.toLocaleString() + '</div><div class="kpi-sub">' + (qTotal ? ((tierMidCount/qTotal)*100).toFixed(0) : 0) + '% of assessments</div></div>'
+        + '<div class="kpi-mini-card" style="--tone:var(--danger);"><div class="kpi-title">Low Tier (<85%)</div><div class="kpi-val" style="color:var(--danger);">' + tierLowCount.toLocaleString() + '</div><div class="kpi-sub">' + (qTotal ? ((tierLowCount/qTotal)*100).toFixed(0) : 0) + '% of assessments</div></div>'
+      + '</div>'
+
+      // Quality Rankings Tables: Shift & QTC
+      + '<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(340px, 1fr)); gap:18px; margin-top:20px;">'
+        + '<div class="ux-panel">'
+          + '<h3>Quality Accuracy by Shift</h3>'
+          + '<div class="perf-table" style="margin-top:10px;">'
+            + '<table>'
+              + '<thead><tr><th>Shift</th><th>Assessed Tasks</th><th>Avg Accuracy</th><th>Tier</th></tr></thead>'
+              + '<tbody>'
+                + ([...qShiftMap.entries()].sort((a,b)=>(b[1].sum/b[1].count)-(a[1].sum/a[1].count)).map(([sh, d]) => {
+                  const acc = d.count ? d.sum / d.count : 0;
+                  const tier = acc >= 0.95 ? 'tier-high' : acc >= 0.85 ? 'tier-mid' : 'tier-low';
+                  return '<tr><td><b>' + esc(sh) + '</b></td><td>' + d.count.toLocaleString() + '</td><td>' + (acc*100).toFixed(1) + '%</td><td><span class="tier-badge ' + tier + '">' + (acc >= 0.95 ? 'High' : acc >= 0.85 ? 'Mid' : 'Low') + '</span></td></tr>';
+                }).join('') || '<tr><td colspan="4" class="ux-empty">No shift quality records</td></tr>')
+              + '</tbody>'
+            + '</table>'
+          + '</div>'
+        + '</div>'
+
+        + '<div class="ux-panel">'
+          + '<h3>Top QTC Quality Rankings</h3>'
+          + '<div class="perf-table" style="margin-top:10px;">'
+            + '<table>'
+              + '<thead><tr><th>Rank</th><th>QTC Supervisor</th><th>Assessed Tasks</th><th>Accuracy</th><th>Tier</th></tr></thead>'
+              + '<tbody>'
+                + ([...qQtcMap.entries()].sort((a,b)=>(b[1].sum/b[1].count)-(a[1].sum/a[1].count)).slice(0, 10).map(([qc, d], i) => {
+                  const acc = d.count ? d.sum / d.count : 0;
+                  const tier = acc >= 0.95 ? 'tier-high' : acc >= 0.85 ? 'tier-mid' : 'tier-low';
+                  return '<tr><td>' + (i < 3 ? ['🥇','🥈','🥉'][i] : '#' + (i+1)) + '</td><td><b>' + esc(qc) + '</b></td><td>' + d.count.toLocaleString() + '</td><td>' + (acc*100).toFixed(1) + '%</td><td><span class="tier-badge ' + tier + '">' + (acc >= 0.95 ? 'High' : acc >= 0.85 ? 'Mid' : 'Low') + '</span></td></tr>';
+                }).join('') || '<tr><td colspan="5" class="ux-empty">No QTC quality records</td></tr>')
+              + '</tbody>'
+            + '</table>'
+          + '</div>'
+        + '</div>'
+      + '</div>'
+
+      // Main Quality Assessments Table
+      + '<section class="ux-panel" style="margin-top:20px;">'
+        + '<div class="ux-heading" style="margin-bottom:12px;">'
+          + '<div><h3>Verified Quality Assessment Records (' + qTotal.toLocaleString() + ')</h3><p>Individual task accuracy scores from quality evaluations.</p></div>'
+        + '</div>'
+        + '<div class="perf-table">'
+          + '<table>'
+            + '<thead><tr>'
+              + '<th>Task ID</th><th>Date</th><th>Labeler</th><th>QTC</th><th>Shift</th><th>Attribute Acc</th><th>TVA F1</th><th>Total Acc</th><th>Tier</th><th>Artifacts</th>'
+            + '</tr></thead>'
+            + '<tbody>'
+              + (qsEntries.slice(0, 50).map(([aid, q]) => {
+                const info = (window.idInfo && window.idInfo[aid]) || {};
+                const tot = typeof window.qNum === 'function' ? window.qNum(q.totalAccuracy) : parseFloat(q.totalAccuracy);
+                const tier = tot !== null ? (tot >= 0.95 ? 'tier-high' : tot >= 0.85 ? 'tier-mid' : 'tier-low') : '';
+                return '<tr>'
+                  + '<td><code>' + esc(aid) + '</code></td>'
+                  + '<td>' + (q.actualDate || '—') + '</td>'
+                  + '<td><b>' + esc(info.name || q.email || '—') + '</b></td>'
+                  + '<td>' + esc(info.qtc || '—') + '</td>'
+                  + '<td>' + esc(info.shift || '—') + '</td>'
+                  + '<td>' + (typeof window.qFmt === 'function' ? window.qFmt(q.attribute) : (q.attribute || '—')) + '</td>'
+                  + '<td>' + (typeof window.qFmt === 'function' ? window.qFmt(q.tvaF1) : (q.tvaF1 || '—')) + '</td>'
+                  + '<td><b>' + (typeof window.qFmt === 'function' ? window.qFmt(tot) : (tot*100).toFixed(1)+'%') + '</b></td>'
+                  + '<td>' + (tier ? '<span class="tier-badge ' + tier + '">' + (tot >= 0.95 ? 'High' : tot >= 0.85 ? 'Mid' : 'Low') + '</span>' : '—') + '</td>'
+                  + '<td>' + (q.artifacts || '0') + '</td>'
+                + '</tr>';
+              }).join('') || '<tr><td colspan="10" class="ux-empty">No quality assessment records found. Click "Import / Refresh Quality" above.</td></tr>')
+            + '</tbody>'
+          + '</table>'
+          + (qTotal > 50 ? '<div style="text-align:center; padding:12px; font-size:12px; color:var(--muted);">Showing first 50 of ' + qTotal.toLocaleString() + ' records</div>' : '')
+        + '</div>'
+      + '</section>'
+    + '</div>'
+
+    // ============================================================
+    // SECTION B CONTENT: DAILY OPERATIONAL REPORT
+    // ============================================================
+    + '<div id="sectionB_Daily" style="display:' + (dailyReportSection==='daily'?'block':'none') + ';">'
+      // Operational Date Picker Bar
+      + '<div class="ux-panel" style="margin-bottom:18px; padding:14px 20px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:14px;">'
+        + '<div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">'
+          + '<label style="font-weight:700; font-size:13px; display:flex; align-items:center; gap:6px;">📅 Operational Date (Cairo):<input type="date" id="dailyDateAInput" value="' + dateA + '" style="padding:6px 10px; border-radius:8px; border:1px solid var(--border); font-size:13px; background:var(--bg-3); color:var(--text);"></label>'
+          + '<button class="btn btn-c" id="btnDailyToday" style="font-size:12px; padding:5px 10px;">Today</button>'
+          + '<button class="btn" id="btnDailyYesterday" style="font-size:12px; padding:5px 10px;">Yesterday</button>'
+          + '<label style="font-size:12px; display:flex; align-items:center; gap:6px; margin-left:10px; cursor:pointer;"><input type="checkbox" id="dailyCompareToggle" ' + (dailyReportCompareMode?'checked':'') + '> <b>⚖️ Compare Two Dates</b></label>'
+          + (dailyReportCompareMode ? '<label style="font-size:12px; display:flex; align-items:center; gap:6px;">Compare with Date B:<input type="date" id="dailyDateBInput" value="' + dateB + '" style="padding:5px 8px; border-radius:8px; border:1px solid var(--border); font-size:12px; background:var(--bg-3); color:var(--text);"></label>' : '')
+        + '</div>'
+        + '<div style="display:flex; gap:8px;">'
+          + '<button class="btn btn-c" id="dailyExportCSV" style="font-size:12px;">↓ Export Daily CSV</button>'
+          + '<button class="btn" id="dailyPrintBtn" style="font-size:12px;">🖨️ Print</button>'
+        + '</div>'
+      + '</div>'
+
+      // 10 Daily KPI Cards
+      + '<div class="ux-grid-10">'
+        + '<div class="kpi-mini-card" style="--tone:var(--primary);"><div class="kpi-title">Day Submissions</div><div class="kpi-val">' + statsA.tot.toLocaleString() + '</div><div class="kpi-sub">' + dateA + ' output</div></div>'
+        + '<div class="kpi-mini-card" style="--tone:#0a9d8c;"><div class="kpi-title">Active Labelers</div><div class="kpi-val">' + statsA.lab.toLocaleString() + '</div><div class="kpi-sub">On this date</div></div>'
+        + '<div class="kpi-mini-card" style="--tone:#df8b24;"><div class="kpi-title">Active QTCs</div><div class="kpi-val">' + statsA.qtc.toLocaleString() + '</div><div class="kpi-sub">Supervising</div></div>'
+        + '<div class="kpi-mini-card" style="--tone:#df5c99;"><div class="kpi-title">Active Queues</div><div class="kpi-val">' + statsA.q.toLocaleString() + '</div><div class="kpi-sub">Receiving work</div></div>'
+        + '<div class="kpi-mini-card" style="--tone:#0d9488;"><div class="kpi-title">Lidar FP</div><div class="kpi-val">' + statsA.lFP.toLocaleString() + '</div><div class="kpi-sub">First pass</div></div>'
+        + '<div class="kpi-mini-card" style="--tone:#14b8a6;"><div class="kpi-title">Lidar QA</div><div class="kpi-val">' + statsA.lQA.toLocaleString() + '</div><div class="kpi-sub">Quality review</div></div>'
+        + '<div class="kpi-mini-card" style="--tone:#ed9a35;"><div class="kpi-title">Lane Line FP</div><div class="kpi-val">' + statsA.lnFP.toLocaleString() + '</div><div class="kpi-sub">First pass</div></div>'
+        + '<div class="kpi-mini-card" style="--tone:#ec4899;"><div class="kpi-title">Lane Line QA</div><div class="kpi-val">' + statsA.lnQA.toLocaleString() + '</div><div class="kpi-sub">Quality review</div></div>'
+        + '<div class="kpi-mini-card" style="--tone:#6366f1;"><div class="kpi-title">Hourly Velocity</div><div class="kpi-val">' + statsA.vel + ' /hr</div><div class="kpi-sub">Submits / hour</div></div>'
+        + '<div class="kpi-mini-card" style="--tone:var(--success);"><div class="kpi-title">DoD Growth %</div><div class="kpi-val" style="color:' + (parseFloat(dodGrowth)>=0?'var(--success)':'var(--danger)') + ';">' + (parseFloat(dodGrowth)>=0?'+':'') + dodGrowth + '%</div><div class="kpi-sub">vs previous day</div></div>'
+      + '</div>'
+
+      // TWO-DATE COMPARISON MODE VIEW (When active)
+      + (dailyReportCompareMode ? (
+        '<div class="ux-panel" style="margin-top:20px; border-top:4px solid var(--accent);">'
+          + '<div class="ux-heading" style="margin-bottom:12px;">'
+            + '<div><h3>⚖️ Two-Date Period Comparison: ' + dateA + ' vs ' + dateB + '</h3><p>Side-by-side delta calculation between both selected operational dates.</p></div>'
+          + '</div>'
+          + '<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:12px;">'
+            + [
+              ['Total Submissions', statsA.tot, statsB.tot],
+              ['Active Labelers', statsA.lab, statsB.lab],
+              ['Active QTCs', statsA.qtc, statsB.qtc],
+              ['Active Queues', statsA.q, statsB.q],
+              ['Lidar FP', statsA.lFP, statsB.lFP],
+              ['Lidar QA', statsA.lQA, statsB.lQA],
+              ['Lane Line FP', statsA.lnFP, statsB.lnFP],
+              ['Lane Line QA', statsA.lnQA, statsB.lnQA]
+            ].map(([lbl, va, vb]) => {
+              const diff = va - vb;
+              const pct = vb > 0 ? ((diff / vb) * 100).toFixed(1) : '—';
+              const isPos = diff >= 0;
+              return '<div style="background:var(--bg-2); padding:12px; border-radius:10px; border:1px solid var(--border);">'
+                + '<span class="ux-note">' + lbl + '</span>'
+                + '<div style="display:flex; justify-content:space-between; align-items:baseline; margin-top:4px;">'
+                  + '<strong style="font-size:16px;">' + va.toLocaleString() + '</strong>'
+                  + '<span style="font-size:12px; color:var(--text-soft);">vs ' + vb.toLocaleString() + '</span>'
+                + '</div>'
+                + '<div style="margin-top:6px; font-weight:700; font-size:11px; color:' + (isPos ? 'var(--success)' : 'var(--danger)') + ';">'
+                  + (isPos ? '▲ +' : '▼ ') + diff.toLocaleString() + (pct !== '—' ? ' (' + (isPos ? '+' : '') + pct + '%)' : '')
+                + '</div>'
+              + '</div>';
+            }).join('')
+          + '</div>'
+        + '</div>'
+      ) : '')
+
+      // 6 IN-DEPTH BREAKDOWN TABLES FOR DATE A
+      + '<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:18px; margin-top:20px;">'
+        // 1. Shift Breakdown
+        + '<div class="ux-panel">'
+          + '<h3>1. Shift Production Breakdown</h3>'
+          + '<div class="perf-table" style="margin-top:10px;">'
+            + '<table><thead><tr><th>Shift</th><th>Submissions</th><th>Share %</th></tr></thead><tbody>'
+              + ([...shiftDaily.entries()].sort((a,b)=>b[1]-a[1]).map(([s,c])=>'<tr><td><b>' + esc(s) + '</b></td><td>' + c.toLocaleString() + '</td><td>' + (statsA.tot ? ((c/statsA.tot)*100).toFixed(1) : 0) + '%</td></tr>').join('') || '<tr><td colspan="3" class="ux-empty">No shift data</td></tr>')
+            + '</tbody></table>'
+          + '</div>'
+        + '</div>'
+
+        // 2. Floor Breakdown
+        + '<div class="ux-panel">'
+          + '<h3>2. Floor Breakdown</h3>'
+          + '<div class="perf-table" style="margin-top:10px;">'
+            + '<table><thead><tr><th>Floor</th><th>Submissions</th><th>Share %</th></tr></thead><tbody>'
+              + (['Floor 01','Floor 02','Floor 03','Floor 04'].map(fl=>{ const c = floorDaily.get(fl)||0; return '<tr><td><b>' + fl + '</b></td><td>' + c.toLocaleString() + '</td><td>' + (statsA.tot ? ((c/statsA.tot)*100).toFixed(1) : 0) + '%</td></tr>'; }).join(''))
+            + '</tbody></table>'
+          + '</div>'
+        + '</div>'
+
+        // 3. Queue Breakdown
+        + '<div class="ux-panel">'
+          + '<h3>3. Top Queues for ' + dateA + '</h3>'
+          + '<div class="perf-table" style="margin-top:10px;">'
+            + '<table><thead><tr><th>Queue</th><th>Submissions</th></tr></thead><tbody>'
+              + ([...queueDaily.entries()].sort((a,b)=>b[1]-a[1]).slice(0,8).map(([q,c])=>'<tr><td><b style="text-overflow:ellipsis; overflow:hidden; white-space:nowrap; max-width:200px; display:block;">' + esc(q) + '</b></td><td>' + c.toLocaleString() + '</td></tr>').join('') || '<tr><td colspan="2" class="ux-empty">No queue data</td></tr>')
+            + '</tbody></table>'
+          + '</div>'
+        + '</div>'
+
+        // 4. QTC Breakdown
+        + '<div class="ux-panel">'
+          + '<h3>4. Top QTC Teams for ' + dateA + '</h3>'
+          + '<div class="perf-table" style="margin-top:10px;">'
+            + '<table><thead><tr><th>QTC Supervisor</th><th>Team Submissions</th></tr></thead><tbody>'
+              + ([...qtcDaily.entries()].sort((a,b)=>b[1]-a[1]).slice(0,8).map(([qc,c])=>'<tr><td><b>' + esc(qc) + '</b></td><td>' + c.toLocaleString() + '</td></tr>').join('') || '<tr><td colspan="2" class="ux-empty">No QTC data</td></tr>')
+            + '</tbody></table>'
+          + '</div>'
+        + '</div>'
+
+        // 5. Top Labelers
+        + '<div class="ux-panel">'
+          + '<h3>5. Top Labelers for ' + dateA + '</h3>'
+          + '<div class="perf-table" style="margin-top:10px;">'
+            + '<table><thead><tr><th>Labeler</th><th>Submissions</th></tr></thead><tbody>'
+              + ([...labelerDaily.entries()].sort((a,b)=>b[1]-a[1]).slice(0,8).map(([l,c])=>'<tr><td><b>' + esc(l) + '</b></td><td>' + c.toLocaleString() + '</td></tr>').join('') || '<tr><td colspan="2" class="ux-empty">No labeler data</td></tr>')
+            + '</tbody></table>'
+          + '</div>'
+        + '</div>'
+
+        // 6. Modality x Pass Matrix
+        + '<div class="ux-panel">'
+          + '<h3>6. Modality × Pass Matrix</h3>'
+          + '<div class="perf-table" style="margin-top:10px;">'
+            + '<table><thead><tr><th>Modality</th><th>First Pass (FP)</th><th>Quality (QA)</th><th>Total</th></tr></thead><tbody>'
+              + '<tr><td><b>Lidar</b></td><td>' + statsA.lFP.toLocaleString() + '</td><td>' + statsA.lQA.toLocaleString() + '</td><td><b>' + (statsA.lFP + statsA.lQA).toLocaleString() + '</b></td></tr>'
+              + '<tr><td><b>Lane Line</b></td><td>' + statsA.lnFP.toLocaleString() + '</td><td>' + statsA.lnQA.toLocaleString() + '</td><td><b>' + (statsA.lnFP + statsA.lnQA).toLocaleString() + '</b></td></tr>'
+            + '</tbody></table>'
+          + '</div>'
+        + '</div>'
+      + '</div>'
+    + '</div>'
+  + '</div>';
+
+  bindHeaderControls(page, 'daily');
+
+  // Toggle Section A / Section B
+  $('btnSecQuality').onclick = () => { dailyReportSection = 'quality'; renderDailyReport(); };
+  $('btnSecDaily').onclick = () => { dailyReportSection = 'daily'; renderDailyReport(); };
+
+  // Section A Buttons
+  const qRefBtn = page.querySelector('#qualityRefreshBtn');
+  if(qRefBtn) qRefBtn.onclick = () => {
+    if(typeof fetchQualityData === 'function') fetchQualityData(false);
+  };
+  const qUnmBtn = page.querySelector('#qualityUnmatchedBtn');
+  if(qUnmBtn) qUnmBtn.onclick = () => {
+    const unList = [];
+    qsEntries.forEach(([aid, q]) => {
+      const match = rows.some(r => {
+        const ti = hdrs.findIndex(h => ['task id', 'id'].includes(h.toLowerCase()));
+        return ti >= 0 && String(r[ti]).trim() === aid;
+      });
+      if (!match) unList.push([aid, q.actualDate || '—', q.email || '—', q.totalAccuracy || '—']);
+    });
+    openDrilldownModal({
+      title: 'Unmatched Quality Records (' + unList.length + ')',
+      subtitle: 'Tasks in Quality Export tab not matched to active Turso DB rows',
+      badge: 'Discrepancy Check',
+      columns: ['Actual Task ID', 'Actual Date', 'Email', 'Total Accuracy'],
+      rows: unList
+    });
+  };
+
+  // Section B Buttons
+  const dateAInp = page.querySelector('#dailyDateAInput');
+  if(dateAInp) dateAInp.onchange = (e) => { dailyReportDateA = e.target.value; renderDailyReport(); };
+  const dateBInp = page.querySelector('#dailyDateBInput');
+  if(dateBInp) dateBInp.onchange = (e) => { dailyReportDateB = e.target.value; renderDailyReport(); };
+
+  const cmpTgl = page.querySelector('#dailyCompareToggle');
+  if(cmpTgl) cmpTgl.onchange = (e) => { dailyReportCompareMode = e.target.checked; renderDailyReport(); };
+
+  const todayBtn = page.querySelector('#btnDailyToday');
+  if(todayBtn) todayBtn.onclick = () => { dailyReportDateA = cToday; renderDailyReport(); };
+  const yestBtn = page.querySelector('#btnDailyYesterday');
+  if(yestBtn) yestBtn.onclick = () => { dailyReportDateA = _addDays(cToday, -1); renderDailyReport(); };
+
+  const printBtn = page.querySelector('#dailyPrintBtn');
+  if(printBtn) printBtn.onclick = () => window.print();
+
+  const exportBtn = page.querySelector('#dailyExportCSV');
+  if(exportBtn) exportBtn.onclick = () => {
+    const headers = ['Category', 'Item Name', 'Count / Value', 'Share %'];
+    const csvRows = [
+      ['Date', dateA, statsA.tot + ' tasks', '100%'],
+      ['Metrics', 'Active Labelers', statsA.lab, '—'],
+      ['Metrics', 'Active QTCs', statsA.qtc, '—'],
+      ['Metrics', 'Active Queues', statsA.q, '—'],
+      ['Metrics', 'Lidar FP', statsA.lFP, '—'],
+      ['Metrics', 'Lidar QA', statsA.lQA, '—'],
+      ['Metrics', 'Lane Line FP', statsA.lnFP, '—'],
+      ['Metrics', 'Lane Line QA', statsA.lnQA, '—'],
+      ['Metrics', 'Hourly Velocity', statsA.vel + ' /hr', '—'],
+      ...([...shiftDaily.entries()].map(([s,c]) => ['Shift', s, c, ((c/statsA.tot)*100).toFixed(1)+'%'])),
+      ...([...floorDaily.entries()].map(([f,c]) => ['Floor', f, c, ((c/statsA.tot)*100).toFixed(1)+'%'])),
+      ...([...queueDaily.entries()].slice(0, 15).map(([q,c]) => ['Queue', q, c, ((c/statsA.tot)*100).toFixed(1)+'%']))
+    ];
+    const cell = v => '"' + String(v ?? '').replace(/^[=+@\-\t\r]/, "'$&").replace(/"/g, '""') + '"';
+    const csv = [headers, ...csvRows].map(r => r.map(cell).join(',')).join('\r\n');
+    downloadBlob(new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' }), 'MEEG_daily_report_' + dateA + '.csv');
+    showToast('✓ Daily operational report CSV exported');
+  };
 }
-
-
 
 const sourceStateObserver=new MutationObserver(()=>{if(!window._firstDataReady){renderDailyReport();if(typeof renderQueuesAnalysis==='function')renderQueuesAnalysis();}});if($('mainContent'))sourceStateObserver.observe($('mainContent'),{childList:true,subtree:true});
 
@@ -1461,352 +2958,308 @@ function exportQueuesCSV(queues){
 }
 
 function renderQueuesAnalysis(){
- const page=$('uxQueues');
- if(!page||page.hidden)return;
+  const page = $('uxQueues');
+  if(!page || page.hidden) return;
 
- if(!window._firstDataReady&&!hdrs.length){
-  const error=$('mainContent')?.querySelector('.errbox');
-  page.innerHTML='<div class="ux-overview"><div class="ux-heading"><div><div class="ux-eyebrow">Queue breakdown · Shifts & Floors & QTCs</div><h2>Queues Analysis</h2><p>Submission volume, shifts, floors, and QTC distribution per queue</p></div>'+renderHeaderControlsHTML('queues')+'</div><div class="ux-panel"><h3>'+(error?'Data could not be loaded':'Waiting for source data')+'</h3><p>'+esc(error?error.textContent.replace('↻ Retry','').trim():'Queues analysis will appear once dashboard data is loaded.')+'</p><button class="btn btn-c" id="qRetry" style="margin-top:16px">↻ Retry data load</button></div></div>';
-  bindHeaderControls(page,'queues');
-  $('qRetry')?.addEventListener('click',()=>loadData());
-  return;
- }
-
- const base=rowsInView();
- const catSummary=getCategorySummary(base);
- const allQueues=queuesAggregateData(base);
-
- const allShifts=[...new Set(allQueues.flatMap(q=>q.shifts))].sort();
- const allFloors=[...new Set(allQueues.flatMap(q=>q.floors))].sort();
- const distinctQueues=[...new Set(allQueues.map(q=>q.name))].sort();
-
- // Filter queues
- const qFilter=queuesFilters.query.toLowerCase().trim();
- const filtered=allQueues.filter(q=>{
-  if(queuesFilters.shift&&!q.shifts.includes(queuesFilters.shift))return false;
-  if(queuesFilters.floor&&!q.floors.includes(queuesFilters.floor))return false;
-  if(queuesFilters.category){
-   if(queuesFilters.category==='lidarFP'&&q.lidarFP===0)return false;
-   if(queuesFilters.category==='lidarQA'&&q.lidarQA===0)return false;
-   if(queuesFilters.category==='laneFP'&&q.laneFP===0)return false;
-   if(queuesFilters.category==='laneQA'&&q.laneQA===0)return false;
+  if(!window._firstDataReady && !hdrs.length){
+    const error = $('mainContent')?.querySelector('.errbox');
+    page.innerHTML = '<div class="ux-overview"><div class="ux-heading"><div><div class="ux-eyebrow">Queue breakdown · Shifts & Floors & QTCs</div><h2>Queues Analysis</h2><p>Submission volume, shifts, floors, and QTC distribution per queue</p></div>' + renderHeaderControlsHTML('queues') + '</div><div class="ux-panel"><h3>' + (error ? 'Data could not be loaded' : 'Waiting for source data') + '</h3><p>' + esc(error ? error.textContent.replace('↻ Retry','').trim() : 'Queues analysis will appear once dashboard data is loaded.') + '</p><button class="btn btn-c" id="qRetry" style="margin-top:16px">↻ Retry data load</button></div></div>';
+    bindHeaderControls(page, 'queues');
+    $('qRetry')?.addEventListener('click', () => loadData());
+    return;
   }
-  if(qFilter){
-   const matchName=q.name.toLowerCase().includes(qFilter);
-   const matchShifts=q.shifts.some(s=>s.toLowerCase().includes(qFilter));
-   const matchFloors=q.floors.some(f=>f.toLowerCase().includes(qFilter));
-   const matchQtcs=q.qtcs.some(qc=>qc.toLowerCase().includes(qFilter));
-   if(!matchName&&!matchShifts&&!matchFloors&&!matchQtcs)return false;
+
+  const base = rowsInView();
+  const catSummary = getCategorySummary(base);
+  const allQueues = queuesAggregateData(base);
+
+  const allShifts = [...new Set(allQueues.flatMap(q => q.shifts))].sort();
+  const allFloors = [...new Set(allQueues.flatMap(q => q.floors))].sort();
+  const distinctQueues = [...new Set(allQueues.map(q => q.name))].sort();
+
+  // Filter queues
+  const qFilter = (queuesFilters.query || '').toLowerCase().trim();
+  const filtered = allQueues.filter(q => {
+    if(queuesFilters.shift && !q.shifts.includes(queuesFilters.shift)) return false;
+    if(queuesFilters.floor && !q.floors.includes(queuesFilters.floor)) return false;
+    if(queuesFilters.category){
+      if(queuesFilters.category === 'lidarFP' && q.lidarFP === 0) return false;
+      if(queuesFilters.category === 'lidarQA' && q.lidarQA === 0) return false;
+      if(queuesFilters.category === 'laneFP' && q.laneFP === 0) return false;
+      if(queuesFilters.category === 'laneQA' && q.laneQA === 0) return false;
+    }
+    if(qFilter){
+      const matchName = q.name.toLowerCase().includes(qFilter);
+      const matchShifts = q.shifts.some(s => s.toLowerCase().includes(qFilter));
+      const matchFloors = q.floors.some(f => f.toLowerCase().includes(qFilter));
+      const matchQtcs = q.qtcs.some(qc => qc.toLowerCase().includes(qFilter));
+      if(!matchName && !matchShifts && !matchFloors && !matchQtcs) return false;
+    }
+    return true;
+  });
+
+  // Sort queues
+  const col = queuesFilters.sortCol || 'totalSubmit';
+  const asc = !!queuesFilters.sortAsc;
+  filtered.sort((a,b) => {
+    let va = a[col], vb = b[col];
+    if(typeof va === 'string') return asc ? va.localeCompare(vb) : vb.localeCompare(va);
+    va = Number(va) || 0; vb = Number(vb) || 0;
+    return asc ? (va - vb) : (vb - va);
+  });
+
+  // Selection summary stats
+  const totalTasks = filtered.reduce((n,q) => n + q.totalSubmit, 0);
+  const totalLidarFP = filtered.reduce((n,q) => n + q.lidarFP, 0);
+  const totalLidarQA = filtered.reduce((n,q) => n + q.lidarQA, 0);
+  const totalLaneFP = filtered.reduce((n,q) => n + q.laneFP, 0);
+  const totalLaneQA = filtered.reduce((n,q) => n + q.laneQA, 0);
+
+  const totalUniqueQtcs = new Set(filtered.flatMap(q => q.qtcs)).size;
+  const totalUniqueLabelers = new Set(filtered.flatMap(q => [...(q.labelerSet || [])])).size;
+  const avgSubmit = totalUniqueLabelers > 0 ? (totalTasks / totalUniqueLabelers).toFixed(1) : '0';
+
+  const sortedByVol = [...filtered].sort((a,b) => b.totalSubmit - a.totalSubmit);
+  const topQueue = sortedByVol.length ? sortedByVol[0] : null;
+  const lowestQueue = sortedByVol.length ? sortedByVol[sortedByVol.length - 1] : null;
+  const decliningQueues = filtered.filter(q => q.totalSubmit <= 5);
+
+  // Pagination
+  const pageSize = queuesFilters.pageSize || 25;
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  queuesFilters.page = Math.min(queuesFilters.page || 0, totalPages - 1);
+  const visible = filtered.slice(queuesFilters.page * pageSize, (queuesFilters.page + 1) * pageSize);
+
+  // 8 KPI Cards
+  const kpi8 = [
+    { title: 'Total Active Queues', val: filtered.length.toLocaleString(), sub: 'Receiving submissions', tone: '#df5c99' },
+    { title: 'Queue Submissions', val: totalTasks.toLocaleString(), sub: 'Total task entries', tone: '#0d9488' },
+    { title: 'Unique Labelers', val: totalUniqueLabelers.toLocaleString(), sub: 'Active contributors', tone: '#0a9d8c' },
+    { title: 'Unique QTCs', val: totalUniqueQtcs.toLocaleString(), sub: 'Distinct QA reviewers', tone: '#df8b24' },
+    { title: 'Avg Submissions / Labeler', val: avgSubmit, sub: 'Average productivity', tone: '#3b82f6' },
+    { title: 'Highest Performing Queue', val: (topQueue ? topQueue.name : '—'), sub: (topQueue ? topQueue.totalSubmit.toLocaleString() + ' tasks' : '—'), tone: '#10b981' },
+    { title: 'Lowest Volume Queue', val: (lowestQueue ? lowestQueue.name : '—'), sub: (lowestQueue ? lowestQueue.totalSubmit.toLocaleString() + ' tasks' : '—'), tone: '#f59e0b' },
+    { title: 'Declining Activity Queues', val: decliningQueues.length.toLocaleString(), sub: 'Volume <= 5 submissions', tone: '#ef4444' }
+  ];
+
+  page.innerHTML = '<div class="ux-overview">'
+    + '<div class="ux-heading">'
+      + '<div>'
+        + '<div class="ux-eyebrow">Queue Operations · Velocity & Workload</div>'
+        + '<h2>Queues Analysis</h2>'
+        + '<p>Monitor queue productivity, operational balance, modality distribution, and team throughput.</p>'
+      + '</div>'
+      + renderHeaderControlsHTML('queues')
+    + '</div>'
+
+    // 8 KPI Grid
+    + '<div class="ux-grid-8">'
+      + kpi8.map(k => '<div class="kpi-mini-card" style="--tone:' + k.tone + '">'
+        + '<div class="kpi-title"><span>' + esc(k.title) + '</span><span style="color:' + k.tone + '">●</span></div>'
+        + '<div class="kpi-val" style="font-size:18px; text-overflow:ellipsis; overflow:hidden; white-space:nowrap;" title="' + esc(k.val) + '">' + esc(k.val) + '</div>'
+        + '<div class="kpi-sub">' + esc(k.sub) + '</div>'
+      + '</div>').join('')
+    + '</div>'
+
+    + renderCategoryCardsHTML(catSummary, queuesFilters.category, 'queues')
+
+    // Filter Controls Bar
+    + '<div class="queues-controls" style="margin-top:16px;">'
+      + '<label>Search Queue / Shift / Floor / QTC<input id="qSearch" placeholder="Type to filter queues, shifts, floors, QTCs…" value="' + esc(queuesFilters.query || '') + '"></label>'
+      + '<label>Shift<select id="qShift"><option value="">All shifts (' + allShifts.length + ')</option>' + allShifts.map(s => '<option value="' + esc(s) + '" ' + (queuesFilters.shift===s?'selected':'') + '>' + esc(s) + '</option>').join('') + '</select></label>'
+      + '<label>Floor / Unit<select id="qFloor"><option value="">All floors (' + allFloors.length + ')</option>' + allFloors.map(f => '<option value="' + esc(f) + '" ' + (queuesFilters.floor===f?'selected':'') + '>' + esc(f) + '</option>').join('') + '</select></label>'
+      + '<label>Category filter<select id="qCategory"><option value="">All categories</option><option value="lidarFP" ' + (queuesFilters.category==='lidarFP'?'selected':'') + '>Lidar FP</option><option value="lidarQA" ' + (queuesFilters.category==='lidarQA'?'selected':'') + '>Lidar QA</option><option value="laneFP" ' + (queuesFilters.category==='laneFP'?'selected':'') + '>Lane Line FP</option><option value="laneQA" ' + (queuesFilters.category==='laneQA'?'selected':'') + '>Lane Line QA</option></select></label>'
+      + '<div style="margin-left:auto; display:flex; gap:8px; align-items:flex-end;">'
+        + '<button class="btn btn-c" id="qExportCSV">↓ Export CSV</button>'
+        + '<button class="btn" id="qReset">Reset filters</button>'
+      + '</div>'
+    + '</div>'
+
+    // Operational Notice Banner
+    + '<div class="ux-panel" style="margin-top:16px; padding:12px 18px; border-left:4px solid #3b82f6; background:rgba(59,130,246,0.06); font-size:12px; color:var(--text);">'
+      + '<b>ℹ️ Operational Queue Notice:</b> Queues with low submission volume are flagged as <i>Declining Activity</i>. Do not label low submission volume as a backlog unless task assignment, pending-task status, or queue inventory data confirms it.'
+    + '</div>'
+
+    // MAIN 13-COLUMN QUEUE TABLE
+    + '<section class="ux-panel" style="margin-top:20px;">'
+      + '<div class="ux-heading" style="margin-bottom:12px;">'
+        + '<div><h3>Queues Breakdown Table (' + filtered.length.toLocaleString() + ' queues)</h3><p>Click any column header with ↕ to sort. Click any queue row to inspect full drill-down records.</p></div>'
+        + '<span class="ux-note">Showing ' + (visible.length ? (queuesFilters.page*pageSize+1) : 0) + ' – ' + Math.min((queuesFilters.page+1)*pageSize, filtered.length) + ' of ' + filtered.length + ' queues</span>'
+      + '</div>'
+      + '<div class="perf-table">'
+        + '<table>'
+          + '<thead><tr>'
+            + '<th data-sort="name">Queue Name ↕</th>'
+            + '<th>Modality</th>'
+            + '<th>Stage</th>'
+            + '<th data-sort="lidarFP" style="color:#0d9488;">Lidar FP ↕</th>'
+            + '<th data-sort="lidarQA" style="color:#14b8a6;">Lidar QA ↕</th>'
+            + '<th data-sort="laneFP" style="color:#ed9a35;">Lane Line FP ↕</th>'
+            + '<th data-sort="laneQA" style="color:#ec4899;">Lane Line QA ↕</th>'
+            + '<th data-sort="totalSubmit" style="color:var(--primary);">Total Submit ↕</th>'
+            + '<th data-sort="uniqueLabelers">Unique Labelers ↕</th>'
+            + '<th data-sort="uniqueQtc">Unique QTCs ↕</th>'
+            + '<th data-sort="avgSubmit">Avg / Labeler ↕</th>'
+            + '<th>Production Share %</th>'
+            + '<th>Latest Activity</th>'
+          + '</tr></thead>'
+          + '<tbody>'
+            + visible.map(q => {
+              const isDeclining = q.totalSubmit <= 5;
+              const sharePct = totalTasks ? ((q.totalSubmit / totalTasks) * 100).toFixed(1) + '%' : '0%';
+              const modBadge = q.lidarFP || q.lidarQA ? (q.laneFP || q.laneQA ? 'Mixed' : 'Lidar') : 'Lane Line';
+              const stageBadge = (q.lidarFP || q.laneFP) && (q.lidarQA || q.laneQA) ? 'FP / QA' : (q.lidarQA || q.laneQA ? 'QA' : 'FP');
+              return '<tr class="queue-row-item" data-queue-name="' + esc(q.name) + '" style="cursor:pointer;" title="Click to view detailed queue drill-down">'
+                + '<td><b>' + esc(q.name) + '</b>' + (isDeclining ? ' <span class="q-badge" style="background:rgba(239,68,68,0.12); color:var(--danger); border:1px solid rgba(239,68,68,0.3); font-size:9px;">📉 Declining Activity</span>' : '') + '</td>'
+                + '<td><span class="q-badge" style="background:var(--bg-3);">' + modBadge + '</span></td>'
+                + '<td><span class="q-badge" style="background:var(--bg-3);">' + stageBadge + '</span></td>'
+                + '<td><b style="color:#0d9488;">' + q.lidarFP.toLocaleString() + '</b></td>'
+                + '<td><b style="color:#14b8a6;">' + q.lidarQA.toLocaleString() + '</b></td>'
+                + '<td><b style="color:#ed9a35;">' + q.laneFP.toLocaleString() + '</b></td>'
+                + '<td><b style="color:#ec4899;">' + q.laneQA.toLocaleString() + '</b></td>'
+                + '<td><strong style="color:var(--primary); font-size:14px;">' + q.totalSubmit.toLocaleString() + '</strong></td>'
+                + '<td><b>' + q.uniqueLabelers.toLocaleString() + '</b></td>'
+                + '<td><b>' + q.uniqueQtc.toLocaleString() + '</b></td>'
+                + '<td><span class="q-val-avg">' + q.avgSubmitStr + '</span></td>'
+                + '<td><b>' + sharePct + '</b></td>'
+                + '<td><span class="ux-note">' + (q.latestTimestamp || 'Recent') + '</span></td>'
+              + '</tr>';
+            }).join('')
+          + '</tbody>'
+        + '</table>'
+        + (!filtered.length ? '<div class="ux-empty">No queues match your current filters.</div>' : '')
+      + '</div>'
+      + '<div class="perf-pagination" style="display:flex; justify-content:space-between; align-items:center; margin-top:14px;">'
+        + '<button class="btn" id="qPrev" ' + (queuesFilters.page === 0 ? 'disabled' : '') + '>Previous</button>'
+        + '<span class="ux-note">Page ' + (queuesFilters.page + 1) + ' of ' + totalPages + '</span>'
+        + '<button class="btn" id="qNext" ' + (queuesFilters.page >= totalPages - 1 ? 'disabled' : '') + '>Next</button>'
+      + '</div>'
+    + '</section>'
+
+    // INTERACTIVE TREND & BREAKDOWN SECTION
+    + '<section class="ux-panel queues-trend-section" style="margin-top:20px;">'
+      + '<div class="ux-heading" style="margin-bottom:14px;">'
+        + '<div>'
+          + '<div class="ux-eyebrow">Interactive Trend Analysis</div>'
+          + '<h3 style="font-size:18px; margin:4px 0;">Queue Performance Trend</h3>'
+          + '<p style="margin:0;">Track submissions over time for any queue and stage.</p>'
+        + '</div>'
+      + '</div>'
+      + '<div class="queues-controls" style="margin:0 0 16px; padding:14px 18px;">'
+        + '<label>Select Queue:<select id="qTrendQueue"><option value="all">All Queues</option>' + distinctQueues.map(n => '<option value="' + esc(n) + '" ' + (queuesChartFilters.queue===n?'selected':'') + '>' + esc(n) + '</option>').join('') + '</select></label>'
+        + '<label>Stage / Modality:<select id="qTrendStage"><option value="all" ' + (queuesChartFilters.stage==='all'?'selected':'') + '>All Stages (Total)</option><option value="lidarFP" ' + (queuesChartFilters.stage==='lidarFP'?'selected':'') + '>Lidar FP</option><option value="lidarQA" ' + (queuesChartFilters.stage==='lidarQA'?'selected':'') + '>Lidar QA</option><option value="laneFP" ' + (queuesChartFilters.stage==='laneFP'?'selected':'') + '>Lane Line FP</option><option value="laneQA" ' + (queuesChartFilters.stage==='laneQA'?'selected':'') + '>Lane Line QA</option></select></label>'
+        + '<label>Single Day:<input type="date" id="qTrendDay" value="' + esc(queuesChartFilters.day || '') + '"></label>'
+        + '<label>From:<input type="date" id="qTrendFrom" value="' + esc(queuesChartFilters.from || '') + '"></label>'
+        + '<label>To:<input type="date" id="qTrendTo" value="' + esc(queuesChartFilters.to || '') + '"></label>'
+        + '<div style="display:flex; gap:8px; align-self:flex-end;">'
+          + '<button class="btn btn-c" id="qTrendApplyDate">Filter Trend</button>'
+          + '<button class="btn" id="qTrendResetDate">Reset Trend</button>'
+        + '</div>'
+      + '</div>'
+      + '<div id="qTrendChart" class="an-line"></div>'
+      + '<div id="qTrendSummary" style="display:flex; gap:12px; flex-wrap:wrap; margin-top:14px; font-size:12px;"></div>'
+    + '</section>'
+  + '</div>';
+
+  bindHeaderControls(page, 'queues');
+
+  // Search input
+  const qSearch = page.querySelector('#qSearch');
+  if(qSearch){
+    qSearch.oninput = (e) => {
+      queuesFilters.query = e.target.value;
+      queuesFilters.page = 0;
+      renderQueuesAnalysis();
+    };
   }
-  return true;
- });
 
- // Sort
- const col=queuesFilters.sortCol;
- const asc=queuesFilters.sortAsc;
- filtered.sort((a,b)=>{
-  let va=a[col],vb=b[col];
-  if(typeof va==='string')return asc?va.localeCompare(vb):vb.localeCompare(va);
-  return asc?(va-vb):(vb-va);
- });
+  // Filter dropdowns
+  $('qShift').onchange = (e) => { queuesFilters.shift = e.target.value; queuesFilters.page = 0; renderQueuesAnalysis(); };
+  $('qFloor').onchange = (e) => { queuesFilters.floor = e.target.value; queuesFilters.page = 0; renderQueuesAnalysis(); };
+  $('qCategory').onchange = (e) => { queuesFilters.category = e.target.value; queuesFilters.page = 0; renderQueuesAnalysis(); };
+  $('qReset').onclick = () => { queuesFilters.query = ''; queuesFilters.shift = ''; queuesFilters.floor = ''; queuesFilters.category = ''; queuesFilters.page = 0; renderQueuesAnalysis(); };
 
- // Compute selection summary stats
- const totalTasks=filtered.reduce((n,q)=>n+q.totalSubmit,0);
- const totalLidarFP=filtered.reduce((n,q)=>n+q.lidarFP,0);
- const totalLidarQA=filtered.reduce((n,q)=>n+q.lidarQA,0);
- const totalLaneFP=filtered.reduce((n,q)=>n+q.laneFP,0);
- const totalLaneQA=filtered.reduce((n,q)=>n+q.laneQA,0);
+  // Sorting
+  page.querySelectorAll('th[data-sort]').forEach(th => {
+    th.style.cursor = 'pointer';
+    th.onclick = () => {
+      const col = th.dataset.sort;
+      if (queuesFilters.sortCol === col) queuesFilters.sortAsc = !queuesFilters.sortAsc;
+      else { queuesFilters.sortCol = col; queuesFilters.sortAsc = false; }
+      renderQueuesAnalysis();
+    };
+  });
 
- const filteredNames=new Set(filtered.map(q=>q.name));
- const allFilteredLabelers=new Set();
- const allFilteredQtcs=new Set();
- const qi=hdrs.findIndex(h=>String(h).trim().toLowerCase()==='queue name');
- const ni=hdrs.findIndex(h=>String(h).trim().toLowerCase()==='national id');
- const li=hdrs.findIndex(h=>String(h).trim().toLowerCase()==='labeler name');
- const qci=hdrs.findIndex(h=>String(h).trim().toLowerCase()==='qtc name');
+  // Pagination
+  $('qPrev').onclick = () => { if(queuesFilters.page > 0){ queuesFilters.page--; renderQueuesAnalysis(); } };
+  $('qNext').onclick = () => { if(queuesFilters.page < totalPages - 1){ queuesFilters.page++; renderQueuesAnalysis(); } };
 
- base.forEach(r=>{
-  const qName=qi>=0?String(r[qi]||'').trim():'';
-  if(filteredNames.has(qName)){
-   let lid='';
-   if(ni>=0){
-    const rawNi=String(r[ni]??'').trim().replace(/[٠-٩]/g,c=>String(c.charCodeAt(0)-1632)).replace(/\.0+$/,'').replace(/[\s-]/g,'');
-    if(/^\d{14}$/.test(rawNi))lid=rawNi;
-   }
-   if(!lid&&li>=0){
-    const name=String(r[li]??'').trim().toLowerCase();
-    if(name)lid='name:'+name;
-   }
-   if(lid)allFilteredLabelers.add(lid);
-
-   const qtc=qci>=0?String(r[qci]||'').normalize('NFC').trim().toLowerCase():'';
-   if(qtc)allFilteredQtcs.add(qtc);
-  }
- });
-
- const uniqueLabelers=allFilteredLabelers.size;
- const avgSubmit=uniqueLabelers>0?(totalTasks/uniqueLabelers).toFixed(1):'0';
- const uniqueQtc=allFilteredQtcs.size;
-
- // Pagination
- const pageSize=queuesFilters.pageSize||25;
- const totalPages=Math.max(1,Math.ceil(filtered.length/pageSize));
- queuesFilters.page=Math.min(queuesFilters.page,totalPages-1);
- const visible=filtered.slice(queuesFilters.page*pageSize,(queuesFilters.page+1)*pageSize);
-
- page.innerHTML='<div class="ux-overview">'
-  +'<div class="ux-heading"><div><div class="ux-eyebrow">Queue breakdown · Shifts & Floors & QTCs</div><h2>Queues Analysis</h2><p>Submission volume, shifts, floors, and QTC distribution per queue</p></div>'+renderHeaderControlsHTML('queues')+'</div>'
-  +renderCategoryCardsHTML(catSummary,queuesFilters.category,'queues')
-  +'<div class="queues-controls">'
-   +'<label>Search Queues / Shifts / Floors / QCs<input id="qSearch" placeholder="Type to filter queues, shifts, floors, QTCs…" value="'+esc(queuesFilters.query)+'"></label>'
-   +'<label>Shift<select id="qShift"><option value="">All shifts ('+allShifts.length+')</option>'+allShifts.map(s=>'<option value="'+esc(s)+'" '+(queuesFilters.shift===s?'selected':'')+'>'+esc(s)+'</option>').join('')+'</select></label>'
-   +'<label>Floor / Unit<select id="qFloor"><option value="">All floors ('+allFloors.length+')</option>'+allFloors.map(f=>'<option value="'+esc(f)+'" '+(queuesFilters.floor===f?'selected':'')+'>'+esc(f)+'</option>').join('')+'</select></label>'
-   +'<label>Category filter<select id="qCategory"><option value="">All categories</option><option value="lidarFP" '+(queuesFilters.category==='lidarFP'?'selected':'')+'>Lidar FP</option><option value="lidarQA" '+(queuesFilters.category==='lidarQA'?'selected':'')+'>Lidar QA</option><option value="laneFP" '+(queuesFilters.category==='laneFP'?'selected':'')+'>Lane Line FP</option><option value="laneQA" '+(queuesFilters.category==='laneQA'?'selected':'')+'>Lane Line QA</option></select></label>'
-   +'<div style="margin-left:auto;display:flex;gap:8px;align-items:flex-end">'
-    +'<button class="btn btn-c" id="qExportCSV">↓ Export CSV</button>'
-    +'<button class="btn" id="qReset">Reset filters</button>'
-   +'</div>'
-  +'</div>'
-  +'<div class="an-overall-bar" style="margin-bottom:18px">'
-   +'<div class="an-overall-item"><span class="an-overall-lbl">Queues Count</span><strong class="an-overall-val highlight">'+filtered.length.toLocaleString()+'</strong></div>'
-   +'<div class="an-overall-item"><span class="an-overall-lbl">Total Submit</span><strong class="an-overall-val highlight">'+totalTasks.toLocaleString()+'</strong></div>'
-   +'<div class="an-overall-item"><span class="an-overall-lbl">Total Unique QTC</span><strong class="an-overall-val">'+uniqueQtc.toLocaleString()+'</strong></div>'
-   +'<div class="an-overall-item"><span class="an-overall-lbl">Unique Labelers</span><strong class="an-overall-val">'+uniqueLabelers.toLocaleString()+'</strong></div>'
-   +'<div class="an-overall-item"><span class="an-overall-lbl">Avg Submit / Labeler</span><strong class="an-overall-val highlight">'+avgSubmit+'</strong></div>'
-  +'</div>'
-  +'<section class="ux-panel">'
-   +'<div class="ux-heading" style="margin-bottom:12px"><div><h3>Queues breakdown table ('+filtered.length.toLocaleString()+' queues)</h3><p>Click any column header with ↕ to sort</p></div><span class="ux-note">Showing '+(visible.length?(queuesFilters.page*pageSize+1):0)+' – '+Math.min((queuesFilters.page+1)*pageSize,filtered.length)+' of '+filtered.length+' queues</span></div>'
-   +'<div class="perf-table">'
-    +'<table>'
-     +'<thead><tr>'
-      +'<th data-sort="name" class="'+(queuesFilters.sortCol==='name'?(queuesFilters.sortAsc?' th-sorted-asc':' th-sorted-desc'):'')+'">Queue Name'+(queuesFilters.sortCol==='name'?(queuesFilters.sortAsc?' ▲':' ▼'):' ↕')+'</th>'
-      +'<th data-tip-key="shifts">Shifts</th>'
-      +'<th data-tip-key="floors">Floors / Units</th>'
-      +'<th data-tip-key="qtcs">QCs / QTCs</th>'
-      +'<th data-sort="lidarFP" class="'+(queuesFilters.sortCol==='lidarFP'?(queuesFilters.sortAsc?' th-sorted-asc':' th-sorted-desc'):'')+'" style="color:#0d9488">Lidar FP'+(queuesFilters.sortCol==='lidarFP'?(queuesFilters.sortAsc?' ▲':' ▼'):' ↕')+'</th>'
-      +'<th data-sort="lidarQA" class="'+(queuesFilters.sortCol==='lidarQA'?(queuesFilters.sortAsc?' th-sorted-asc':' th-sorted-desc'):'')+'" style="color:#15b8a6">Lidar QA'+(queuesFilters.sortCol==='lidarQA'?(queuesFilters.sortAsc?' ▲':' ▼'):' ↕')+'</th>'
-      +'<th data-sort="laneFP" class="'+(queuesFilters.sortCol==='laneFP'?(queuesFilters.sortAsc?' th-sorted-asc':' th-sorted-desc'):'')+'" style="color:#ed9a35">Lane Line FP'+(queuesFilters.sortCol==='laneFP'?(queuesFilters.sortAsc?' ▲':' ▼'):' ↕')+'</th>'
-      +'<th data-sort="laneQA" class="'+(queuesFilters.sortCol==='laneQA'?(queuesFilters.sortAsc?' th-sorted-asc':' th-sorted-desc'):'')+'" style="color:#e9689e">Lane Line QA'+(queuesFilters.sortCol==='laneQA'?(queuesFilters.sortAsc?' ▲':' ▼'):' ↕')+'</th>'
-      +'<th data-sort="totalSubmit" class="'+(queuesFilters.sortCol==='totalSubmit'?(queuesFilters.sortAsc?' th-sorted-asc':' th-sorted-desc'):'')+'">Total Submit'+(queuesFilters.sortCol==='totalSubmit'?(queuesFilters.sortAsc?' ▲':' ▼'):' ↕')+'</th>'
-      +'<th data-sort="uniqueLabelers" class="'+(queuesFilters.sortCol==='uniqueLabelers'?(queuesFilters.sortAsc?' th-sorted-asc':' th-sorted-desc'):'')+'">Unique Labelers'+(queuesFilters.sortCol==='uniqueLabelers'?(queuesFilters.sortAsc?' ▲':' ▼'):' ↕')+'</th>'
-      +'<th data-sort="avgSubmit" class="'+(queuesFilters.sortCol==='avgSubmit'?(queuesFilters.sortAsc?' th-sorted-asc':' th-sorted-desc'):'')+'">Avg Submit'+(queuesFilters.sortCol==='avgSubmit'?(queuesFilters.sortAsc?' ▲':' ▼'):' ↕')+'</th>'
-      +'<th data-sort="uniqueQtc" class="'+(queuesFilters.sortCol==='uniqueQtc'?(queuesFilters.sortAsc?' th-sorted-asc':' th-sorted-desc'):'')+'">Total Unique QTC'+(queuesFilters.sortCol==='uniqueQtc'?(queuesFilters.sortAsc?' ▲':' ▼'):' ↕')+'</th>'
-     +'</tr></thead>'
-     +'<tbody>'
-      +visible.map(q=>'<tr>'
-       +'<td><b>'+esc(q.name)+'</b></td>'
-       +'<td>'+(q.shifts.length?q.shifts.map(s=>'<span class="q-badge q-shift">'+esc(s)+'</span>').join(''):'—')+'</td>'
-       +'<td>'+(q.floors.length?q.floors.map(f=>'<span class="q-badge q-floor">'+esc(f)+'</span>').join(''):'—')+'</td>'
-       +'<td><span class="q-badge q-qtc" data-qtcs="'+esc(q.qtcs.join(', '))+'">'+q.uniqueQtc+' QTC'+(q.uniqueQtc===1?'':'s')+'</span></td>'
-       +'<td><b class="q-val-lidar-fp">'+q.lidarFP.toLocaleString()+'</b></td>'
-       +'<td><b class="q-val-lidar-qa">'+q.lidarQA.toLocaleString()+'</b></td>'
-       +'<td><b class="q-val-lane-fp">'+q.laneFP.toLocaleString()+'</b></td>'
-       +'<td><b class="q-val-lane-qa">'+q.laneQA.toLocaleString()+'</b></td>'
-       +'<td><strong class="q-val-total">'+q.totalSubmit.toLocaleString()+'</strong></td>'
-       +'<td><b>'+q.uniqueLabelers.toLocaleString()+'</b></td>'
-       +'<td><span class="q-val-avg">'+q.avgSubmitStr+'</span></td>'
-       +'<td><b>'+q.uniqueQtc.toLocaleString()+'</b></td>'
-      +'</tr>').join('')
-     +'</tbody>'
-    +'</table>'
-    +(!filtered.length?'<div class="ux-empty">No queues match your current filters. Adjust or clear your search.</div>':'')
-   +'</div>'
-   +'<div class="perf-pagination" style="display:flex;align-items:center;justify-content:space-between;margin-top:14px">'
-    +'<button class="btn" id="qPrev" '+(queuesFilters.page===0?'disabled':'')+'>Previous</button>'
-    +'<span class="ux-note">Page '+(queuesFilters.page+1)+' of '+totalPages+' ('+filtered.length.toLocaleString()+' queues)</span>'
-    +'<button class="btn" id="qNext" '+(queuesFilters.page>=totalPages-1?'disabled':'')+'>Next</button>'
-   +'</div>'
-  +'</section>'
-  +'<section class="ux-panel queues-trend-section">'
-   +'<div class="ux-heading" style="margin-bottom:14px">'
-    +'<div>'
-     +'<div class="ux-eyebrow">Interactive Trend Analysis</div>'
-     +'<h3 style="font-size:18px;margin:4px 0">Queue Performance Trend</h3>'
-     +'<p style="margin:0">Track submissions over time for any queue and stage.</p>'
-    +'</div>'
-   +'</div>'
-   +'<div class="queues-controls" style="margin:0 0 16px;padding:14px 18px">'
-    +'<label>Select Queue:<select id="qTrendQueue"><option value="all">All Queues</option>'+distinctQueues.map(n=>'<option value="'+esc(n)+'" '+(queuesChartFilters.queue===n?'selected':'')+'>'+esc(n)+'</option>').join('')+'</select></label>'
-    +'<label>Stage / Modality:<select id="qTrendStage"><option value="all" '+(queuesChartFilters.stage==='all'?'selected':'')+'>All Stages (Total)</option><option value="lidarFP" '+(queuesChartFilters.stage==='lidarFP'?'selected':'')+'>Lidar FP</option><option value="lidarQA" '+(queuesChartFilters.stage==='lidarQA'?'selected':'')+'>Lidar QA</option><option value="laneFP" '+(queuesChartFilters.stage==='laneFP'?'selected':'')+'>Lane Line FP</option><option value="laneQA" '+(queuesChartFilters.stage==='laneQA'?'selected':'')+'>Lane Line QA</option></select></label>'
-    +'<label>Single Day:<input type="date" id="qTrendDay" value="'+esc(queuesChartFilters.day)+'"></label>'
-    +'<label>From:<input type="date" id="qTrendFrom" value="'+esc(queuesChartFilters.from)+'"></label>'
-    +'<label>To:<input type="date" id="qTrendTo" value="'+esc(queuesChartFilters.to)+'"></label>'
-    +'<div style="display:flex;gap:8px;align-self:flex-end">'
-     +'<button class="btn btn-c" id="qTrendApplyDate">Filter Trend</button>'
-     +'<button class="btn" id="qTrendResetDate">Reset Trend</button>'
-    +'</div>'
-   +'</div>'
-   +'<div id="qTrendChart" class="an-line"></div>'
-   +'<div id="qTrendSummary" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:14px;font-size:12px"></div>'
-  +'</section>'
- +'</div>';
-
- bindHeaderControls(page,'queues');
-
- // Card click filter
- page.querySelectorAll('.an-cat-card[data-cat]').forEach(card=>{
-  const cat=card.dataset.cat;
-  card.onclick=()=>{
-   queuesFilters.category=queuesFilters.category===cat?'':cat;
-   queuesFilters.page=0;
-   renderQueuesAnalysis();
+  // Export CSV
+  $('qExportCSV').onclick = () => {
+    const headers = ['Queue Name', 'Modality', 'Stage', 'Lidar FP', 'Lidar QA', 'Lane Line FP', 'Lane Line QA', 'Total Submits', 'Unique Labelers', 'Unique QTCs', 'Avg Submit / Labeler', 'Production Share %', 'Latest Timestamp'];
+    const csvRows = filtered.map(q => [
+      q.name,
+      q.lidarFP || q.lidarQA ? (q.laneFP || q.laneQA ? 'Mixed' : 'Lidar') : 'Lane Line',
+      (q.lidarFP || q.laneFP) && (q.lidarQA || q.laneQA) ? 'FP / QA' : (q.lidarQA || q.laneQA ? 'QA' : 'FP'),
+      q.lidarFP,
+      q.lidarQA,
+      q.laneFP,
+      q.laneQA,
+      q.totalSubmit,
+      q.uniqueLabelers,
+      q.uniqueQtc,
+      q.avgSubmitStr,
+      totalTasks ? ((q.totalSubmit / totalTasks) * 100).toFixed(1) + '%' : '0%',
+      q.latestTimestamp || 'Recent'
+    ]);
+    const cell = v => '"' + String(v ?? '').replace(/^[=+@\-\t\r]/, "'$&").replace(/"/g, '""') + '"';
+    const csv = [headers, ...csvRows].map(r => r.map(cell).join(',')).join('\r\n');
+    downloadBlob(new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' }), 'MEEG_queues_analysis_' + cairoToday() + '.csv');
+    showToast('✓ Queues analysis CSV exported');
   };
-  card.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();card.onclick();}};
- });
 
- // Table sort headers
- page.querySelectorAll('th[data-sort]').forEach(th=>{
-  const sortKey=th.dataset.sort;
-  th.onclick=()=>{
-   if(queuesFilters.sortCol===sortKey){
-    queuesFilters.sortAsc=!queuesFilters.sortAsc;
-   }else{
-    queuesFilters.sortCol=sortKey;
-    queuesFilters.sortAsc=sortKey==='name';
-   }
-   renderQueuesAnalysis();
-  };
- });
+  // Row-click drilldown modal
+  page.querySelectorAll('.queue-row-item').forEach(tr => {
+    tr.onclick = () => {
+      const qName = tr.dataset.queueName;
+      const qRows = base.filter(r => {
+        const qi = hdrs.findIndex(h => h.toLowerCase() === 'queue name');
+        return qi >= 0 && r[qi] === qName;
+      });
+      const ti = hdrs.findIndex(h => ['task id', 'id'].includes(h.toLowerCase()));
+      const li = hdrs.findIndex(h => h.toLowerCase() === 'labeler name');
+      const ni = hdrs.findIndex(h => h.toLowerCase() === 'national id');
+      const si = hdrs.findIndex(h => h.toLowerCase() === 'shift');
+      const fi = hdrs.findIndex(h => ['floor', 'unit'].includes(h.toLowerCase()));
+      const qcI = hdrs.findIndex(h => h.toLowerCase() === 'qtc name');
+      const mi = hdrs.findIndex(h => h.toLowerCase() === 'modality');
+      const pi = hdrs.findIndex(h => h.toLowerCase() === 'pass');
 
- // Inputs
- const searchInput=$('qSearch');
- if(searchInput){
-  searchInput.oninput=()=>{
-   queuesFilters.query=searchInput.value;
-   queuesFilters.page=0;
-   renderQueuesAnalysis();
-   // Maintain focus
-   const el=$('qSearch');
-   if(el){el.focus();el.selectionStart=el.selectionEnd=el.value.length;}
-  };
- }
+      const drillRows = qRows.map(r => [
+        ti >= 0 ? esc(r[ti]) : '—',
+        rDate(r) || '—',
+        li >= 0 ? esc(r[li]) : '—',
+        maskEmployeeId(ni >= 0 ? r[ni] : '', r[li]),
+        si >= 0 ? esc(r[si]) : '—',
+        fi >= 0 ? esc(r[fi]) : '—',
+        qcI >= 0 ? esc(r[qcI]) : '—',
+        esc(r[mi] || ''),
+        esc(r[pi] || '')
+      ]);
 
- const shiftSelect=$('qShift');
- if(shiftSelect){
-  shiftSelect.onchange=()=>{
-   queuesFilters.shift=shiftSelect.value;
-   queuesFilters.page=0;
-   renderQueuesAnalysis();
-  };
- }
+      openDrilldownModal({
+        title: qName + ' · Queue Drill-Down',
+        subtitle: qRows.length.toLocaleString() + ' total submissions on this queue',
+        badge: 'Queue Records',
+        columns: ['Task ID', 'Date', 'Labeler Name', 'Employee ID', 'Shift', 'Unit', 'QTC', 'Modality', 'Pass'],
+        rows: drillRows
+      });
+    };
+  });
 
- const floorSelect=$('qFloor');
- if(floorSelect){
-  floorSelect.onchange=()=>{
-   queuesFilters.floor=floorSelect.value;
-   queuesFilters.page=0;
-   renderQueuesAnalysis();
-  };
- }
-
- const catSelect=$('qCategory');
- if(catSelect){
-  catSelect.onchange=()=>{
-   queuesFilters.category=catSelect.value;
-   queuesFilters.page=0;
-   renderQueuesAnalysis();
-  };
- }
-
- $('qReset')?.addEventListener('click',()=>{
-  Object.assign(queuesFilters,{query:'',shift:'',floor:'',category:'',sortCol:'totalSubmit',sortAsc:false,page:0});
-  renderQueuesAnalysis();
- });
-
- $('qExportCSV')?.addEventListener('click',()=>exportQueuesCSV(filtered));
-
- // Tooltip attachments for Queues Analysis
- page.querySelectorAll('th[data-sort], th[data-tip-key]').forEach(th => {
-  const sortKey = th.dataset.sort || th.dataset.tipKey;
-  const info = QUEUE_HEADER_EXPLANATIONS[sortKey];
-  if (info) {
-   MeegTooltip.attach(th, () => ({
-    title: info.title,
-    badge: th.dataset.sort ? 'Click to Sort' : 'Column Info',
-    desc: info.desc,
-    note: info.note
-   }));
-  }
- });
-
- page.querySelectorAll('.q-badge.q-qtc').forEach(badge => {
-  const row = badge.closest('tr');
-  const qName = row ? (row.querySelector('td b')?.textContent || 'Queue') : 'Queue';
-  const qtcData = badge.dataset.qtcs || '';
-  const qtcList = qtcData.split(',').map(s => s.trim()).filter(Boolean);
-  MeegTooltip.attach(badge, () => ({
-   title: qName,
-   badge: qtcList.length + ' QTC' + (qtcList.length === 1 ? '' : 's'),
-   desc: 'Quality Controllers assigned to this queue',
-   chips: qtcList,
-   note: 'All active QTCs for this queue'
-  }));
- });
-
- page.querySelectorAll('.q-badge.q-shift').forEach(b => {
-  MeegTooltip.attach(b, () => ({
-   title: 'Shift ' + b.textContent,
-   badge: 'Shift',
-   desc: 'Work shift operating on this queue'
-  }));
- });
-
- page.querySelectorAll('.q-badge.q-floor').forEach(b => {
-  MeegTooltip.attach(b, () => ({
-   title: 'Floor: ' + b.textContent,
-   badge: 'Location',
-   desc: 'Production floor or unit'
-  }));
- });
-
- page.querySelectorAll('.an-overall-item').forEach(item => {
-  const lbl = item.querySelector('.an-overall-lbl')?.textContent || '';
-  const val = item.querySelector('.an-overall-val')?.textContent || '';
-  const descriptions = {
-   'QUEUES COUNT': 'إجمالي عدد الكيوات المطابقة للفلاتر الحالية',
-   'TOTAL SUBMIT': 'إجمالي عدد التاسكات المسلمة لجميع الكيوات المعروضة',
-   'TOTAL UNIQUE QTC': 'عدد مسؤولي الجودة (QTCs) الفريدين المشرفين على الكيوات المعروضة',
-   'UNIQUE LABELERS': 'عدد أفراد اللابلرز الفريدين (محسوب بالرقم القومي 14 رقم بالضبط)',
-   'AVG SUBMIT / LABELER': 'معدل الإنتاجية المتوسط = Total Submit ÷ Unique Labelers'
-  };
-  const desc = descriptions[lbl.trim().toUpperCase()] || 'Summary KPI metric';
-  MeegTooltip.attach(item, () => ({
-   title: lbl,
-   badge: 'Queues KPI',
-   desc: desc,
-   rows: [{ label: 'Value', value: val, color: 'var(--accent)' }]
-  }));
- });
-
- $('qPrev')?.addEventListener('click',()=>{
-  if(queuesFilters.page>0){
-   queuesFilters.page--;
-   renderQueuesAnalysis();
-  }
- });
-
- $('qNext')?.addEventListener('click',()=>{
-  if(queuesFilters.page<totalPages-1){
-   queuesFilters.page++;
-   renderQueuesAnalysis();
-  }
- });
-
- renderQueueTrendChart('qTrendChart',base);
- $('qTrendQueue')?.addEventListener('change',e=>{queuesChartFilters.queue=e.target.value;renderQueueTrendChart('qTrendChart',base);});
- $('qTrendStage')?.addEventListener('change',e=>{queuesChartFilters.stage=e.target.value;renderQueueTrendChart('qTrendChart',base);});
- $('qTrendApplyDate')?.addEventListener('click',()=>{
-  queuesChartFilters.day=$('qTrendDay').value;
-  queuesChartFilters.from=$('qTrendFrom').value;
-  queuesChartFilters.to=$('qTrendTo').value;
-  renderQueueTrendChart('qTrendChart',base);
- });
- $('qTrendResetDate')?.addEventListener('click',()=>{
-  Object.assign(queuesChartFilters,{queue:'all',stage:'all',from:'',to:'',day:''});
-  renderQueuesAnalysis();
- });
+  // Render trend chart
+  renderQueueTrendChart('qTrendChart', base);
 }
-
 
 function renderQueueTrendChart(containerId, rows){
  const qi=hdrs.findIndex(h=>h.trim().toLowerCase()==='queue name');
@@ -2112,368 +3565,368 @@ function exportFloorPerformanceCSV(groups){
 }
 
 function renderQtcFloorPerformance(){
- const page=$('uxQtcFloor');
- if(!page||page.hidden)return;
+  const page = $('uxQtcFloor');
+  if(!page || page.hidden) return;
 
- const baseRows=rowsInView();
+  const baseRows = rowsInView();
+  const idx = name => hdrs.findIndex(h => h.trim().toLowerCase() === name.toLowerCase());
+  const qi = idx('qtc name');
+  const fi = hdrs.findIndex(h => ['floor', 'unit'].includes(h.trim().toLowerCase()));
+  const si = idx('shift');
+  const mi = idx('modality');
+  const pi = idx('pass');
 
- const idx=name=>hdrs.findIndex(h=>h.trim().toLowerCase()===name.toLowerCase());
- const qi=idx('qtc name');
- const fi=hdrs.findIndex(h=>['floor','unit'].includes(h.trim().toLowerCase()));
- const si=idx('shift');
- const mi=idx('modality');
- const pi=idx('pass');
+  const distinctQtcs = [...new Set(baseRows.map(r => qi >= 0 ? String(r[qi] || '').normalize('NFC').trim().replace(/\s+/gu, ' ') : '').filter(Boolean))].sort();
+  const distinctFloors = ['Floor 01', 'Floor 02', 'Floor 03', 'Floor 04'];
+  const distinctShifts = [...new Set(baseRows.map(r => si >= 0 ? String(r[si] || '').trim() : '').filter(Boolean))].sort();
 
- // Extract distinct options across baseRows for dropdown population
- const distinctQtcs=[...new Set(baseRows.map(r=>qi>=0?String(r[qi]||'').normalize('NFC').trim().replace(/\s+/gu,' '):'').filter(Boolean))].sort();
- const distinctFloors=[...new Set(baseRows.map(r=>fi>=0?String(r[fi]||'').trim():'').filter(Boolean))].sort();
- const distinctShifts=[...new Set(baseRows.map(r=>si>=0?String(r[si]||'').trim():'').filter(Boolean))].sort();
+  // Filter baseRows by page filters
+  const q = (qtcFloorFilters.query || '').toLowerCase().trim();
+  const filteredRows = baseRows.filter(r => {
+    const qtc = qi >= 0 ? String(r[qi] || '').normalize('NFC').trim().replace(/\s+/gu, ' ') : '';
+    const floor = fi >= 0 ? deriveFloor(r[fi]) : 'Floor 01';
+    const shift = si >= 0 ? String(r[si] || '').trim() : '';
+    const mod = mi < 0 ? '' : String(r[mi] || '').toLowerCase().replace(/[\s_-]+/g, '');
+    const pass = pi < 0 ? '' : String(r[pi] || '').trim().toUpperCase();
+    const cat = (mod === 'lidar' ? 'lidar' : (mod === 'laneline' || mod === 'lane') ? 'lane' : '') + pass;
 
- // Filter baseRows by all page filters (synchronously applies to whole page!)
- const q=qtcFloorFilters.query.toLowerCase().trim();
- const filteredRows=baseRows.filter(r=>{
-  const qtc=qi>=0?String(r[qi]||'').normalize('NFC').trim().replace(/\s+/gu,' '):'';
-  const floor=fi>=0?String(r[fi]||'').trim():'';
-  const shift=si>=0?String(r[si]||'').trim():'';
-  const mod=mi<0?'':String(r[mi]||'').toLowerCase().replace(/[\s_-]+/g,'');
-  const pass=pi<0?'':String(r[pi]||'').trim().toUpperCase();
-  const cat=(mod==='lidar'?'lidar':(mod==='laneline'||mod==='lane')?'lane':'')+pass;
+    if (qtcFloorFilters.qtc && qtc !== qtcFloorFilters.qtc) return false;
+    if (qtcFloorFilters.floor && floor !== qtcFloorFilters.floor) return false;
+    if (qtcFloorFilters.shift && shift !== qtcFloorFilters.shift) return false;
+    if (qtcFloorFilters.category && cat !== qtcFloorFilters.category) return false;
 
-  if(qtcFloorFilters.qtc&&qtc!==qtcFloorFilters.qtc)return false;
-  if(qtcFloorFilters.floor&&floor!==qtcFloorFilters.floor)return false;
-  if(qtcFloorFilters.shift&&shift!==qtcFloorFilters.shift)return false;
-  if(qtcFloorFilters.category&&cat!==qtcFloorFilters.category)return false;
+    if (q) {
+      const matchQ = qtc.toLowerCase().includes(q);
+      const matchF = floor.toLowerCase().includes(q);
+      const matchS = shift.toLowerCase().includes(q);
+      if (!matchQ && !matchF && !matchS) return false;
+    }
+    return true;
+  });
 
-  if(q){
-   const matchQ=qtc.toLowerCase().includes(q);
-   const matchF=floor.toLowerCase().includes(q);
-   const matchS=shift.toLowerCase().includes(q);
-   if(!matchQ&&!matchF&&!matchS)return false;
+  // Table 1: QTC & Floor aggregation
+  const allQTCFloorGroups = qtcFloorAggregateData(filteredRows);
+  allQTCFloorGroups.sort((a,b) => {
+    const col = qtcFloorFilters.sortCol || 'totalSubmit';
+    let va = a[col], vb = b[col];
+    if (typeof va === 'string') return qtcFloorFilters.sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
+    va = Number(va) || 0; vb = Number(vb) || 0;
+    return qtcFloorFilters.sortAsc ? (va - vb) : (vb - va);
+  });
+
+  const qfPageSize = qtcFloorFilters.pageSize || 25;
+  const qfTotalPages = Math.max(1, Math.ceil(allQTCFloorGroups.length / qfPageSize));
+  qtcFloorFilters.page = Math.min(qtcFloorFilters.page || 0, qfTotalPages - 1);
+  const qfVisible = allQTCFloorGroups.slice(qtcFloorFilters.page * qfPageSize, (qtcFloorFilters.page + 1) * qfPageSize);
+
+  // Table 2: Floor Performance aggregation
+  const allFloorGroups = floorAggregateData(filteredRows);
+  allFloorGroups.sort((a,b) => {
+    const col = floorPerformanceFilters.sortCol || 'totalSubmit';
+    let va = a[col], vb = b[col];
+    if (typeof va === 'string') return floorPerformanceFilters.sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
+    va = Number(va) || 0; vb = Number(vb) || 0;
+    return floorPerformanceFilters.sortAsc ? (va - vb) : (vb - va);
+  });
+
+  // Summary Metrics for 8 KPI Cards
+  const totalSubmissions = filteredRows.length;
+  const totalActiveLabelers = uniq(filteredRows, 'Labeler Name') || 0;
+  const totalActiveQtcs = distinctQtcs.length;
+  const totalFloorsCount = distinctFloors.length;
+  const avgSubmitsPerQtcTeam = totalActiveQtcs > 0 ? (totalSubmissions / totalActiveQtcs).toFixed(1) : '0';
+  const avgLabelersPerQtc = totalActiveQtcs > 0 ? (totalActiveLabelers / totalActiveQtcs).toFixed(1) : '0';
+  const totalQaReviewVolume = filteredRows.filter(r => isModPass(r, 'lidar', 'QA') || isModPass(r, 'laneline', 'QA')).length;
+  const avgFloorProductivity = (totalSubmissions / 4).toFixed(0);
+
+  // Heatmap Matrix: Floor (Floor 01-04) x Shift
+  const heatmapData = {};
+  distinctFloors.forEach(fl => {
+    heatmapData[fl] = {};
+    distinctShifts.forEach(sh => { heatmapData[fl][sh] = 0; });
+  });
+  filteredRows.forEach(r => {
+    const fl = fi >= 0 ? deriveFloor(r[fi]) : 'Floor 01';
+    const sh = si >= 0 ? String(r[si] || '').trim() : '';
+    if (heatmapData[fl] && sh) {
+      heatmapData[fl][sh] = (heatmapData[fl][sh] || 0) + 1;
+    }
+  });
+
+  // 8 KPI Cards
+  const kpi8 = [
+    { title: 'Total Active QTCs', val: totalActiveQtcs.toLocaleString(), sub: 'Supervising reviewers', tone: '#df8b24' },
+    { title: 'Total Active Labelers', val: totalActiveLabelers.toLocaleString(), sub: 'Supervised workforce', tone: '#0a9d8c' },
+    { title: 'Operational Floors', val: '4 Floors', sub: 'Floor 01, 02, 03, 04', tone: '#3b82f6' },
+    { title: 'Total Submissions', val: totalSubmissions.toLocaleString(), sub: 'Workforce output', tone: '#0d9488' },
+    { title: 'Avg Submissions / QTC Team', val: avgSubmitsPerQtcTeam, sub: 'Team throughput', tone: '#8b5cf6' },
+    { title: 'Avg Labelers / QTC', val: avgLabelersPerQtc, sub: 'Team capacity', tone: '#10b981' },
+    { title: 'QA Review Volume', val: totalQaReviewVolume.toLocaleString(), sub: 'QA validation volume', tone: '#ec4899' },
+    { title: 'Avg Floor Productivity', val: avgFloorProductivity, sub: 'Submissions per floor', tone: '#f59e0b' }
+  ];
+
+  page.innerHTML = '<div class="ux-overview">'
+    + '<div class="ux-heading">'
+      + '<div>'
+        + '<div class="ux-eyebrow">Supervisory & Facility Intelligence</div>'
+        + '<h2>Performance per QTC & Floor</h2>'
+        + '<p>Supervisor team throughput, floor capacity utilization, and operational room balance.</p>'
+      + '</div>'
+      + renderHeaderControlsHTML('qtcfloor')
+    + '</div>'
+
+    // 8 KPI Grid
+    + '<div class="ux-grid-8">'
+      + kpi8.map(k => '<div class="kpi-mini-card" style="--tone:' + k.tone + '">'
+        + '<div class="kpi-title"><span>' + esc(k.title) + '</span><span style="color:' + k.tone + '">●</span></div>'
+        + '<div class="kpi-val">' + k.val + '</div>'
+        + '<div class="kpi-sub">' + esc(k.sub) + '</div>'
+      + '</div>').join('')
+    + '</div>'
+
+    // Distinction Notice
+    + '<div class="ux-panel" style="margin-top:16px; padding:12px 18px; border-left:4px solid #8b5cf6; background:rgba(139,92,246,0.06); font-size:12px; color:var(--text);">'
+      + '<b>📌 Distinction Notice:</b> Individual QTC review counts (QA Review Volume) are clearly distinguished from overall team submissions. Team submissions reflect the cumulative output of all labelers reporting to that supervisor.'
+    + '</div>'
+
+    // Filters
+    + '<div class="queues-controls" style="margin-top:16px;">'
+      + '<label>Search QTC / Floor / Shift<input id="qfQuery" placeholder="Type QTC name, floor, shift…" value="' + esc(qtcFloorFilters.query || '') + '"></label>'
+      + '<label>QTC Supervisor<select id="qfQtcSelect"><option value="">All QTCs (' + distinctQtcs.length + ')</option>' + distinctQtcs.map(q => '<option value="' + esc(q) + '" ' + (qtcFloorFilters.qtc===q?'selected':'') + '>' + esc(q) + '</option>').join('') + '</select></label>'
+      + '<label>Floor<select id="qfFloorSelect"><option value="">All Floors</option>' + distinctFloors.map(f => '<option value="' + esc(f) + '" ' + (qtcFloorFilters.floor===f?'selected':'') + '>' + esc(f) + '</option>').join('') + '</select></label>'
+      + '<label>Shift<select id="qfShiftSelect"><option value="">All Shifts</option>' + distinctShifts.map(s => '<option value="' + esc(s) + '" ' + (qtcFloorFilters.shift===s?'selected':'') + '>' + esc(s) + '</option>').join('') + '</select></label>'
+      + '<div style="margin-left:auto; display:flex; gap:8px; align-items:flex-end;">'
+        + '<button class="btn btn-c" id="qfExportCSV">↓ Export QTC CSV</button>'
+        + '<button class="btn" id="qfReset">Reset Filters</button>'
+      + '</div>'
+    + '</div>'
+
+    // SHIFT x FLOOR HEATMAP MATRIX
+    + '<section class="ux-panel" style="margin-top:20px;">'
+      + '<div class="ux-heading" style="margin-bottom:12px;">'
+        + '<div><h3>Shift × Floor Throughput Heatmap</h3><p>Task submissions across operating shifts and facility floors.</p></div>'
+        + '<span class="ux-note">Live Floor Cross-Matrix</span>'
+      + '</div>'
+      + '<div style="overflow-x:auto;">'
+        + '<table class="heatmap-table">'
+          + '<thead><tr>'
+            + '<th>Floor</th>'
+            + distinctShifts.map(s => '<th>' + esc(s) + '</th>').join('')
+            + '<th>Floor Total</th>'
+          + '</tr></thead>'
+          + '<tbody>'
+            + distinctFloors.map(fl => {
+              let fTot = 0;
+              return '<tr>'
+                + '<td><b>' + fl + '</b></td>'
+                + distinctShifts.map(sh => {
+                  const val = (heatmapData[fl] && heatmapData[fl][sh]) || 0;
+                  fTot += val;
+                  const intensity = Math.min(1, val / Math.max(1, (totalSubmissions / 10)));
+                  const bg = val > 0 ? ('rgba(13,148,136,' + Math.max(0.12, intensity * 0.45) + ')') : 'transparent';
+                  return '<td style="background:' + bg + ';" class="heatmap-cell">' + (val > 0 ? '<b>' + val.toLocaleString() + '</b>' : '<span style="color:var(--muted);">—</span>') + '</td>';
+                }).join('')
+                + '<td><strong style="color:var(--primary);">' + fTot.toLocaleString() + '</strong></td>'
+              + '</tr>';
+            }).join('')
+          + '</tbody>'
+        + '</table>'
+      + '</div>'
+    + '</section>'
+
+    // TABLE 1: QTC PERFORMANCE TABLE
+    + '<section class="ux-panel" style="margin-top:20px;">'
+      + '<div class="ux-heading" style="margin-bottom:12px;">'
+        + '<div><h3>QTC Team Performance Table (' + allQTCFloorGroups.length.toLocaleString() + ' supervisor records)</h3><p>Click column headers with ↕ to sort. Click any QTC to drill down to team labelers.</p></div>'
+        + '<span class="ux-note">Showing ' + (qfVisible.length ? (qtcFloorFilters.page*qfPageSize+1) : 0) + ' – ' + Math.min((qtcFloorFilters.page+1)*qfPageSize, allQTCFloorGroups.length) + ' of ' + allQTCFloorGroups.length + ' teams</span>'
+      + '</div>'
+      + '<div class="perf-table">'
+        + '<table>'
+          + '<thead><tr>'
+            + '<th data-qf-sort="qtc">QTC Name ↕</th>'
+            + '<th>Shift(s)</th>'
+            + '<th>Assigned Floor</th>'
+            + '<th data-qf-sort="uniqueLabelers">Team Labelers ↕</th>'
+            + '<th data-qf-sort="totalSubmit" style="color:var(--primary);">Team Submits ↕</th>'
+            + '<th data-qf-sort="lidarFP" style="color:#0d9488;">Lidar FP ↕</th>'
+            + '<th data-qf-sort="lidarQA" style="color:#14b8a6;">Lidar QA ↕</th>'
+            + '<th data-qf-sort="laneFP" style="color:#ed9a35;">Lane Line FP ↕</th>'
+            + '<th data-qf-sort="laneQA" style="color:#ec4899;">Lane Line QA ↕</th>'
+            + '<th data-qf-sort="avgSubmit">Avg / Labeler ↕</th>'
+            + '<th>Verified Quality</th>'
+          + '</tr></thead>'
+          + '<tbody>'
+            + qfVisible.map(q => {
+              const qScore = getQtcQuality(q.qtc);
+              const qStr = qScore ? (qScore.totalAccuracy*100).toFixed(1)+'%' : '—';
+              const tierClass = qScore ? (qScore.totalAccuracy >= 0.95 ? 'tier-high' : qScore.totalAccuracy >= 0.85 ? 'tier-mid' : 'tier-low') : '';
+              return '<tr class="qtc-row-item" data-qtc-name="' + esc(q.qtc) + '" style="cursor:pointer;" title="Click to view labelers under this QTC">'
+                + '<td><b style="color:var(--primary);">' + esc(q.qtc) + '</b></td>'
+                + '<td>' + (q.shifts.map(s => '<span class="q-badge q-shift">' + esc(s) + '</span>').join('') || '—') + '</td>'
+                + '<td>' + esc(q.floor) + '</td>'
+                + '<td><b>' + q.uniqueLabelers.toLocaleString() + '</b></td>'
+                + '<td><strong style="color:var(--primary); font-size:14px;">' + q.totalSubmit.toLocaleString() + '</strong></td>'
+                + '<td>' + q.lidarFP.toLocaleString() + '</td>'
+                + '<td>' + q.lidarQA.toLocaleString() + '</td>'
+                + '<td>' + q.laneFP.toLocaleString() + '</td>'
+                + '<td>' + q.laneQA.toLocaleString() + '</td>'
+                + '<td><span class="q-val-avg">' + q.avgSubmitStr + '</span></td>'
+                + '<td>' + (qScore ? '<span class="tier-badge ' + tierClass + '">' + qStr + '</span>' : '<span class="ux-note">—</span>') + '</td>'
+              + '</tr>';
+            }).join('')
+          + '</tbody>'
+        + '</table>'
+        + (!allQTCFloorGroups.length ? '<div class="ux-empty">No QTC team records match filters.</div>' : '')
+      + '</div>'
+      + '<div class="perf-pagination" style="display:flex; justify-content:space-between; align-items:center; margin-top:14px;">'
+        + '<button class="btn" id="qfPrev" ' + (qtcFloorFilters.page === 0 ? 'disabled' : '') + '>Previous</button>'
+        + '<span class="ux-note">Page ' + (qtcFloorFilters.page + 1) + ' of ' + qfTotalPages + '</span>'
+        + '<button class="btn" id="qfNext" ' + (qtcFloorFilters.page >= qfTotalPages - 1 ? 'disabled' : '') + '>Next</button>'
+      + '</div>'
+    + '</section>'
+
+    // TABLE 2: FLOOR PERFORMANCE TABLE
+    + '<section class="ux-panel" style="margin-top:20px;">'
+      + '<div class="ux-heading" style="margin-bottom:12px;">'
+        + '<div><h3>Floor Performance Analysis (Floor 01 – Floor 04)</h3><p>Production, capacity, and workforce distribution per facility floor.</p></div>'
+        + '<button class="btn btn-c" id="floorExportCSV">↓ Export Floor CSV</button>'
+      + '</div>'
+      + '<div class="perf-table">'
+        + '<table>'
+          + '<thead><tr>'
+            + '<th>Floor</th>'
+            + '<th>Total Submissions</th>'
+            + '<th>Active Labelers</th>'
+            + '<th>Active QTCs</th>'
+            + '<th>Lidar FP</th>'
+            + '<th>Lidar QA</th>'
+            + '<th>Lane Line FP</th>'
+            + '<th>Lane Line QA</th>'
+            + '<th>Floor Share %</th>'
+            + '<th>Avg / Labeler</th>'
+            + '<th>Operating Shifts</th>'
+          + '</tr></thead>'
+          + '<tbody>'
+            + distinctFloors.map(fl => {
+              const g = allFloorGroups.find(x => x.floor === fl) || { floor: fl, totalSubmit: 0, uniqueLabelers: 0, uniqueQtcs: 0, lidarFP: 0, lidarQA: 0, laneFP: 0, laneQA: 0, shifts: [], sharePctStr: '0%' };
+              const avg = g.uniqueLabelers > 0 ? (g.totalSubmit / g.uniqueLabelers).toFixed(1) : '—';
+              const share = totalSubmissions ? ((g.totalSubmit / totalSubmissions) * 100).toFixed(1) + '%' : '0%';
+              return '<tr class="floor-row-item" data-floor-name="' + fl + '" style="cursor:pointer;" title="Click to view rooms on this floor">'
+                + '<td><b>' + fl + '</b></td>'
+                + '<td><strong style="color:var(--primary);">' + g.totalSubmit.toLocaleString() + '</strong></td>'
+                + '<td><b>' + g.uniqueLabelers.toLocaleString() + '</b></td>'
+                + '<td><b>' + g.uniqueQtcs.toLocaleString() + '</b></td>'
+                + '<td>' + g.lidarFP.toLocaleString() + '</td>'
+                + '<td>' + g.lidarQA.toLocaleString() + '</td>'
+                + '<td>' + g.laneFP.toLocaleString() + '</td>'
+                + '<td>' + g.laneQA.toLocaleString() + '</td>'
+                + '<td><b>' + share + '</b></td>'
+                + '<td>' + avg + '</td>'
+                + '<td>' + (g.shifts.slice(0, 3).map(s => '<span class="q-badge q-shift">' + esc(s) + '</span>').join('') || '—') + '</td>'
+              + '</tr>';
+            }).join('')
+          + '</tbody>'
+        + '</table>'
+      + '</div>'
+    + '</section>'
+  + '</div>';
+
+  bindHeaderControls(page, 'qtcfloor');
+
+  // Input & Dropdowns
+  const qfSearch = page.querySelector('#qfQuery');
+  if(qfSearch){
+    qfSearch.oninput = (e) => {
+      qtcFloorFilters.query = e.target.value;
+      qtcFloorFilters.page = 0;
+      renderQtcFloorPerformance();
+    };
   }
-  return true;
- });
 
- // Table 1: QTC & Floor aggregation from filteredRows
- const allQTCFloorGroups=qtcFloorAggregateData(filteredRows);
- allQTCFloorGroups.sort((a,b)=>{
-  const col=qtcFloorFilters.sortCol;
-  let va=a[col],vb=b[col];
-  if(typeof va==='string')return qtcFloorFilters.sortAsc?va.localeCompare(vb):vb.localeCompare(va);
-  va=Number(va)||0;vb=Number(vb)||0;
-  return qtcFloorFilters.sortAsc?va-vb:vb-va;
- });
+  $('qfQtcSelect').onchange = (e) => { qtcFloorFilters.qtc = e.target.value; qtcFloorFilters.page = 0; renderQtcFloorPerformance(); };
+  $('qfFloorSelect').onchange = (e) => { qtcFloorFilters.floor = e.target.value; qtcFloorFilters.page = 0; renderQtcFloorPerformance(); };
+  $('qfShiftSelect').onchange = (e) => { qtcFloorFilters.shift = e.target.value; qtcFloorFilters.page = 0; renderQtcFloorPerformance(); };
+  $('qfReset').onclick = () => { qtcFloorFilters.query = ''; qtcFloorFilters.qtc = ''; qtcFloorFilters.floor = ''; qtcFloorFilters.shift = ''; qtcFloorFilters.page = 0; renderQtcFloorPerformance(); };
 
- const qfPageSize=qtcFloorFilters.pageSize||25;
- const qfTotalPages=Math.max(1,Math.ceil(allQTCFloorGroups.length/qfPageSize));
- qtcFloorFilters.page=Math.min(qtcFloorFilters.page,qfTotalPages-1);
- const qfVisible=allQTCFloorGroups.slice(qtcFloorFilters.page*qfPageSize,(qtcFloorFilters.page+1)*qfPageSize);
+  // Sorting
+  page.querySelectorAll('th[data-qf-sort]').forEach(th => {
+    th.style.cursor = 'pointer';
+    th.onclick = () => {
+      const col = th.dataset.qfSort;
+      if (qtcFloorFilters.sortCol === col) qtcFloorFilters.sortAsc = !qtcFloorFilters.sortAsc;
+      else { qtcFloorFilters.sortCol = col; qtcFloorFilters.sortAsc = false; }
+      renderQtcFloorPerformance();
+    };
+  });
 
- // Table 2: Floor Performance aggregation from filteredRows
- const allFloorGroups=floorAggregateData(filteredRows);
- allFloorGroups.sort((a,b)=>{
-  const col=floorPerformanceFilters.sortCol;
-  let va=a[col],vb=b[col];
-  if(typeof va==='string')return floorPerformanceFilters.sortAsc?va.localeCompare(vb):vb.localeCompare(va);
-  va=Number(va)||0;vb=Number(vb)||0;
-  return floorPerformanceFilters.sortAsc?va-vb:vb-va;
- });
+  // Pagination
+  $('qfPrev').onclick = () => { if(qtcFloorFilters.page > 0){ qtcFloorFilters.page--; renderQtcFloorPerformance(); } };
+  $('qfNext').onclick = () => { if(qtcFloorFilters.page < qfTotalPages - 1){ qtcFloorFilters.page++; renderQtcFloorPerformance(); } };
 
- const floorPageSize=floorPerformanceFilters.pageSize||15;
- const floorTotalPages=Math.max(1,Math.ceil(allFloorGroups.length/floorPageSize));
- floorPerformanceFilters.page=Math.min(floorPerformanceFilters.page,floorTotalPages-1);
- const floorVisible=allFloorGroups.slice(floorPerformanceFilters.page*floorPageSize,(floorPerformanceFilters.page+1)*floorPageSize);
+  // Export CSVs
+  $('qfExportCSV').onclick = () => exportQtcFloorCSV(allQTCFloorGroups);
+  $('floorExportCSV').onclick = () => exportFloorPerformanceCSV(allFloorGroups);
 
- // KPI metrics derived from filteredRows
- const totalSubmissions=filteredRows.length;
- const totalUniqueLabelers=labelerSubmissionMetrics(filteredRows).unique??0;
- const overallAvg=totalUniqueLabelers>0?(totalSubmissions/totalUniqueLabelers).toFixed(1):'0';
- const totalUniqueQtcs=new Set(filteredRows.map(r=>qi>=0?String(r[qi]||'').normalize('NFC').trim().replace(/\s+/gu,' '):'').filter(Boolean)).size;
- const totalUniqueFloors=new Set(filteredRows.map(r=>fi>=0?String(r[fi]||'').trim():'').filter(Boolean)).size;
+  // Drilldown to QTC labelers
+  page.querySelectorAll('.qtc-row-item').forEach(tr => {
+    tr.onclick = () => {
+      const qtcName = tr.dataset.qtcName;
+      const teamRows = filteredRows.filter(r => qi >= 0 && String(r[qi] || '').normalize('NFC').trim() === qtcName);
+      const li = hdrs.findIndex(h => h.toLowerCase() === 'labeler name');
+      const ni = hdrs.findIndex(h => h.toLowerCase() === 'national id');
+      const ti = hdrs.findIndex(h => ['task id', 'id'].includes(h.toLowerCase()));
+      const si = hdrs.findIndex(h => h.toLowerCase() === 'shift');
+      const fi = hdrs.findIndex(h => ['floor', 'unit'].includes(h.toLowerCase()));
 
- const qfSortArrow=colKey=>qtcFloorFilters.sortCol===colKey?(qtcFloorFilters.sortAsc?' ▲':' ▼'):' ↕';
- const qfSortClass=colKey=>qtcFloorFilters.sortCol===colKey?(qtcFloorFilters.sortAsc?' th-sorted-asc':' th-sorted-desc'):'';
+      const drillRows = teamRows.map(r => [
+        ti >= 0 ? esc(r[ti]) : '—',
+        rDate(r) || '—',
+        li >= 0 ? esc(r[li]) : '—',
+        maskEmployeeId(ni >= 0 ? r[ni] : '', r[li]),
+        si >= 0 ? esc(r[si]) : '—',
+        fi >= 0 ? esc(r[fi]) : '—',
+        esc(r[hdrs.findIndex(h => h.toLowerCase() === 'queue name')] || ''),
+        esc(r[hdrs.findIndex(h => h.toLowerCase() === 'pass')] || '')
+      ]);
 
- const floorSortArrow=colKey=>floorPerformanceFilters.sortCol===colKey?(floorPerformanceFilters.sortAsc?' ▲':' ▼'):' ↕';
- const floorSortClass=colKey=>floorPerformanceFilters.sortCol===colKey?(floorPerformanceFilters.sortAsc?' th-sorted-asc':' th-sorted-desc'):'';
+      openDrilldownModal({
+        title: qtcName + ' · Team Submissions',
+        subtitle: teamRows.length.toLocaleString() + ' submissions under this supervisor',
+        badge: 'Supervisor Team',
+        columns: ['Task ID', 'Date', 'Labeler Name', 'Employee ID', 'Shift', 'Unit', 'Queue', 'Pass'],
+        rows: drillRows
+      });
+    };
+  });
 
- page.innerHTML='<div class="ux-overview">'
-  +'<div class="ux-heading">'
-   +'<div>'
-    +'<div class="ux-eyebrow">Workforce & Area Breakdown</div>'
-    +'<h2>Performance per QTC & Floor</h2>'
-    +'<p>Submissions, unique labelers, and average throughput broken down by QC & Floor.</p>'
-   +'</div>'
-   +renderHeaderControlsHTML('qfloor')
-  +'</div>'
-  +'<div class="an-overall-bar">'
-   +'<div class="an-overall-item"><span class="an-overall-lbl">Total Submissions</span><strong class="an-overall-val highlight">'+totalSubmissions.toLocaleString()+'</strong></div>'
-   +'<div class="an-overall-item"><span class="an-overall-lbl">Unique QTCs</span><strong class="an-overall-val">'+totalUniqueQtcs.toLocaleString()+'</strong></div>'
-   +'<div class="an-overall-item"><span class="an-overall-lbl">Unique Floors</span><strong class="an-overall-val">'+totalUniqueFloors.toLocaleString()+'</strong></div>'
-   +'<div class="an-overall-item"><span class="an-overall-lbl">Unique Labelers</span><strong class="an-overall-val">'+totalUniqueLabelers.toLocaleString()+'</strong></div>'
-   +'<div class="an-overall-item"><span class="an-overall-lbl">Overall Avg Submit</span><strong class="an-overall-val highlight">'+overallAvg+'</strong></div>'
-  +'</div>'
-  +'<div class="queues-controls">'
-   +'<label>Search QTC / Floor / Shift:<input type="search" id="qfSearch" placeholder="Filter by name..." value="'+esc(qtcFloorFilters.query)+'"></label>'
-   +'<label>Filter by QTC:<select id="qfQtc"><option value="">All QTCs ('+distinctQtcs.length+')</option>'+distinctQtcs.map(q=>'<option value="'+esc(q)+'" '+(qtcFloorFilters.qtc===q?'selected':'')+'>'+esc(q)+'</option>').join('')+'</select></label>'
-   +'<label>Filter by Floor:<select id="qfFloor"><option value="">All Floors ('+distinctFloors.length+')</option>'+distinctFloors.map(f=>'<option value="'+esc(f)+'" '+(qtcFloorFilters.floor===f?'selected':'')+'>'+esc(f)+'</option>').join('')+'</select></label>'
-   +'<label>Filter by Shift:<select id="qfShift"><option value="">All Shifts ('+distinctShifts.length+')</option>'+distinctShifts.map(s=>'<option value="'+esc(s)+'" '+(qtcFloorFilters.shift===s?'selected':'')+'>'+esc(s)+'</option>').join('')+'</select></label>'
-   +'<label>Stage:<select id="qfCategory"><option value="">All Stages</option><option value="lidarFP" '+(qtcFloorFilters.category==='lidarFP'?'selected':'')+'>Lidar FP</option><option value="lidarQA" '+(qtcFloorFilters.category==='lidarQA'?'selected':'')+'>Lidar QA</option><option value="laneFP" '+(qtcFloorFilters.category==='laneFP'?'selected':'')+'>Lane Line FP</option><option value="laneQA" '+(qtcFloorFilters.category==='laneQA'?'selected':'')+'>Lane Line QA</option></select></label>'
-   +'<div style="display:flex;gap:8px;align-self:flex-end">'
-    +'<button class="btn" id="qfReset">Reset</button>'
-    +'<button class="btn btn-c" id="qfExportCSV">↓ Export QTC & Floor CSV</button>'
-   +'</div>'
-  +'</div>'
-  +'<section class="ux-panel">'
-   +'<div class="ux-heading" style="margin-bottom:12px"><div><h3>QTC & Floor Pairs ('+allQTCFloorGroups.length.toLocaleString()+' pairs)</h3><p>Click any column header with ↕ to sort</p></div><span class="ux-note">Showing '+(qfVisible.length?(qtcFloorFilters.page*qfPageSize+1):0)+' – '+Math.min((qtcFloorFilters.page+1)*qfPageSize,allQTCFloorGroups.length)+' of '+allQTCFloorGroups.length+' pairs</span></div>'
-   +'<div class="perf-table">'
-    +'<table>'
-     +'<thead><tr>'
-      +'<th data-qf-sort="qtc" class="'+qfSortClass('qtc')+'">QTC Name'+qfSortArrow('qtc')+'</th>'
-      +'<th data-qf-sort="floor" class="'+qfSortClass('floor')+'">Floor / Unit'+qfSortArrow('floor')+'</th>'
-      +'<th data-qf-tip="shifts">Shifts</th>'
-      +'<th data-qf-sort="lidarFP" class="'+qfSortClass('lidarFP')+'" style="color:#0d9488">Lidar FP'+qfSortArrow('lidarFP')+'</th>'
-      +'<th data-qf-sort="lidarQA" class="'+qfSortClass('lidarQA')+'" style="color:#15b8a6">Lidar QA'+qfSortArrow('lidarQA')+'</th>'
-      +'<th data-qf-sort="laneFP" class="'+qfSortClass('laneFP')+'" style="color:#ed9a35">Lane Line FP'+qfSortArrow('laneFP')+'</th>'
-      +'<th data-qf-sort="laneQA" class="'+qfSortClass('laneQA')+'" style="color:#e9689e">Lane Line QA'+qfSortArrow('laneQA')+'</th>'
-      +'<th data-qf-sort="totalSubmit" class="'+qfSortClass('totalSubmit')+'">Total Submit'+qfSortArrow('totalSubmit')+'</th>'
-      +'<th data-qf-sort="uniqueLabelers" class="'+qfSortClass('uniqueLabelers')+'">Unique Labelers'+qfSortArrow('uniqueLabelers')+'</th>'
-      +'<th data-qf-sort="avgSubmit" class="'+qfSortClass('avgSubmit')+'">Avg Submit'+qfSortArrow('avgSubmit')+'</th>'
-     +'</tr></thead>'
-     +'<tbody>'
-      +qfVisible.map(g=>'<tr>'
-       +'<td><b style="color:var(--accent)">'+esc(g.qtc)+'</b></td>'
-       +'<td><span class="q-badge q-floor">'+esc(g.floor)+'</span></td>'
-       +'<td>'+(g.shifts.length?g.shifts.map(s=>'<span class="q-badge q-shift">'+esc(s)+'</span>').join(''):'—')+'</td>'
-       +'<td><b class="q-val-lidar-fp">'+g.lidarFP.toLocaleString()+'</b></td>'
-       +'<td><b class="q-val-lidar-qa">'+g.lidarQA.toLocaleString()+'</b></td>'
-       +'<td><b class="q-val-lane-fp">'+g.laneFP.toLocaleString()+'</b></td>'
-       +'<td><b class="q-val-lane-qa">'+g.laneQA.toLocaleString()+'</b></td>'
-       +'<td><strong class="q-val-total">'+g.totalSubmit.toLocaleString()+'</strong></td>'
-       +'<td><b>'+g.uniqueLabelers.toLocaleString()+'</b></td>'
-       +'<td><span class="q-val-avg">'+g.avgSubmitStr+'</span></td>'
-      +'</tr>').join('')
-     +'</tbody>'
-    +'</table>'
-    +(!allQTCFloorGroups.length?'<div class="ux-empty">No records match your filters.</div>':'')
-   +'</div>'
-   +'<div class="perf-pagination" style="display:flex;align-items:center;justify-content:space-between;margin-top:14px">'
-    +'<button class="btn" id="qfPrev" '+(qtcFloorFilters.page===0?'disabled':'')+'>Previous</button>'
-    +'<span class="ux-note">Page '+(qtcFloorFilters.page+1)+' of '+qfTotalPages+' ('+allQTCFloorGroups.length.toLocaleString()+' pairs)</span>'
-    +'<button class="btn" id="qfNext" '+(qtcFloorFilters.page>=qfTotalPages-1?'disabled':'')+'>Next</button>'
-   +'</div>'
-  +'</section>'
+  // Drilldown to Floor rooms
+  page.querySelectorAll('.floor-row-item').forEach(tr => {
+    tr.onclick = () => {
+      const flName = tr.dataset.floorName;
+      const flRows = filteredRows.filter(r => fi >= 0 && deriveFloor(r[fi]) === flName);
+      const ti = hdrs.findIndex(h => ['task id', 'id'].includes(h.toLowerCase()));
+      const li = hdrs.findIndex(h => h.toLowerCase() === 'labeler name');
+      const ni = hdrs.findIndex(h => h.toLowerCase() === 'national id');
 
-  // TABLE 2: PERFORMANCE PER FLOOR / UNIT / ROOM
-  +'<section class="ux-panel floor-performance-section">'
-   +'<div class="floor-panel-heading">'
-    +'<div class="floor-panel-title">'
-     +'<div class="ux-eyebrow" style="color:var(--accent)">Area & Room Analysis</div>'
-     +'<h3>🏢 Performance per Floor / Unit / Room ('+allFloorGroups.length.toLocaleString()+' rooms / floors)</h3>'
-     +'<p>Consolidated output, active shifts, supervising QTCs, and throughput aggregated by Floor / Unit / Room.</p>'
-    +'</div>'
-    +'<div style="display:flex;gap:10px;align-items:center">'
-     +'<span class="ux-note">Showing '+(floorVisible.length?(floorPerformanceFilters.page*floorPageSize+1):0)+' – '+Math.min((floorPerformanceFilters.page+1)*floorPageSize,allFloorGroups.length)+' of '+allFloorGroups.length+' floors</span>'
-     +'<button class="btn btn-c" id="floorExportCSV">↓ Export Floors CSV</button>'
-    +'</div>'
-   +'</div>'
-   +'<div class="perf-table">'
-    +'<table>'
-     +'<thead><tr>'
-      +'<th data-floor-sort="floor" class="'+floorSortClass('floor')+'">Floor / Unit / Room'+floorSortArrow('floor')+'</th>'
-      +'<th data-floor-tip="shifts">Active Shifts</th>'
-      +'<th data-floor-sort="uniqueQtcs" class="'+floorSortClass('uniqueQtcs')+'">Active QTCs'+floorSortArrow('uniqueQtcs')+'</th>'
-      +'<th data-floor-sort="lidarFP" class="'+floorSortClass('lidarFP')+'" style="color:#0d9488">Lidar FP'+floorSortArrow('lidarFP')+'</th>'
-      +'<th data-floor-sort="lidarQA" class="'+floorSortClass('lidarQA')+'" style="color:#15b8a6">Lidar QA'+floorSortArrow('lidarQA')+'</th>'
-      +'<th data-floor-sort="laneFP" class="'+floorSortClass('laneFP')+'" style="color:#ed9a35">Lane Line FP'+floorSortArrow('laneFP')+'</th>'
-      +'<th data-floor-sort="laneQA" class="'+floorSortClass('laneQA')+'" style="color:#e9689e">Lane Line QA'+floorSortArrow('laneQA')+'</th>'
-      +'<th data-floor-sort="totalSubmit" class="'+floorSortClass('totalSubmit')+'">Total Submit'+floorSortArrow('totalSubmit')+'</th>'
-      +'<th data-floor-sort="uniqueLabelers" class="'+floorSortClass('uniqueLabelers')+'">Unique Labelers'+floorSortArrow('uniqueLabelers')+'</th>'
-      +'<th data-floor-sort="avgSubmit" class="'+floorSortClass('avgSubmit')+'">Avg Submit'+floorSortArrow('avgSubmit')+'</th>'
-      +'<th data-floor-sort="sharePct" class="'+floorSortClass('sharePct')+'">Floor Share %'+floorSortArrow('sharePct')+'</th>'
-     +'</tr></thead>'
-     +'<tbody>'
-      +floorVisible.map(g=>'<tr>'
-       +'<td><b style="color:var(--accent);display:inline-flex;align-items:center;gap:6px"><span class="q-badge q-floor">'+esc(g.floor)+'</span></b></td>'
-       +'<td>'+(g.shifts.length?g.shifts.map(s=>'<span class="q-badge q-shift">'+esc(s)+'</span>').join(''):'—')+'</td>'
-       +'<td><span class="q-badge q-qtc" data-qtcs="'+esc(g.qtcs.join(', '))+'">'+g.uniqueQtcs+' QTC'+(g.uniqueQtcs===1?'':'s')+'</span></td>'
-       +'<td><b class="q-val-lidar-fp">'+g.lidarFP.toLocaleString()+'</b></td>'
-       +'<td><b class="q-val-lidar-qa">'+g.lidarQA.toLocaleString()+'</b></td>'
-       +'<td><b class="q-val-lane-fp">'+g.laneFP.toLocaleString()+'</b></td>'
-       +'<td><b class="q-val-lane-qa">'+g.laneQA.toLocaleString()+'</b></td>'
-       +'<td><strong class="q-val-total">'+g.totalSubmit.toLocaleString()+'</strong></td>'
-       +'<td><b>'+g.uniqueLabelers.toLocaleString()+'</b></td>'
-       +'<td><span class="q-val-avg">'+g.avgSubmitStr+'</span></td>'
-       +'<td>'
-        +'<div class="floor-share-wrap">'
-         +'<div class="floor-share-bar">'
-          +'<div class="floor-share-fill" style="width:'+Math.min(100,Math.max(3,g.sharePct))+'%"></div>'
-         +'</div>'
-         +'<span class="floor-share-val">'+g.sharePctStr+'</span>'
-        +'</div>'
-       +'</td>'
-      +'</tr>').join('')
-     +'</tbody>'
-    +'</table>'
-    +(!allFloorGroups.length?'<div class="ux-empty">No floor data matches your current filters.</div>':'')
-   +'</div>'
-   +'<div class="perf-pagination" style="display:flex;align-items:center;justify-content:space-between;margin-top:14px">'
-    +'<button class="btn" id="floorPrev" '+(floorPerformanceFilters.page===0?'disabled':'')+'>Previous</button>'
-    +'<span class="ux-note">Page '+(floorPerformanceFilters.page+1)+' of '+floorTotalPages+' ('+allFloorGroups.length.toLocaleString()+' floors / rooms)</span>'
-    +'<button class="btn" id="floorNext" '+(floorPerformanceFilters.page>=floorTotalPages-1?'disabled':'')+'>Next</button>'
-   +'</div>'
-  +'</section>'
- +'</div>';
+      const drillRows = flRows.map(r => [
+        ti >= 0 ? esc(r[ti]) : '—',
+        rDate(r) || '—',
+        esc(r[fi] || '—'),
+        li >= 0 ? esc(r[li]) : '—',
+        maskEmployeeId(ni >= 0 ? r[ni] : '', r[li]),
+        esc(r[hdrs.findIndex(h => h.toLowerCase() === 'shift')] || ''),
+        esc(r[hdrs.findIndex(h => h.toLowerCase() === 'queue name')] || '')
+      ]);
 
- bindHeaderControls(page,'qfloor');
-
- // Tooltips for Table 1
- page.querySelectorAll('th[data-qf-sort], th[data-qf-tip]').forEach(th=>{
-  const col=th.dataset.qfSort||th.dataset.qfTip;
-  const info=QF_HEADER_EXPLANATIONS[col];
-  if(info){
-   MeegTooltip.attach(th,()=>({
-    title:info.title,
-    badge:th.dataset.qfSort?'Click to Sort':'Column Info',
-    desc:info.desc,
-    note:info.note
-   }));
-  }
- });
-
- // Tooltips for Table 2 (Floor Performance)
- page.querySelectorAll('th[data-floor-sort], th[data-floor-tip]').forEach(th=>{
-  const col=th.dataset.floorSort||th.dataset.floorTip;
-  const info=FLOOR_HEADER_EXPLANATIONS[col];
-  if(info){
-   MeegTooltip.attach(th,()=>({
-    title:info.title,
-    badge:th.dataset.floorSort?'Click to Sort':'Column Info',
-    desc:info.desc,
-    note:info.note
-   }));
-  }
- });
-
- // Tooltips for QTC badges in Table 2
- page.querySelectorAll('.floor-performance-section .q-badge.q-qtc').forEach(badge=>{
-  const row=badge.closest('tr');
-  const floorName=row?(row.querySelector('td b')?.textContent||'Floor'):'Floor';
-  const qtcData=badge.dataset.qtcs||'';
-  const qtcList=qtcData.split(',').map(s=>s.trim()).filter(Boolean);
-  MeegTooltip.attach(badge,()=>({
-   title:'Supervising QTCs: '+floorName,
-   badge:qtcList.length+' QTC'+(qtcList.length===1?'':'s'),
-   desc:'Quality Controllers active in this floor / room',
-   chips:qtcList,
-   note:'Supervising quality operations'
-  }));
- });
-
- // Tooltips for badges and overall bar
- page.querySelectorAll('.an-overall-item').forEach(item=>{
-  const lbl=item.querySelector('.an-overall-lbl')?.textContent||'';
-  const val=item.querySelector('.an-overall-val')?.textContent||'';
-  const descMap={
-   'TOTAL SUBMISSIONS':'إجمالي عدد التاسكات المسلمة لجميع السجلات المطابقة للفلاتر',
-   'UNIQUE QTCS':'عدد مسؤولي الجودة (QTCs) الفريدين في النتائج المعروضة',
-   'UNIQUE FLOORS':'عدد الأدوار / الوحدات المكانية المختلفة',
-   'UNIQUE LABELERS':'عدد اللابلرز الفريدين (محسوبين بالرقم القومي 14 رقم بالضبط)',
-   'OVERALL AVG SUBMIT':'متوسط تسليم اللابلر الواحد = Total Submissions ÷ Unique Labelers'
-  };
-  MeegTooltip.attach(item,()=>({
-   title:lbl,
-   badge:'QTC & Floor KPI',
-   desc:descMap[lbl.trim().toUpperCase()]||'Summary KPI metric',
-   rows:[{label:'Value',value:val,color:'var(--accent)'}]
-  }));
- });
-
- page.querySelectorAll('.q-badge.q-shift').forEach(b=>{
-  MeegTooltip.attach(b,()=>({
-   title:'Shift '+b.textContent,
-   badge:'Shift',
-   desc:'Work shift operating for this team / floor'
-  }));
- });
-
- page.querySelectorAll('.q-badge.q-floor').forEach(b=>{
-  MeegTooltip.attach(b,()=>({
-   title:'Floor: '+b.textContent,
-   badge:'Location',
-   desc:'Floor or production unit'
-  }));
- });
-
- // Table 1 sorting
- page.querySelectorAll('th[data-qf-sort]').forEach(th=>{
-  const col=th.dataset.qfSort;
-  th.onclick=()=>{
-   if(qtcFloorFilters.sortCol===col)qtcFloorFilters.sortAsc=!qtcFloorFilters.sortAsc;
-   else{qtcFloorFilters.sortCol=col;qtcFloorFilters.sortAsc=col==='qtc'||col==='floor';}
-   renderQtcFloorPerformance();
-  };
- });
-
- // Table 2 sorting
- page.querySelectorAll('th[data-floor-sort]').forEach(th=>{
-  const col=th.dataset.floorSort;
-  th.onclick=()=>{
-   if(floorPerformanceFilters.sortCol===col)floorPerformanceFilters.sortAsc=!floorPerformanceFilters.sortAsc;
-   else{floorPerformanceFilters.sortCol=col;floorPerformanceFilters.sortAsc=col==='floor';}
-   renderQtcFloorPerformance();
-  };
- });
-
- // Controls: input, selects, reset, CSV
- const searchInp=$('qfSearch');
- if(searchInp){
-  searchInp.oninput=()=>{
-   qtcFloorFilters.query=searchInp.value;
-   qtcFloorFilters.page=0;
-   floorPerformanceFilters.page=0;
-   renderQtcFloorPerformance();
-   const el=$('qfSearch');
-   if(el){el.focus();el.selectionStart=el.selectionEnd=el.value.length;}
-  };
- }
- $('qfQtc')?.addEventListener('change',e=>{
-  qtcFloorFilters.qtc=e.target.value;
-  qtcFloorFilters.page=0;
-  floorPerformanceFilters.page=0;
-  renderQtcFloorPerformance();
- });
- $('qfFloor')?.addEventListener('change',e=>{
-  qtcFloorFilters.floor=e.target.value;
-  qtcFloorFilters.page=0;
-  floorPerformanceFilters.page=0;
-  renderQtcFloorPerformance();
- });
- $('qfShift')?.addEventListener('change',e=>{
-  qtcFloorFilters.shift=e.target.value;
-  qtcFloorFilters.page=0;
-  floorPerformanceFilters.page=0;
-  renderQtcFloorPerformance();
- });
- $('qfCategory')?.addEventListener('change',e=>{
-  qtcFloorFilters.category=e.target.value;
-  qtcFloorFilters.page=0;
-  floorPerformanceFilters.page=0;
-  renderQtcFloorPerformance();
- });
- $('qfReset')?.addEventListener('click',()=>{
-  Object.assign(qtcFloorFilters,{query:'',qtc:'',floor:'',shift:'',category:'',sortCol:'totalSubmit',sortAsc:false,page:0});
-  Object.assign(floorPerformanceFilters,{sortCol:'totalSubmit',sortAsc:false,page:0});
-  renderQtcFloorPerformance();
- });
-
- $('qfExportCSV')?.addEventListener('click',()=>exportQtcFloorCSV(allQTCFloorGroups));
- $('floorExportCSV')?.addEventListener('click',()=>exportFloorPerformanceCSV(allFloorGroups));
-
- $('qfPrev')?.addEventListener('click',()=>{if(qtcFloorFilters.page>0){qtcFloorFilters.page--;renderQtcFloorPerformance();}});
- $('qfNext')?.addEventListener('click',()=>{if(qtcFloorFilters.page<qfTotalPages-1){qtcFloorFilters.page++;renderQtcFloorPerformance();}});
-
- $('floorPrev')?.addEventListener('click',()=>{if(floorPerformanceFilters.page>0){floorPerformanceFilters.page--;renderQtcFloorPerformance();}});
- $('floorNext')?.addEventListener('click',()=>{if(floorPerformanceFilters.page<floorTotalPages-1){floorPerformanceFilters.page++;renderQtcFloorPerformance();}});
+      openDrilldownModal({
+        title: flName + ' · Facility Records',
+        subtitle: flRows.length.toLocaleString() + ' total submissions across this floor',
+        badge: 'Facility Operations',
+        columns: ['Task ID', 'Date', 'Room / Unit', 'Labeler Name', 'Employee ID', 'Shift', 'Queue'],
+        rows: drillRows
+      });
+    };
+  });
 }
 
 renderAllSections=function(){
