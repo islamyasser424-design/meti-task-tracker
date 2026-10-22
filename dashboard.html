@@ -2373,29 +2373,29 @@
       </div>
       <div class="modal-bd">
         <p style="font-size:0.82rem; color:var(--text-secondary); margin-bottom:14px; line-height:1.5;">
-          نظام الإرسال التلقائي: عندما تضغط <strong>"Approve"</strong> على أي طلب استعادة كلمة مرور، يقوم النظام تلقائياً بإرسال كود التحقق (OTP) إلى البريد الإلكتروني للموظف.
+          Automated Dispatch System: When you click <strong>"Approve"</strong> on any password reset request, the system automatically sends the verification code (OTP) to the employee's email address.
         </p>
 
         <div class="form-group">
           <label class="form-label">Google Apps Script Mailer Webhook URL</label>
           <input type="url" id="mailerWebhookUrl" class="form-input" style="font-family:monospace; font-size:0.8rem;" placeholder="https://script.google.com/macros/s/AKfycbwU6RQpM9OwOPfc6OVNts2x6mOpHMwGr6Px5T_HxN-h0grQsqVegw-MOYgvyXeTAtdbig/exec">
           <div style="font-size:0.73rem; color:var(--text-muted); margin-top:4px; line-height:1.4;">
-            الملف البرمجي الجاهز للإرسال موجود في المشروع: <code style="color:var(--primary); font-weight:700;">scripts/google_apps_script_mailer.gs</code>. انشره كـ Web App وانسخ رابطه هنا.
+            The script file is located in the project at: <code style="color:var(--primary); font-weight:700;">scripts/google_apps_script_mailer.gs</code>. Deploy it as a Web App and paste its URL here.
           </div>
         </div>
 
         <div style="background:rgba(13,148,136,0.06); border:1px solid rgba(13,148,136,0.25); border-radius:8px; padding:12px 14px; margin-bottom:16px;">
-          <label class="form-label" style="margin-bottom:6px; font-size:0.8rem;">🧪 تجربة إرسال إيميل اختبار (Send Test Email)</label>
+          <label class="form-label" style="margin-bottom:6px; font-size:0.8rem;">🧪 Send Test Email</label>
           <div style="display:flex; gap:8px;">
-            <input type="email" id="testEmailInput" class="form-input" placeholder="اكتب إيميلك للتجربة" style="flex:1; font-size:0.8rem;">
-            <button type="button" class="btn-action" onclick="sendTestEmail()" id="btnSendTestEmail" style="padding:7px 14px; font-size:0.78rem;">إرسال تجربة</button>
+            <input type="email" id="testEmailInput" class="form-input" placeholder="Enter test email address" style="flex:1; font-size:0.8rem;">
+            <button type="button" class="btn-action" onclick="sendTestEmail()" id="btnSendTestEmail" style="padding:7px 14px; font-size:0.78rem;">Send Test</button>
           </div>
           <div id="testEmailMsg" style="font-size:0.75rem; margin-top:6px; font-weight:600;"></div>
         </div>
 
         <div style="display:flex; justify-content:flex-end; gap:8px;">
-          <button type="button" class="btn-action secondary" onclick="closeEmailSettingsModal()">إغلاق</button>
-          <button type="button" class="btn-action" onclick="saveEmailSettings()">حفظ الإعدادات</button>
+          <button type="button" class="btn-action secondary" onclick="closeEmailSettingsModal()">Close</button>
+          <button type="button" class="btn-action" onclick="saveEmailSettings()">Save Settings</button>
         </div>
       </div>
     </div>
@@ -2869,7 +2869,7 @@
     }
 
     // ============================================================
-    // MANAGE QUEUES TAB LOGIC (بدلاً من الشيت)
+    // MANAGE QUEUES TAB LOGIC (in place of spreadsheet)
     // ============================================================
     function loadLiveQueuesAdmin() {
       var tbody = document.getElementById("queuesAdminTableBody");
@@ -3007,7 +3007,7 @@
     }
 
     // ============================================================
-    // MANAGE QTC TAB LOGIC (بدلاً من الشيت)
+    // MANAGE QTC TAB LOGIC (in place of spreadsheet)
     // ============================================================
     function loadLiveQTCAdmin() {
       var tbody = document.getElementById("qtcAdminTableBody");
@@ -4255,7 +4255,7 @@
         if (reqSec) reqSec.style.display = "block";
         title.textContent = "🔐 Reset Password (Admin Approval Required)";
         desc.textContent = "For data security, password resets require explicit Admin approval. Submit a request first or enter your approved Reset Code:";
-        pinLabel.textContent = "Admin One-Time Approval Code (كود موافقة الإدمن)";
+        pinLabel.textContent = "Admin One-Time Approval Code (OTP)";
         submitBtn.textContent = "🔄 Verify Code & Reset Password";
       }
 
@@ -4295,8 +4295,8 @@
         btn.textContent = "📩 Submit Reset Request to Admin";
         if (!data.ok) throw new Error(data.message || "Request failed");
         msg.style.color = "var(--success)";
-        msg.innerHTML = "✅ <strong>تم إرسال طلب إعادة التعيين للإدمن بنجاح!</strong><br>"
-          + "بمجرد موافقة مسؤول النظام (Admin) على طلبك في لوحة التحكم، سيصلك <strong>كود التأكيد السري المكون من 6 أرقام تلقائياً على بريدك الإلكتروني</strong> لتكتبه أدناه وتختار كلمة المرور الجديدة.";
+        msg.innerHTML = "✅ <strong>Password reset request submitted successfully!</strong><br>"
+          + "Once a system administrator approves your request in the dashboard, you will automatically receive a <strong>6-digit verification code via email</strong>. Enter the code below to set your new password.";
       })
       .catch(function(err) {
         btn.disabled = false;
@@ -4509,13 +4509,13 @@ async function syncGoogleSheetsClient(isAuto) {
       syncPill.textContent = '⚡ Live Edge Synced (' + new Date().toLocaleTimeString() + ')';
     }
     if (!isAuto) {
-      alert('✅ تم مزامنة أحدث بيانات Google Sheets بنجاح! (العدد الإجمالي: ' + (data.total_submissions || _totalDbCount) + ')');
+      alert('✅ Google Sheets data synchronized successfully! (Total submissions: ' + (data.total_submissions || _totalDbCount) + ')');
     }
     fetchLiveDataOnly();
   } catch(err) {
     console.warn('Sync error:', err);
     if (!isAuto) {
-      alert('❌ فشلت المزامنة: ' + (err.message || err));
+      alert('❌ Sync failed: ' + (err.message || err));
     }
   } finally {
     _isSyncingSheets = false;

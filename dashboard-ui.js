@@ -147,63 +147,63 @@ window.renderGmReport = typeof renderGmReport !== "undefined" ? renderGmReport :
 window.renderShiftComparison = typeof renderShiftComparison !== "undefined" ? renderShiftComparison : null;
 
 const QUEUE_HEADER_EXPLANATIONS = {
- 'name': { title: 'Queue Name', desc: 'اسم الكيو أو مسار العمل الخاص بالتاسكات', note: 'اضغط للترتيب أبجدياً' },
- 'shifts': { title: 'Shifts', desc: 'الشيفتات التي سجلت تسليمات في هذا الكيو' },
- 'floors': { title: 'Floors / Units', desc: 'الأدوار والوحدات المكانية المشاركة في العمل' },
- 'qtcs': { title: 'QCs / QTCs', desc: 'مسؤولو الجودة والمراجعة المشرفون على هذا الكيو' },
- 'lidarFP': { title: 'Lidar FP (First Pass)', desc: 'تاسكات الليدار مرحلة الفيرست باس الأولى', note: 'اضغط للترتيب حسب الحجم' },
- 'lidarQA': { title: 'Lidar QA (Quality Assurance)', desc: 'تاسكات الليدار مرحلة مراجعة الجودة', note: 'اضغط للترتيب حسب الحجم' },
- 'laneFP': { title: 'Lane Line FP', desc: 'تاسكات اللين لاين مرحلة الفيرست باس', note: 'اضغط للترتيب حسب الحجم' },
- 'laneQA': { title: 'Lane Line QA', desc: 'تاسكات اللين لاين مرحلة مراجعة الجودة', note: 'اضغط للترتيب حسب الحجم' },
- 'totalSubmit': { title: 'Total Submit', desc: 'إجمالي عدد التاسكات المسلمة المسجلة لهذا الكيو عبر كافة المراحل', note: 'اضغط للترتيب' },
- 'uniqueLabelers': { title: 'Unique Labelers', desc: 'عدد أفراد اللابلرز الفريدين (محسوب بالرقم القومي 14 رقم بالضبط)', note: 'اضغط للترتيب' },
- 'avgSubmit': { title: 'Avg Submit / Labeler', desc: 'معدل الإنتاجية المتوسط = Total Submit ÷ Unique Labelers', note: 'اضغط للترتيب' },
- 'uniqueQtc': { title: 'Total Unique QTC', desc: 'عدد مسؤولي الجودة (QTCs) الفريدين المشرفين على هذا الكيو', note: 'اضغط للترتيب' }
+ 'name': { title: 'Queue Name', desc: 'Name of the task queue or operational workflow path', note: 'Click to sort alphabetically' },
+ 'shifts': { title: 'Shifts', desc: 'Operational shifts with recorded submissions in this queue' },
+ 'floors': { title: 'Floors / Units', desc: 'Physical floors and operational units working on this queue' },
+ 'qtcs': { title: 'QCs / QTCs', desc: 'Quality controllers and review supervisors overseeing this queue' },
+ 'lidarFP': { title: 'Lidar FP (First Pass)', desc: 'Lidar first-pass annotation submissions', note: 'Click to sort by volume' },
+ 'lidarQA': { title: 'Lidar QA (Quality Assurance)', desc: 'Lidar quality assurance review submissions', note: 'Click to sort by volume' },
+ 'laneFP': { title: 'Lane Line FP', desc: 'Lane Line first-pass annotation submissions', note: 'Click to sort by volume' },
+ 'laneQA': { title: 'Lane Line QA', desc: 'Lane Line quality assurance review submissions', note: 'Click to sort by volume' },
+ 'totalSubmit': { title: 'Total Submit', desc: 'Total submitted tasks recorded for this queue across all passes', note: 'Click to sort' },
+ 'uniqueLabelers': { title: 'Unique Labelers', desc: 'Unique active labelers (deduplicated by 14-digit National ID)', note: 'Click to sort' },
+ 'avgSubmit': { title: 'Avg Submit / Labeler', desc: 'Average productivity = Total Submit ÷ Unique Labelers', note: 'Click to sort' },
+ 'uniqueQtc': { title: 'Total Unique QTC', desc: 'Distinct quality supervisors overseeing this queue', note: 'Click to sort' }
 };
 
 const FLOOR_HEADER_EXPLANATIONS = {
- 'floor': { title: 'Floor / Unit / Room', desc: 'اسم الدور أو الغرفة أو الوحدة المكانية (مثل 4th Floor, NC Room 102)', note: 'اضغط للترتيب أبجدياً' },
- 'shifts': { title: 'Active Shifts', desc: 'الشيفتات التي سجلت إنتاجية في هذا الدور (Morning, Night, Over Night)' },
- 'uniqueQtcs': { title: 'Supervising QTCs', desc: 'عدد مسؤولي الجودة المشرفين على هذا الدور - حوّم لرؤية قائمة الأسماء', note: 'اضغط للترتيب' },
- 'lidarFP': { title: 'Lidar FP', desc: 'إجمالي تاسكات ليدار فيرست باس المسلمة في هذا الدور', note: 'اضغط للترتيب' },
- 'lidarQA': { title: 'Lidar QA', desc: 'إجمالي تاسكات ليدار مراجعة الجودة في هذا الدور', note: 'اضغط للترتيب' },
- 'laneFP': { title: 'Lane Line FP', desc: 'إجمالي تاسكات لين لاين فيرست باس في هذا الدور', note: 'اضغط للترتيب' },
- 'laneQA': { title: 'Lane Line QA', desc: 'إجمالي تاسكات لين لاين مراجعة الجودة في هذا الدور', note: 'اضغط للترتيب' },
- 'totalSubmit': { title: 'Total Submit', desc: 'إجمالي عدد التاسكات المسلمة من جميع العاملين في هذا الدور', note: 'اضغط للترتيب' },
- 'uniqueLabelers': { title: 'Unique Labelers', desc: 'عدد أفراد اللابلرز الفريدين في هذا الدور (محسوب بالرقم القومي 14 رقم)', note: 'اضغط للترتيب' },
- 'avgSubmit': { title: 'Avg Submit / Labeler', desc: 'معدل الإنتاجية المتوسط للدور = Total Submit ÷ Unique Labelers', note: 'اضغط للترتيب' },
- 'sharePct': { title: 'Floor Share %', desc: 'نسبة مساهمة هذا الدور من إجمالي تسليمات الشركة المعروضة', note: 'اضغط للترتيب' }
+ 'floor': { title: 'Floor / Unit / Room', desc: 'Floor, room, or operational unit identifier (e.g. 4th Floor, NC Room 102)', note: 'Click to sort alphabetically' },
+ 'shifts': { title: 'Active Shifts', desc: 'Shifts with recorded production on this floor (Morning, Night, Over Night)' },
+ 'uniqueQtcs': { title: 'Supervising QTCs', desc: 'Count of quality supervisors overseeing this floor — hover to view roster', note: 'Click to sort' },
+ 'lidarFP': { title: 'Lidar FP', desc: 'Total Lidar first-pass tasks submitted on this floor', note: 'Click to sort' },
+ 'lidarQA': { title: 'Lidar QA', desc: 'Total Lidar quality assurance tasks submitted on this floor', note: 'Click to sort' },
+ 'laneFP': { title: 'Lane Line FP', desc: 'Total Lane Line first-pass tasks submitted on this floor', note: 'Click to sort' },
+ 'laneQA': { title: 'Lane Line QA', desc: 'Total Lane Line quality assurance tasks submitted on this floor', note: 'Click to sort' },
+ 'totalSubmit': { title: 'Total Submit', desc: 'Total submissions from all contributors on this floor', note: 'Click to sort' },
+ 'uniqueLabelers': { title: 'Unique Labelers', desc: 'Unique labelers on this floor (deduplicated by 14-digit National ID)', note: 'Click to sort' },
+ 'avgSubmit': { title: 'Avg Submit / Labeler', desc: 'Floor average productivity = Total Submit ÷ Unique Labelers', note: 'Click to sort' },
+ 'sharePct': { title: 'Floor Share %', desc: 'Percentage contribution of this floor to total enterprise submissions', note: 'Click to sort' }
 };
 
 const QF_HEADER_EXPLANATIONS = {
- 'qtc': { title: 'QTC Name', desc: 'اسم مسؤول الجودة المشرف على الفريق', note: 'اضغط للترتيب أبجدياً' },
- 'floor': { title: 'Floor / Unit', desc: 'الدور أو الوحدة المكانية للعمل', note: 'اضغط للترتيب' },
- 'shifts': { title: 'Shifts', desc: 'الشيفتات التي عمل بها هذا الفريق' },
- 'lidarFP': { title: 'Lidar FP', desc: 'تاسكات ليدار فيرست باس', note: 'اضغط للترتيب' },
- 'lidarQA': { title: 'Lidar QA', desc: 'تاسكات ليدار كواليتي (QA)', note: 'اضغط للترتيب' },
- 'laneFP': { title: 'Lane Line FP', desc: 'تاسكات لين لاين فيرست باس', note: 'اضغط للترتيب' },
- 'laneQA': { title: 'Lane Line QA', desc: 'تاسكات لين لاين كواليتي (QA)', note: 'اضغط للترتيب' },
- 'totalSubmit': { title: 'Total Submit', desc: 'إجمالي التاسكات المسلمة لهذا الـ QTC والدور', note: 'اضغط للترتيب' },
- 'uniqueLabelers': { title: 'Unique Labelers', desc: 'عدد اللابلرز الفريدين (محسوبين بالرقم القومي 14 رقم)', note: 'اضغط للترتيب' },
- 'avgSubmit': { title: 'Avg Submit / Labeler', desc: 'متوسط الإنتاجية = Total Submit ÷ Unique Labelers', note: 'اضغط للترتيب' }
+ 'qtc': { title: 'QTC Name', desc: 'Name of the Quality Controller supervising the team', note: 'Click to sort alphabetically' },
+ 'floor': { title: 'Floor / Unit', desc: 'Physical floor or unit location of the team', note: 'Click to sort' },
+ 'shifts': { title: 'Shifts', desc: 'Active shifts for this supervisor and team' },
+ 'lidarFP': { title: 'Lidar FP', desc: 'Lidar first-pass task submissions', note: 'Click to sort' },
+ 'lidarQA': { title: 'Lidar QA', desc: 'Lidar quality assurance (QA) task submissions', note: 'Click to sort' },
+ 'laneFP': { title: 'Lane Line FP', desc: 'Lane Line first-pass task submissions', note: 'Click to sort' },
+ 'laneQA': { title: 'Lane Line QA', desc: 'Lane Line quality assurance (QA) task submissions', note: 'Click to sort' },
+ 'totalSubmit': { title: 'Total Submit', desc: 'Total tasks submitted under this QTC and floor', note: 'Click to sort' },
+ 'uniqueLabelers': { title: 'Unique Labelers', desc: 'Unique labelers supervised (deduplicated by 14-digit National ID)', note: 'Click to sort' },
+ 'avgSubmit': { title: 'Avg Submit / Labeler', desc: 'Average productivity = Total Submit ÷ Unique Labelers', note: 'Click to sort' }
 };
 
 const PERF_HEADER_EXPLANATIONS = {
- 'rank': { title: 'Rank', desc: 'الترتيب التنازلي حسب إجمالي عدد الأوبجكت المنجزة' },
- 'labeler': { title: 'Labeler Name', desc: 'اسم اللابلر أو الرقم القومي 14 رقم' },
- 'totalObjects': { title: 'Total Objects', desc: 'إجمالي عدد الأوبجكت في جميع التاسكات المسلمة' },
- 'tasks': { title: 'Tasks Count', desc: 'إجمالي عدد التاسكات المسلمة (صفوف التسليم)' },
- 'largestTask': { title: 'Largest Task', desc: 'أكبر تاسك من حيث عدد الأوبجكت المنجزة دفعة واحدة' },
- 'shifts': { title: 'Shifts', desc: 'الشيفتات التي قام بالعمل خلالها' },
- 'qtcs': { title: 'QTCs', desc: 'مسؤولو الجودة المشرفون على تسليماته' }
+ 'rank': { title: 'Rank', desc: 'Descending rank ordered by total completed objects or submissions' },
+ 'labeler': { title: 'Labeler Name', desc: 'Contributor name and masked identifier' },
+ 'totalObjects': { title: 'Total Objects', desc: 'Cumulative object count across all submitted tasks' },
+ 'tasks': { title: 'Tasks Count', desc: 'Total number of submitted tasks (task rows)' },
+ 'largestTask': { title: 'Largest Task', desc: 'Single task with highest object count' },
+ 'shifts': { title: 'Shifts', desc: 'Shifts during which submissions were logged' },
+ 'qtcs': { title: 'QTCs', desc: 'Supervisors who oversaw these submissions' }
 };
 
 const DAILY_HEADER_EXPLANATIONS = {
- 'queue': { title: 'Queue & Modality', desc: 'اسم الكيو ومسار العمل ونوع الموداليتي (Lidar / Lane Line)' },
- 'fpLabelers': { title: 'Unique Labelers (FP)', desc: 'عدد اللابلرز الفريدين في مرحلة الفيرست باس (محسوبين بالرقم القومي 14 رقم)' },
- 'fpSubmits': { title: 'Total Submit (FP)', desc: 'إجمالي عدد تاسكات الفيرست باس المسلمة في هذا اليوم' },
- 'qaLabelers': { title: 'Unique Labelers (QA)', desc: 'عدد اللابلرز الفريدين في مرحلة مراجعة الجودة (QA)' },
- 'qaSubmits': { title: 'Total Submit (QA)', desc: 'إجمالي عدد تاسكات الكواليتي المسلمة في هذا اليوم' }
+ 'queue': { title: 'Queue & Modality', desc: 'Queue name, operational path, and modality (Lidar / Lane Line)' },
+ 'fpLabelers': { title: 'Unique Labelers (FP)', desc: 'Unique labelers in First Pass (deduplicated by 14-digit National ID)' },
+ 'fpSubmits': { title: 'Total Submit (FP)', desc: 'Total First Pass submissions during this period' },
+ 'qaLabelers': { title: 'Unique Labelers (QA)', desc: 'Unique labelers in QA (deduplicated by 14-digit National ID)' },
+ 'qaSubmits': { title: 'Total Submit (QA)', desc: 'Total Quality Assurance submissions during this period' }
 };
 
 function copyCurrentSummaryToClipboard(){
@@ -280,11 +280,11 @@ function openGuideModal(){
    +'<div class="guide-content" style="font-size:13px;line-height:1.7;color:var(--text)">'
     +'<h4 style="margin:12px 0 6px;color:var(--text)">📐 Metric Definitions</h4>'
     +'<ul style="padding-left:20px;margin:0 0 16px">'
-     +'<li><b>Total Submit (إجمالي التسليمات):</b> Total rows matching current filters. Each row represents one submitted task.</li>'
-     +'<li><b>Unique Labelers (اللابلرز الفريدين):</b> Distinct labelers calculated strictly using 14-digit Egyptian National ID (الرقم القومي). Incomplete or missing IDs are highlighted in notes.</li>'
-     +'<li><b>Avg Submit / Labeler (متوسط التسليم لكل لابلر):</b> Total Submissions ÷ Unique Labelers. Measures productivity per individual.</li>'
-     +'<li><b>Total Unique QTC (مسؤولو الجودة):</b> Distinct Quality Controllers / QTCs present in the selection.</li>'
-     +'<li><b>Active Queues (الكيوات النشطة):</b> Count of active task queues in the dataset.</li>'
+     +'<li><b>Total Submit:</b> Total rows matching current filters. Each row represents one submitted task.</li>'
+     +'<li><b>Unique Labelers:</b> Distinct labelers calculated strictly using 14-digit Egyptian National ID. Incomplete or missing IDs are highlighted in notes.</li>'
+     +'<li><b>Avg Submit / Labeler:</b> Total Submissions ÷ Unique Labelers. Measures productivity per individual.</li>'
+     +'<li><b>Total Unique QTC:</b> Distinct Quality Controllers / QTCs present in the selection.</li>'
+     +'<li><b>Active Queues:</b> Count of active task queues in the dataset.</li>'
     +'</ul>'
     +'<h4 style="margin:12px 0 6px;color:var(--text)">🚀 Work Modality & Stages</h4>'
     +'<ul style="padding-left:20px;margin:0 0 16px">'
@@ -710,75 +710,75 @@ function renderUniversalFilterBar(pageKey) {
   let activeTagsHtml = '';
   if (hasAnyFilter) {
     activeTagsHtml = '<div class="uf-tags-strip">'
-      + '<span class="uf-tags-lbl">الفلاتر النشطة (Active):</span>'
-      + (globalUnifiedFilters.date ? '<span class="uf-tag">📅 يوم: <b>' + esc(globalUnifiedFilters.date) + '</b> <button type="button" class="uf-tag-del" data-clear="date">✕</button></span>' : '')
-      + (globalUnifiedFilters.from ? '<span class="uf-tag">من: <b>' + esc(globalUnifiedFilters.from) + '</b> <button type="button" class="uf-tag-del" data-clear="from">✕</button></span>' : '')
-      + (globalUnifiedFilters.to ? '<span class="uf-tag">إلى: <b>' + esc(globalUnifiedFilters.to) + '</b> <button type="button" class="uf-tag-del" data-clear="to">✕</button></span>' : '')
-      + (globalUnifiedFilters.floor ? '<span class="uf-tag">🏢 فلور: <b>' + esc(globalUnifiedFilters.floor) + '</b> <button type="button" class="uf-tag-del" data-clear="floor">✕</button></span>' : '')
-      + (globalUnifiedFilters.qtc ? '<span class="uf-tag">👤 مشرف: <b>' + esc(globalUnifiedFilters.qtc) + '</b> <button type="button" class="uf-tag-del" data-clear="qtc">✕</button></span>' : '')
-      + (globalUnifiedFilters.shift ? '<span class="uf-tag">⏱️ شيفت: <b>' + esc(globalUnifiedFilters.shift) + '</b> <button type="button" class="uf-tag-del" data-clear="shift">✕</button></span>' : '')
-      + '<button type="button" class="uf-clear-all-link" id="ufClearAllLink_' + pageKey + '">مسح كل الفلاتر</button>'
+      + '<span class="uf-tags-lbl">Active Filters:</span>'
+      + (globalUnifiedFilters.date ? '<span class="uf-tag">📅 Date: <b>' + esc(globalUnifiedFilters.date) + '</b> <button type="button" class="uf-tag-del" data-clear="date">✕</button></span>' : '')
+      + (globalUnifiedFilters.from ? '<span class="uf-tag">From: <b>' + esc(globalUnifiedFilters.from) + '</b> <button type="button" class="uf-tag-del" data-clear="from">✕</button></span>' : '')
+      + (globalUnifiedFilters.to ? '<span class="uf-tag">To: <b>' + esc(globalUnifiedFilters.to) + '</b> <button type="button" class="uf-tag-del" data-clear="to">✕</button></span>' : '')
+      + (globalUnifiedFilters.floor ? '<span class="uf-tag">🏢 Floor: <b>' + esc(globalUnifiedFilters.floor) + '</b> <button type="button" class="uf-tag-del" data-clear="floor">✕</button></span>' : '')
+      + (globalUnifiedFilters.qtc ? '<span class="uf-tag">👤 QTC: <b>' + esc(globalUnifiedFilters.qtc) + '</b> <button type="button" class="uf-tag-del" data-clear="qtc">✕</button></span>' : '')
+      + (globalUnifiedFilters.shift ? '<span class="uf-tag">⏱️ Shift: <b>' + esc(globalUnifiedFilters.shift) + '</b> <button type="button" class="uf-tag-del" data-clear="shift">✕</button></span>' : '')
+      + '<button type="button" class="uf-clear-all-link" id="ufClearAllLink_' + pageKey + '">Clear All Filters</button>'
       + '</div>';
   }
 
   return '<div class="universal-filter-panel" data-uf-page="' + pageKey + '">'
     + '<div class="uf-header-row">'
       + '<div class="uf-header-left">'
-        + '<span class="uf-header-badge">⚡ الفلاتر العامة الموحدة (Operational Filters)</span>'
+        + '<span class="uf-header-badge">⚡ Universal Operational Filters</span>'
         + '<span class="uf-stats-badge ' + (hasAnyFilter ? 'active-filter-badge' : '') + '">'
-          + 'عرض <b>' + filteredCount.toLocaleString() + '</b> من <b>' + totalCount.toLocaleString() + '</b> مهمة (' + pct + '%)'
+          + 'Showing <b>' + filteredCount.toLocaleString() + '</b> of <b>' + totalCount.toLocaleString() + '</b> tasks (' + pct + '%)'
         + '</span>'
       + '</div>'
       + '<div class="uf-header-right">'
-        + (hasAnyFilter ? '<button type="button" class="btn btn-sm btn-uf-reset" id="ufResetBtn_' + pageKey + '">↺ تفريغ الفلاتر (Reset All)</button>' : '')
+        + (hasAnyFilter ? '<button type="button" class="btn btn-sm btn-uf-reset" id="ufResetBtn_' + pageKey + '">↺ Reset All Filters</button>' : '')
       + '</div>'
     + '</div>'
 
     + '<div class="uf-grid-controls">'
       // 1. Date Picker (Any day) & Presets & Custom Range
       + '<div class="uf-ctrl-box uf-ctrl-date">'
-        + '<label class="uf-ctrl-lbl" for="ufDate_' + pageKey + '">📅 التاريخ (أي يوم - Date):</label>'
+        + '<label class="uf-ctrl-lbl" for="ufDate_' + pageKey + '">📅 Specific Date:</label>'
         + '<div class="uf-date-actions-wrap">'
           + '<div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">'
-            + '<input type="date" class="uf-input-date" id="ufDate_' + pageKey + '" value="' + esc(globalUnifiedFilters.date) + '" title="اختر أي يوم لتصفية كل البيانات">'
+            + '<input type="date" class="uf-input-date" id="ufDate_' + pageKey + '" value="' + esc(globalUnifiedFilters.date) + '" title="Select any date to filter all data">'
             + '<div class="uf-presets-group">'
-              + '<button type="button" class="uf-preset-btn ' + (isToday ? 'active' : '') + '" data-uf-date-preset="today">اليوم</button>'
-              + '<button type="button" class="uf-preset-btn ' + (isYesterday ? 'active' : '') + '" data-uf-date-preset="yesterday">أمس</button>'
-              + '<button type="button" class="uf-preset-btn ' + (isAllDays ? 'active' : '') + '" data-uf-date-preset="all">الكل</button>'
+              + '<button type="button" class="uf-preset-btn ' + (isToday ? 'active' : '') + '" data-uf-date-preset="today">Today</button>'
+              + '<button type="button" class="uf-preset-btn ' + (isYesterday ? 'active' : '') + '" data-uf-date-preset="yesterday">Yesterday</button>'
+              + '<button type="button" class="uf-preset-btn ' + (isAllDays ? 'active' : '') + '" data-uf-date-preset="all">All</button>'
             + '</div>'
           + '</div>'
           + '<div style="display:flex; gap:6px; align-items:center; margin-top:4px;">'
-            + '<span style="font-size:11px; color:var(--text-soft); white-space:nowrap;">أو فترة من:</span>'
-            + '<input type="date" class="uf-input-date-sm" id="ufFrom_' + pageKey + '" value="' + esc(globalUnifiedFilters.from) + '" title="من تاريخ">'
-            + '<span style="font-size:11px; color:var(--text-soft);">إلى:</span>'
-            + '<input type="date" class="uf-input-date-sm" id="ufTo_' + pageKey + '" value="' + esc(globalUnifiedFilters.to) + '" title="إلى تاريخ">'
+            + '<span style="font-size:11px; color:var(--text-soft); white-space:nowrap;">Or Range: From:</span>'
+            + '<input type="date" class="uf-input-date-sm" id="ufFrom_' + pageKey + '" value="' + esc(globalUnifiedFilters.from) + '" title="From date">'
+            + '<span style="font-size:11px; color:var(--text-soft);">To:</span>'
+            + '<input type="date" class="uf-input-date-sm" id="ufTo_' + pageKey + '" value="' + esc(globalUnifiedFilters.to) + '" title="To date">'
           + '</div>'
         + '</div>'
       + '</div>'
 
       // 2. Floor (= Unit) Dropdown
       + '<div class="uf-ctrl-box">'
-        + '<label class="uf-ctrl-lbl" for="ufFloor_' + pageKey + '">🏢 الفلور = Unit (Floor):</label>'
+        + '<label class="uf-ctrl-lbl" for="ufFloor_' + pageKey + '">🏢 Floor / Unit:</label>'
         + '<select class="uf-input-select" id="ufFloor_' + pageKey + '">'
-          + '<option value="">🏢 كل الفلورات (All Floors / Units)</option>'
+          + '<option value="">🏢 All Floors / Units</option>'
           + opts.floors.map(f => '<option value="' + esc(f) + '" ' + (globalUnifiedFilters.floor === f ? 'selected' : '') + '>' + esc(f) + '</option>').join('')
         + '</select>'
       + '</div>'
 
       // 3. QTC Supervisor Dropdown
       + '<div class="uf-ctrl-box">'
-        + '<label class="uf-ctrl-lbl" for="ufQtc_' + pageKey + '">👤 المشرف (QTC Supervisor):</label>'
+        + '<label class="uf-ctrl-lbl" for="ufQtc_' + pageKey + '">👤 QTC Supervisor:</label>'
         + '<select class="uf-input-select" id="ufQtc_' + pageKey + '">'
-          + '<option value="">👤 كل المشرفين (All QTCs)</option>'
+          + '<option value="">👤 All QTCs</option>'
           + opts.qtcs.map(q => '<option value="' + esc(q) + '" ' + (globalUnifiedFilters.qtc === q ? 'selected' : '') + '>' + esc(q) + '</option>').join('')
         + '</select>'
       + '</div>'
 
       // 4. Shift Dropdown
       + '<div class="uf-ctrl-box">'
-        + '<label class="uf-ctrl-lbl" for="ufShift_' + pageKey + '">⏱️ الشيفت (Shift):</label>'
+        + '<label class="uf-ctrl-lbl" for="ufShift_' + pageKey + '">⏱️ Shift:</label>'
         + '<select class="uf-input-select" id="ufShift_' + pageKey + '">'
-          + '<option value="">⏱️ كل الشيفتات (All Shifts)</option>'
+          + '<option value="">⏱️ All Shifts</option>'
           + opts.shifts.map(s => '<option value="' + esc(s) + '" ' + (globalUnifiedFilters.shift === s ? 'selected' : '') + '>' + esc(s) + '</option>').join('')
         + '</select>'
       + '</div>'
@@ -890,7 +890,7 @@ function resetUniversalFilters() {
   globalUnifiedFilters.shift = '';
   applyGlobalFilters();
   if (typeof showToast === 'function') {
-    showToast('✓ تم تفريغ جميع الفلاتر الموحدة (Filters reset)');
+    showToast('✓ All operational filters reset');
   }
 }
 
@@ -4045,10 +4045,10 @@ function renderGmReport(){
   // Grand totals across all 24 hours
   const grand24hSubmits = baseRows.length;
   const activeDateDisplay = globalUnifiedFilters.date 
-    ? ('📅 يوم: ' + globalUnifiedFilters.date)
+    ? ('📅 Day: ' + globalUnifiedFilters.date)
     : (globalUnifiedFilters.from && globalUnifiedFilters.to)
-      ? ('📅 فترة: ' + globalUnifiedFilters.from + ' → ' + globalUnifiedFilters.to)
-      : ('📅 كافة الأيام المتاحة (All-time: ' + cairoToday() + ')');
+      ? ('📅 Range: ' + globalUnifiedFilters.from + ' → ' + globalUnifiedFilters.to)
+      : ('📅 All Available History (All-time: ' + cairoToday() + ')');
 
   page.innerHTML = `
     <div class="ux-overview">
@@ -4056,7 +4056,7 @@ function renderGmReport(){
         <div>
           <div class="ux-eyebrow">24-Hour Operational Diagnostics · 3 Sequential Shift Reports</div>
           <h2>📊 GM Report — 3 Shift Daily Activity</h2>
-          <p>${esc(activeDateDisplay)} · مقسمة زمنياً بنظام 24 ساعة (ON · Morning · Night)</p>
+          <p>${esc(activeDateDisplay)} · 24-Hour Sequential Shift Windows (ON · Morning · Night)</p>
         </div>
         <div class="ux-tools">
           ${renderHeaderControlsHTML('gm')}
@@ -4071,16 +4071,16 @@ function renderGmReport(){
         <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:14px; margin-bottom:12px;">
           <div>
             <h3 style="margin:0 0 4px; font-size:16px; font-weight:700; color:var(--text); display:flex; align-items:center; gap:8px;">
-              <span>⏱️</span> 24-Hour Operational Summary (إجمالي اليوم بالكامل)
+              <span>⏱️</span> 24-Hour Operational Summary (Consolidated Daily)
             </h3>
             <p style="margin:0; font-size:12px; color:var(--text-soft);">
-              إجمالي تسليمات اليوم: <b style="color:var(--primary); font-size:14px;">${grand24hSubmits.toLocaleString()}</b> مهمة مسجلة موزعة على الـ 3 شيفتات بالتساوي (8 ساعات لكل شيفت).
+              Total Daily Submissions: <b style="color:var(--primary); font-size:14px;">${grand24hSubmits.toLocaleString()}</b> recorded tasks distributed across 3 shifts (8 hours per shift).
             </p>
           </div>
           <div style="display:flex; align-items:center; gap:8px;">
             <label style="font-size:12px; color:var(--text-soft); display:flex; align-items:center; gap:6px; cursor:pointer;">
               <input type="checkbox" id="gmHideZeroToggle" ${gmReportFilters.hideZero !== false ? 'checked' : ''}>
-              إخفاء الكيوهات الصفرية في الجداول
+              Hide Inactive Queues
             </label>
           </div>
         </div>
@@ -4166,7 +4166,7 @@ function renderGmReport(){
 
         <!-- Quick Jump Navigation -->
         <div class="gm-shift-nav-bar">
-          <span style="font-size:11.5px; font-weight:700; color:var(--muted);">الانتقال المباشر للتقرير:</span>
+          <span style="font-size:11.5px; font-weight:700; color:var(--muted);">Jump directly to report:</span>
           <div class="gm-shift-jump-group">
             ${shiftReports.map(rep => `
               <a href="#gmShiftSec_${rep.meta.key}" class="gm-shift-jump-btn">
@@ -4195,7 +4195,7 @@ function renderGmReport(){
                   <span class="daily-mod ${rep.meta.badgeClass}">${rep.meta.timeWindow}</span>
                 </h3>
                 <p>
-                  تقرير تفصيلي لإنتاجية الكيوهات الخاصة بفترة الشيفت (${rep.meta.timeWindow}). الكيوهات بدون تسليمات خلال هذه الفترة يتم استبعادها تلقائياً.
+                  Detailed queue productivity report for shift window (${rep.meta.timeWindow}). Queues without submissions during this period are excluded.
                 </p>
               </div>
               <div style="display:flex; align-items:center; gap:8px;">
@@ -4245,7 +4245,7 @@ function renderGmReport(){
                   ${!rep.groups.length ? `
                     <tr>
                       <td colspan="5" class="ux-empty" style="text-align:center; padding:32px; color:var(--muted);">
-                        لا توجد تسليمات مسجلة في هذا الكيو خلال فترة ${rep.meta.name} (${rep.meta.timeWindow}).
+                        No submissions recorded for this queue during ${rep.meta.name} (${rep.meta.timeWindow}).
                       </td>
                     </tr>
                   ` : ''}

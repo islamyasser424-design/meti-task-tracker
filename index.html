@@ -1696,7 +1696,7 @@ input[type=number] { -moz-appearance: textfield; }
     <div class="header-right-actions">
       <div class="instructions-btn-wrap">
         <span class="instructions-arabic-label">
-          لو متلغبط اقرا
+          Need Help? Read Here
           <span class="arrow-down-anim">👇</span>
         </span>
         <a href="#"
@@ -1815,7 +1815,7 @@ input[type=number] { -moz-appearance: textfield; }
               </div>
               <div id="labNameWarn" class="warn-box">
                 <span class="warn-icon">&#9888;</span>
-                <span>اسمك باللغه الانجلزيه</span>
+                <span>Full name in English</span>
               </div>
             </div>
             <div class="field">
@@ -1823,7 +1823,7 @@ input[type=number] { -moz-appearance: textfield; }
               <input type="text" id="natId" placeholder="e.g. 30001011234567" required autocomplete="off" data-lpignore="true" inputmode="numeric" maxlength="14">
               <div id="natIdWarn" class="warn-box">
                 <span class="warn-icon">&#9888;</span>
-                <span>الرقم القومي لازم يكون 14 رقم بالظبط</span>
+                <span>National ID must be exactly 14 digits</span>
               </div>
             </div>
           </div>
@@ -1896,19 +1896,19 @@ input[type=number] { -moz-appearance: textfield; }
     <input type="text" id="taskLink" placeholder="https://labeling.robot.car/#..." required autocomplete="off" inputmode="url">
     <div id="linkNoStageWarn" class="warn-box" dir="rtl" style="display:none">
       <span class="warn-icon">&#9888;</span>
-      <span>فين الـ <span dir="ltr">Stage</span> اللي في الـ <span dir="ltr">Link</span></span>
+      <span>Missing Stage in Link</span>
     </div>
     <div id="linkNoIdWarn" class="warn-box" dir="rtl" style="display:none">
       <span class="warn-icon">&#9888;</span>
-      <span>فين الـ <span dir="ltr">Task ID</span> اللي في الـ <span dir="ltr">Link</span></span>
+      <span>Missing Task ID in Link</span>
     </div>
     <div id="linkShortIdWarn" class="warn-box" dir="rtl" style="display:none">
       <span class="warn-icon">&#9888;</span>
-      <span>الـ <span dir="ltr">Task ID</span> لازم يكون <span dir="ltr">10</span> أرقام على الأقل</span>
+      <span>Task ID must be at least 10 digits</span>
     </div>
     <div id="linkArabicWarn" class="warn-box" dir="rtl" style="display:none">
       <span class="warn-icon">&#9888;</span>
-      <span>الـ <span dir="ltr">Link</span> مش بيقبل حروف عربية</span>
+      <span>Task Link cannot contain Arabic characters</span>
     </div>
   </div>
 
@@ -1963,15 +1963,15 @@ input[type=number] { -moz-appearance: textfield; }
       </div>
       <div id="taskIdNumWarn" class="warn-box" dir="rtl">
         <span class="warn-icon">&#9888;</span>
-        <span>ارقام بس</span>
+        <span>Numbers only</span>
       </div>
       <div id="taskIdWarn" class="warn-box" dir="rtl">
         <span class="warn-icon">&#9888;</span>
-        <span>خلي بالك الـ <span dir="ltr">Task ID</span> مختلف عن اللي في الـ <span dir="ltr">Link</span></span>
+        <span>Warning: Task ID does not match Link</span>
       </div>
-      <div id="taskIdShortWarn" class="warn-box" dir="rtl" style="display:none">
+      <div id="taskIdShortWarn" class="warn-box" dir="ltr" style="display:none">
         <span class="warn-icon">&#9888;</span>
-        <span>الـ <span dir="ltr">Task ID</span> لازم يكون <span dir="ltr">10</span> أرقام على الأقل</span>
+        <span>Task ID must be at least 10 digits</span>
       </div>
     </div>
     <div class="field">
@@ -1990,7 +1990,7 @@ input[type=number] { -moz-appearance: textfield; }
       </div>
       <div id="passWarn" class="warn-box" dir="rtl">
         <span class="warn-icon">&#9888;</span>
-        <span id="passWarnText">خلي بالك الـ <span dir="ltr">Pass</span> مختلف عن اللي في الـ <span dir="ltr">Link</span></span>
+        <span id="passWarnText">Warning: Pass does not match Link</span>
       </div>
     </div>
   </div>
@@ -2073,8 +2073,8 @@ input[type=number] { -moz-appearance: textfield; }
 <div id="dbDupOverlay">
   <div class="db-dup-dialog">
     <div class="db-dup-icon">🚫</div>
-    <div class="db-dup-title" style="direction:rtl;">الـ Task ده اتبعت مره بالفعل موجود في الـ Data Base</div>
-    <div class="db-dup-subtitle" style="direction:rtl;">الـ System لقى نفس الـ Task موجود في الـ Data Base</div>
+    <div class="db-dup-title" style="direction:ltr;">Duplicate Task Detected in Database</div>
+    <div class="db-dup-subtitle" style="direction:ltr;">This task was already submitted and exists in the database</div>
     <div class="db-dup-info-box">
       <div class="db-dup-info-row">
         <span class="db-dup-info-label">Task ID</span>
@@ -2090,10 +2090,10 @@ input[type=number] { -moz-appearance: textfield; }
       </div>
     </div>
     <div class="db-dup-warn-text">
-      ⚠️ لو ده <span class="highlight">غلط</span> وإنت متأكد إن ده Task جديد — <span class="highlight">بلّغ الـ QC</span> ومتبعتوش تاني
+      ⚠️ If this is an <span class="highlight">error</span> and you are sure this is a new task — <span class="highlight">contact QC</span> and do not submit again
     </div>
     <button class="db-dup-btn-ok" id="dbDupOkBtn" type="button">
-      حسناً — هرجع أتأكد من الـ Link
+      OK — I will verify the Link
     </button>
   </div>
 </div>
@@ -2138,12 +2138,12 @@ function apiFetch(endpoint, options) {
 }
 
 // ============================================================
-// GAS_WEBAPP_URL — رابط الـ Web App بتاع Apps Script (اللي فيه doGet)
-// ده بيقرا أسماء الـ QTC وقائمة الـ Queue Name لايف من شيتات:
+// GAS_WEBAPP_URL — Apps Script Web App endpoint
+// Live QTC roster and Queue list from sheets
 // "Morning QTC" / "Night QTC" / "Over Night QTC" / "Queue List"
-// ⚠️ لازم تستبدل الرابط ده برابط الـ Deployment بتاعك
-// (من الشيت: Extensions → Apps Script → Deploy → New deployment → Web app → Execute as: Me → Who has access: Anyone)
-// لازم ينتهي بـ /exec
+// Must be set to active deployment URL
+// Deploy as Web App accessible to authorized clients
+// URL must end with /exec
 // ============================================================
 var GAS_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbxa-Id35-ob1ZCgajX-NLKtz6xPLJVqBd20v7rXdlsoTmeP6nhfvl0of2U2j1RKo3A/exec";
 
@@ -2234,10 +2234,10 @@ function renderCounter() {
 setInterval(function() { getCounter(); renderCounter(); }, 60000);
 
 // ============================================================
-// QTC_DATA — دلوقتي بتتقرا لايف من شيتات "Morning QTC" / "Night QTC" /
-// "Over Night QTC" عن طريق GAS_WEBAPP_URL (شوف loadQTCData تحت).
-// الأوبجكت هنا بيفضل فاضي لحد ما البيانات توصل من الشيت؛ لو الفورم
-// فتح والنت بطيء أو الرابط لسه متظبطش، هيفضل فاضي وهيبان تحذير بسيط.
+// QTC_DATA — Live QTC roster cached in memory
+// Loaded from respective shift tabs
+// Initialized empty until data arrives
+// Fallback defaults used if offline
 // ============================================================
 var QTC_DATA = {};
 
@@ -2579,7 +2579,7 @@ function buildQTCGrid(shift, preserveName){
   var grid=document.getElementById("qtcGrid"),disp=document.getElementById("qtcSelectedDisplay"),
       wrap=document.getElementById("qtcPickerWrap"),msg=document.getElementById("qtcShiftMsg"),
       hid=document.getElementById("qtcName");
-  // لو مبعتش اسم نحافظ عليه، حافظ على اللي متختار حاليًا (لو أي) بدل ما يتمسح
+  // Preserve current selection if still valid
   var keepName = (preserveName !== undefined) ? preserveName : selectedQTC;
   selectedQTC=null;hid.value="";disp.innerHTML="";grid.innerHTML="";
   var list=QTC_DATA[shift];
@@ -2587,7 +2587,7 @@ function buildQTCGrid(shift, preserveName){
     wrap.style.display="none";msg.style.display="block";
     msg.innerHTML = qtcDataLoaded
       ? "&#9432; Please select a QTC Shift first to view available names."
-      : "&#9432; بيتم تحميل الأسماء... Loading names...";
+      : "&#9432; Loading names...";
     return;
   }
   msg.style.display="none";wrap.style.display="block";
@@ -2607,7 +2607,7 @@ function buildQTCGrid(shift, preserveName){
     card.innerHTML='<div class="qtc-check"></div><div><div class="qtc-name">'+p.name+'</div>'+(p.role?'<div class="qtc-role">'+p.role+'</div>':'')+'</div>';
     card.addEventListener("click",function(){ selectCard(card,p); });
     grid.appendChild(card);
-    // رجّع نفس الاختيار القديم لو الاسم لسه موجود في القايمة الجديدة
+    // Restore previous selection
     if(keepName && p.name === keepName){ selectCard(card,p); }
   });
 }
@@ -2621,10 +2621,10 @@ document.getElementById("qtcSearch").addEventListener("input",function(){
 });
 
 // ══════════════════════════════════════════════════════════════
-// LIVE DATA — القراءة من شيتات Morning/Night/Over Night QTC + Queue List
-// عن طريق الـ Apps Script Web App (GAS_WEBAPP_URL)
-// أي تعديل (إضافة/حذف اسم أو Queue) في الشيتات هيبان في الفورم من
-// غير ما حد يلمس الكود خالص.
+// LIVE DATA — Roster sync from Sheets
+// Via Web App API
+// Updates reflect automatically
+// Zero code changes needed.
 // ══════════════════════════════════════════════════════════════
 function escapeHtml(str){
   return String(str).replace(/[&<>"']/g, function(c){
@@ -2632,7 +2632,7 @@ function escapeHtml(str){
   });
 }
 
-// بيلف الجزء اللي محتاج يتلون (highlight) جوه اسم الـ Queue بـ <span class="hl">
+// Highlights matched search string
 function buildQueueLiHTML(name, highlight){
   var safeName = escapeHtml(name);
   if(!highlight) return safeName;
@@ -2644,8 +2644,8 @@ function buildQueueLiHTML(name, highlight){
   return before + '<span class="hl">' + mid + '</span>' + after;
 }
 
-// بيعيد بناء حقل Queue Name بالكامل ببيانات جديدة، وبيعمل reset لكل
-// الـ event listeners بتاعته عشان ميحصلش تكرار (duplicate binding)
+// Rebuilds Queue field with new data
+// Resets event listeners to prevent duplicate bindings
 function renderQueueList(items){
   var wrap = document.getElementById("queueFieldWrap");
   if(!wrap || !items) return;
@@ -2672,13 +2672,13 @@ function renderQueueList(items){
 }
 
 // ══════════════════════════════════════════════════════════════
-// FAST LOAD — بدل نداءين منفصلين لـ Apps Script (queue + qtc)، بقى
-// نداء واحد بس (action=all) وده بيقلل زمن الانتظار تقريبًا للنص.
-// كمان بنحفظ آخر بيانات نزلت في localStorage، وأول ما الفورم يفتح
-// بنعرضها فورًا (من غير أي "Loading names...") وفي نفس الوقت بنجيب
-// النسخة الجديدة من الشيت في الخلفية وبنحدث الشاشة لو فيه فرق.
-// النتيجة: التحضير بيبان فورًا من أول فتح تاني للفورم، وأي تعديل
-// في شيت الـ QTC أو الـ Queue List بيوصل خلال ثواني قليلة تلقائيًا.
+// FAST LOAD — Single round-trip API query
+// Halves network latency
+// Caches data locally for instant render
+// Renders instantly from cache
+// Background refresh ensures freshness
+// Instant startup time
+// Live changes arrive within seconds
 // ══════════════════════════════════════════════════════════════
 var NK_FORM_DATA_CACHE = "meti_form_data_cache_v1";
 
@@ -2690,9 +2690,9 @@ function applyFormData(data){
     QTC_DATA = data.qtc;
     qtcDataLoaded = true;
     var currentShift = document.getElementById("qtcShiftSel") ? document.getElementById("qtcShiftSel").value : "";
-    // كنا بنعمل rebuild للكروت في كل مرة (كل 20 ثانية + كل رجوع للتاب)
-    // وده كان بيمسح اختيار المستخدم ويعمل قفزة سكرول.
-    // دلوقتي: rebuild بس لو البيانات فعلاً اتغيرت، ونحافظ على الاسم المختار.
+    // Conditional rebuild only when data changed
+    // Preserves user inputs and scroll state
+    // Rebuild only on true data diff
     if(currentShift && qtcChanged) buildQTCGrid(currentShift, selectedQTC);
   }
   if(Array.isArray(data.queue)){
@@ -2701,31 +2701,31 @@ function applyFormData(data){
 }
 
 function loadAllFormData(){
-  // 1) اعرض فورًا آخر نسخة محفوظة (لو موجودة) عشان الفورم يبان جاهز على طول
+  // 1) Immediate cache display
   try {
     var cachedRaw = localStorage.getItem(NK_FORM_DATA_CACHE);
     if(cachedRaw){
       applyFormData(JSON.parse(cachedRaw));
     }
-  } catch(e) { /* تجاهل أي خطأ في الكاش */ }
+  } catch(e) { /* Ignore cache errors */ }
 
-  if(!GAS_WEBAPP_URL || GAS_WEBAPP_URL.indexOf("AKfycb...") > -1) return; // لسه مفيش رابط متظبط
+  if(!GAS_WEBAPP_URL || GAS_WEBAPP_URL.indexOf("AKfycb...") > -1) return; // Unconfigured deployment URL
 
-  // 2) في نفس الوقت، هات النسخة الأحدث من الشيت وحدث الشاشة والكاش
+  // 2) Fetch latest version in background
   fetch(GAS_WEBAPP_URL + "?action=all", { cache: "no-store" })
     .then(function(r){ return r.json(); })
     .then(function(data){
       applyFormData(data);
       try { localStorage.setItem(NK_FORM_DATA_CACHE, JSON.stringify(data)); } catch(e) {}
     })
-    .catch(function(){ /* لو فشل، هيفضل شغال بالكاش أو بالقائمة الافتراضية جوه الـ HTML */ });
+    .catch(function(){ /* Fallback to cache on error */ });
 }
 
 loadAllFormData();
 
 // ══════════════════════════════════════════════════════════════
-// SCROLL RESTORE — عشان أي Reload للصفحة ميرميش المستخدم لفوق،
-// بنحفظ مكان الـ Scroll أول بأول وبنرجعه تلقائيًا بعد التحميل
+// SCROLL RESTORE — Preserves scroll position across reloads
+// Automatic scroll restoration
 // ══════════════════════════════════════════════════════════════
 if("scrollRestoration" in history) history.scrollRestoration = "manual";
 
@@ -2747,19 +2747,19 @@ var NK_SCROLL_POS = "meti_scroll_pos_v1";
     try { y = parseInt(sessionStorage.getItem(NK_SCROLL_POS), 10) || 0; } catch(e) {}
     if(y > 0) window.scrollTo(0, y);
   }
-  // بنحاول نرجع المكان أكتر من مرة عشان لو المحتوى (Queue/QTC) اتحمل
-  // بعدين وغيّر طول الصفحة، الـ Scroll يفضل صح
+  // Multiple attempts for async DOM loading
+  // Keeps scroll position stable
   restoreScroll();
   setTimeout(restoreScroll, 100);
   setTimeout(restoreScroll, 400);
   window.addEventListener("load", restoreScroll);
 })();
 
-// كل 20 ثانية، هات آخر نسخة من الشيت تلقائيًا من غير ما المستخدم يعمل Refresh
-// (لو التاب فاتح من قبل التعديل، هيتحدث لوحده)
+// 20s interval auto-refresh
+// Tab stays updated automatically
 setInterval(loadAllFormData, 20000);
 
-// كمان لما المستخدم يرجع للتاب بعد ما يكون سايبها (تبديل تاب/نافذة)، حدّث فورًا
+// Refresh immediately on tab focus
 document.addEventListener("visibilitychange", function(){
   if(document.visibilityState === "visible") loadAllFormData();
 });
@@ -2960,35 +2960,35 @@ else if(/^buffer$/i.test(pcVal)){document.getElementById("pcNo").value="Buffer";
   else if(!/^[a-zA-Z\s]+$/.test(lab)){me("labName");err=true;toast("Labeler Name: English letters only","err");return;}
   else{ce("labName");}
   if(!natId){me("natId");err=true;}
-  else if(!/^\d{14}$/.test(natId)){me("natId");err=true;toast("National ID: لازم يكون 14 رقم بالظبط","err");return;}
+  else if(!/^\d{14}$/.test(natId)){me("natId");err=true;toast("National ID must be exactly 14 digits","err");return;}
   else{ce("natId");}
   chkDD("qtcShiftSel","qtcShiftBtn");
   if(!document.getElementById("qtcName").value){var w=document.getElementById("qtcPickerWrap");w.style.border="1.5px solid var(--error)";w.style.borderRadius="8px";w.style.padding="8px";err=true;}
   else{var w2=document.getElementById("qtcPickerWrap");w2.style.border="";w2.style.padding="";}
   if(!yk){me("yk");err=true;}
-  else{var is6=/^\d{6}$/.test(yk),isE=/^[a-zA-Z]{2}\d+@meti\.ai$/i.test(yk);if(!is6&&!isE){me("yk");err=true;toast("Yubikey: لازم يكون 6 ارقام او me123456@meti.ai","err");return;}else{ce("yk");}}
+  else{var is6=/^\d{6}$/.test(yk),isE=/^[a-zA-Z]{2}\d+@meti\.ai$/i.test(yk);if(!is6&&!isE){me("yk");err=true;toast("Yubikey must be 6 digits or me123456@meti.ai","err");return;}else{ce("yk");}}
   chkDD("modality","modalityBtn"); chkDD("qName","queueBtn");
   if(!lnk.startsWith("https://labeling.robot.car/#")){me("taskLink");err=true;}else{ce("taskLink");}
   var taskIdVal=document.getElementById("taskId").value.trim();
   if(!taskIdVal){me("taskId");err=true;}else{ce("taskId");}
   chkDD("pass","passBtn");
-  if(/[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(lnk)){me("taskLink");toast("الـ Link مش بيقبل حروف عربية","err");return;}
+  if(/[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(lnk)){me("taskLink");toast("Task Link cannot contain Arabic characters","err");return;}
   var stageVal=document.getElementById("stageField").value.trim();
   var taskIdInLink=!!document.getElementById("taskLink").value.trim().match(/\/id\/\d+/);
   if(!stageVal && !taskIdInLink){
     var sfEl=document.getElementById("stageField");
     sfEl.style.borderColor="var(--error)";sfEl.style.boxShadow="0 0 0 3px rgba(192,57,43,.1)";
-    me("taskLink");toast("Task Link: اللينك لازم يحتوي على Stage و Task ID","err");return;
+    me("taskLink");toast("Task Link must contain Stage and Task ID","err");return;
   } else if(!stageVal){
     var sfEl=document.getElementById("stageField");
     sfEl.style.borderColor="var(--error)";sfEl.style.boxShadow="0 0 0 3px rgba(192,57,43,.1)";
-    me("taskLink");toast("Task Link: اللينك لازم يحتوي على Stage صح","err");return;
+    me("taskLink");toast("Task Link must contain a valid Stage","err");return;
   } else if(!taskIdInLink){
-    me("taskLink");toast("Task Link: اللينك لازم يحتوي على Task ID","err");return;
+    me("taskLink");toast("Task Link must contain a Task ID","err");return;
   } else {
     var idInLink=lnk.match(/\/id\/(\d+)/);
     if(idInLink && idInLink[1].length < 10){
-      me("taskLink"); me("taskId");toast("الـ Task ID لازم يكون 10 أرقام على الأقل","err");return;
+      me("taskLink"); me("taskId");toast("Task ID must be at least 10 digits","err");return;
     }
     var sfEl2=document.getElementById("stageField");
     sfEl2.style.borderColor="#1a8a5a";sfEl2.style.boxShadow="";ce("taskLink");
