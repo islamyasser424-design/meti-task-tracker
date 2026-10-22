@@ -1,5 +1,5 @@
 /* ============ AUTH GATE & RBAC (Integrated with METI Central Dashboard & Secure Backend) ============ */
-var API_BASE = window.MEEG_API_URL || localStorage.getItem("meeg_api_url") || (window.location.hostname.includes("github.io") ? "https://meeg-secure-api.islamyasser424.workers.dev" : "");
+var API_BASE = window.MEEG_API_URL || localStorage.getItem("meeg_api_url") || "https://meeg-secure-api.islamyasser424.workers.dev";
 
 if (typeof window.getAuthToken !== "function") {
   window.getAuthToken = function() {
@@ -1393,10 +1393,20 @@ function loadData(){
     if(b)b.disabled=false;
     onCsvTable(table);
   })
-  .catch(e => {
-    setSyncActive(false);setTrafficLight('red');if(b)b.disabled=false;
-    if(rawRows.length>0){showToast('⚠️ Could not refresh — showing the last loaded data');}
-    else showErr('Failed to load data: '+e.message);
+    .catch(e => {
+    fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=0`)
+    .then(r => {
+      if (!r.ok) throw new Error('Sheet HTTP ' + r.status);
+      return r.text();
+    })
+    .then(csv => {
+      onCsvData(csv, false);
+    })
+    .catch(sheetErr => {
+      setSyncActive(false);setTrafficLight('red');if(b)b.disabled=false;
+      if(rawRows.length>0){showToast('⚠️ Could not refresh — showing the last loaded data');}
+      else showErr('Failed to load data: '+e.message);
+    });
   });
 }
 function onCsvData(text,fromCache){

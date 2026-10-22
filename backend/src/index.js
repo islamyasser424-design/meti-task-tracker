@@ -798,6 +798,28 @@ export default {
         return json(result, 200, corsHeaders);
       }
 
+      // ------------------------------------------------------------
+      // ANALYTICS DATASET (Masked by default, Admin gets full National IDs)
+      // ------------------------------------------------------------
+      if (pathname === "/api/analytics/dataset" && request.method === "GET") {
+        const maybeUser = await verifySession(request, env);
+        const role = maybeUser ? maybeUser.role : "qt";
+        const limit = Math.min(25000, parseInt(url.searchParams.get("limit") || "10000", 10));
+        const rawRows = await db(
+          env,
+          `SELECT id, timestamp, shift, unit, pc_no, labeler_name, national_id, qtc_shift, yubikey_email, qtc_name, stage, task_link, pass, modality, queue_name, object_count, created_at 
+           FROM task_submissions 
+           ORDER BY id DESC 
+           LIMIT ?`,
+          [limit]
+        );
+        const rows = rawRows.map(r => ({
+          ...r,
+          national_id: maskNationalId(r.national_id, role)
+        }));
+        return json({ ok: true, count: rows.length, rows }, 200, corsHeaders);
+      }
+
       // ============================================================
       // PROTECTED ROUTES REQUIRE VALID AUTHENTICATION
       // ============================================================
@@ -1102,23 +1124,7 @@ export default {
         }, 200, corsHeaders);
       }
 
-      if (pathname === "/api/analytics/dataset" && request.method === "GET") {
-        // Return recent dataset rows for charts and performance tables
-        const limit = Math.min(25000, parseInt(url.searchParams.get("limit") || "10000", 10));
-        const rawRows = await db(
-          env,
-          `SELECT id, timestamp, shift, unit, pc_no, labeler_name, national_id, qtc_shift, yubikey_email, qtc_name, stage, task_link, pass, modality, queue_name, object_count, created_at 
-           FROM task_submissions 
-           ORDER BY id DESC 
-           LIMIT ?`,
-          [limit]
-        );
-        const rows = rawRows.map(r => ({
-          ...r,
-          national_id: maskNationalId(r.national_id, user.role)
-        }));
-        return json({ ok: true, count: rows.length, rows }, 200, corsHeaders);
-      }
+
 
 
       return json({ error: "not_found", message: "Endpoint not found" }, 404, corsHeaders);

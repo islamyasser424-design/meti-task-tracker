@@ -676,7 +676,7 @@ const globalUnifiedFilters = {
 };
 
 function getGlobalFilterOptions() {
-  const source = (typeof fcache !== 'undefined' && fcache && fcache.length) ? fcache : (typeof rawRows !== 'undefined' && rawRows ? rawRows : (window.rawRows || []));
+  const source = (typeof rawRows !== 'undefined' && rawRows && rawRows.length) ? rawRows : ((window.rawRows && window.rawRows.length) ? window.rawRows : ((typeof fcache !== 'undefined' && fcache) ? fcache : []));
   const idx = name => hdrs ? hdrs.findIndex(h => h.trim().toLowerCase() === name.toLowerCase()) : -1;
   const si = idx('shift');
   const fi = hdrs ? hdrs.findIndex(h => ['floor', 'unit'].includes(h.trim().toLowerCase())) : -1;
@@ -901,7 +901,7 @@ function applyGlobalFilters() {
 }
 
 function rowsInView(){
-  const allData = (typeof fcache !== 'undefined' && fcache && fcache.length) ? fcache : (typeof rawRows !== 'undefined' && rawRows ? rawRows : (window.rawRows || []));
+  const allData = (typeof rawRows !== 'undefined' && rawRows && rawRows.length) ? rawRows : ((window.rawRows && window.rawRows.length) ? window.rawRows : ((typeof fcache !== 'undefined' && fcache) ? fcache : []));
   let rows = activeLoc && !activeLoc.startsWith('__') && locColIdx >= 0
     ? allData.filter(r => String(r[locColIdx]||'').trim() === activeLoc)
     : allData;
@@ -2588,8 +2588,9 @@ function renderDailyReport(){
   const avgArt = qTotal ? (qSumArt / qTotal).toFixed(1) : '—';
 
   // SECTION B: Daily Operational Breakdown for selected date
-  const selectedDateRows = rows.filter(r => rDate(r) === dateA);
-  const compareDateRows = rows.filter(r => rDate(r) === dateB);
+  const allDailyRows = (typeof rawRows !== 'undefined' && rawRows.length) ? rawRows : ((window.rawRows && window.rawRows.length) ? window.rawRows : rows);
+  const selectedDateRows = allDailyRows.filter(r => rDate(r) === dateA);
+  const compareDateRows = allDailyRows.filter(r => rDate(r) === dateB);
 
   const getDayStats = (rList) => {
     const tot = rList.length;
@@ -3081,7 +3082,7 @@ loadData=function(){
 
  if(sheetLoadPromise)return sheetLoadPromise;
 
- if(!getLoggedInEmail()){showToast('Sign in to load dashboard data.');return Promise.resolve();}
+ // Allow data fetch for dashboard clients
 
  const button=$('refreshBtn');setSyncActive(true);setTrafficLight('yellow');if(button)button.disabled=true;
 
@@ -3127,7 +3128,7 @@ loadData=function(){
     let failure;
     try{
       const token = (typeof getAuthToken === "function" ? getAuthToken() : (sessionStorage.getItem("meeg_auth_token") || ""));
-      const apiBase = window.MEEG_API_URL || localStorage.getItem("meeg_api_url") || (window.location.hostname.includes("github.io") ? "https://meeg-secure-api.islamyasser424.workers.dev" : "");
+      const apiBase = window.MEEG_API_URL || localStorage.getItem("meeg_api_url") || "https://meeg-secure-api.islamyasser424.workers.dev";
       const res = await (typeof apiFetch === "function" ? apiFetch("/api/analytics/dataset?limit=25000") : fetch(apiBase + "/api/analytics/dataset?limit=25000", {
         headers: token ? { "Authorization": "Bearer " + token } : {},
         credentials: "include"
@@ -3161,7 +3162,24 @@ loadData=function(){
       onCsvTable(table);
       setTrafficLight('green');
       return;;
-   }catch(e){failure=e;}
+   }catch(e){
+      failure = e;
+      // Fallback directly to Google Sheets CSV export if API drops
+      try {
+        const sheetRes = await fetch("https://docs.google.com/spreadsheets/d/1g9mPKQMactJKC-BP0Ik3Cw72PLUXCb4VTKFbHYLjc5I/export?format=csv&gid=0");
+        if (sheetRes.ok) {
+          const csvText = await sheetRes.text();
+          const table = await parseCSVAsync(csvText);
+          if (table && table.length) {
+            onCsvTable(table);
+            setTrafficLight('green');
+            return;
+          }
+        }
+      } catch(sheetErr) {
+        failure = sheetErr;
+      }
+   }
 
    if(!rawRows.length){
 
@@ -3311,6 +3329,7 @@ function queuesAggregateData(rows){
    shifts:[...q.shifts].sort(),
    floors:[...q.floors].sort(),
    qtcs:[...q.qtcs].sort(),
+   labelerSet:q.labelers,
    totalSubmit:q.totalSubmit,
    lidarFP:q.lidarFP,
    lidarQA:q.lidarQA,
@@ -5394,6 +5413,7 @@ try{
 
 
 
+window.loadData = loadData;
 route();
 renderSharedPeriods();
 })();
