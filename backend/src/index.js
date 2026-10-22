@@ -775,17 +775,24 @@ export default {
           return json({ error: "duplicate_task", message: "Task ID already submitted!" }, 409, corsHeaders);
         }
 
-        await db(
-          env,
-          `INSERT INTO task_submissions 
-           (timestamp, shift, unit, pc_no, labeler_name, national_id, qtc_shift, yubikey_email, qtc_name, stage, task_link, task_id, pass, modality, queue_name, object_count) 
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [
-            timestamp, shift, unit, pc_no, labeler_name, national_id,
-            qtc_shift, yubikey_email, qtc_name, stage, task_link, task_id,
-            pass, modality, queue_name, object_count
-          ]
-        );
+        try {
+          await db(
+            env,
+            `INSERT INTO task_submissions 
+             (timestamp, shift, unit, pc_no, labeler_name, national_id, qtc_shift, yubikey_email, qtc_name, stage, task_link, task_id, pass, modality, queue_name, object_count) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+              timestamp, shift, unit, pc_no, labeler_name, national_id,
+              qtc_shift, yubikey_email, qtc_name, stage, task_link, task_id,
+              pass, modality, queue_name, object_count
+            ]
+          );
+        } catch (insertErr) {
+          if (String(insertErr.message || "").includes("UNIQUE constraint failed")) {
+            return json({ error: "duplicate_task", message: "Task ID already submitted!" }, 409, corsHeaders);
+          }
+          throw insertErr;
+        }
 
         return json({ ok: true, message: "Task submitted successfully" }, 201, corsHeaders);
       }
