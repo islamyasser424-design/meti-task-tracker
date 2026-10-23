@@ -6,7 +6,7 @@ import worker from "../src/index.js";
 
 let localEnv = {};
 try {
-  const envPath = path.resolve(".env");
+  const envPath = path.resolve(import.meta.dirname || ".", "../.env");
   if (fs.existsSync(envPath)) {
     const lines = fs.readFileSync(envPath, "utf-8").split("\n");
     for (const l of lines) {

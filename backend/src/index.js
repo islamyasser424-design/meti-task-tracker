@@ -1178,7 +1178,7 @@ export default {
       // 12. QUEUES & QTC MANAGEMENT
       // ------------------------------------------------------------
       if (pathname === "/api/queues" && request.method === "GET") {
-        const rows = await db(env, "SELECT id, name, highlight, created_at FROM custom_queues ORDER BY name ASC");
+        const rows = await db(env, "SELECT id, name, highlight, COALESCE(is_hidden, 0) AS is_hidden, created_at FROM custom_queues ORDER BY name ASC");
         return json({ ok: true, queues: rows }, 200, corsHeaders);
       }
 
@@ -1225,6 +1225,22 @@ export default {
 
         await db(env, "INSERT OR REPLACE INTO custom_qtc (shift, name, role) VALUES (?, ?, ?)", [shift, name, role]);
         return json({ ok: true, message: "QTC member added" }, 201, corsHeaders);
+      }
+
+      const qtcUpdateMatch = pathname.match(/^\/api\/qtc\/(\d+)$/);
+      if (qtcUpdateMatch && request.method === "PUT") {
+        if (!isSupervisor) return json({ error: "forbidden" }, 403, corsHeaders);
+        const qtcId = qtcUpdateMatch[1];
+        const b = await request.json().catch(() => ({}));
+        const role = b.role !== undefined ? String(b.role).trim() : null;
+        const shift = b.shift !== undefined ? String(b.shift).trim() : null;
+        const name = b.name !== undefined ? String(b.name).trim() : null;
+        await db(
+          env,
+          "UPDATE custom_qtc SET role = COALESCE(?, role), shift = COALESCE(?, shift), name = COALESCE(?, name) WHERE id = ?",
+          [role, shift, name, qtcId]
+        );
+        return json({ ok: true, message: "QTC member updated" }, 200, corsHeaders);
       }
 
       const qtcDeleteMatch = pathname.match(/^\/api\/qtc\/(\d+)$/);

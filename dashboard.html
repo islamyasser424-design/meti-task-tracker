@@ -1493,7 +1493,22 @@
     .theme-toggle-btn span {
       line-height: 1;
     }
-  </style>
+  
+    /* Phone / Mobile Responsive Optimizations */
+    @media (max-width: 768px) {
+      .app-layout { flex-direction: column !important; }
+      .sidebar { width: 100% !important; min-width: 100% !important; border-right: none !important; border-bottom: 1px solid var(--border); }
+      .side-nav { display: flex; flex-wrap: wrap; gap: 4px; padding: 6px !important; }
+      .side-nav-btn { flex: 1 1 45%; padding: 6px 8px !important; font-size: 0.78rem !important; }
+      .main-content { padding: 10px 8px !important; }
+      .table-wrap { overflow-x: auto !important; -webkit-overflow-scrolling: touch !important; }
+      table { min-width: 550px; }
+      .admin-mgmt-card { padding: 12px 10px !important; }
+      .admin-form-box { padding: 10px !important; }
+    }
+
+  
+    </style>
 </head>
 <body>
 
@@ -1920,9 +1935,10 @@
               <tr>
                 <th style="width:50px;">#</th>
                 <th>Queue Name</th>
-                <th style="width:120px;">Highlight</th>
-                <th style="width:160px;">Date Added</th>
-                <th style="width:100px; text-align:center;">Action</th>
+                <th style="width:110px;">Highlight</th>
+                <th style="width:120px; text-align:center;">Form Visibility</th>
+                <th style="width:150px;">Date Added</th>
+                <th style="width:170px; text-align:center;">Action</th>
               </tr>
             </thead>
             <tbody id="queuesAdminTableBody">
@@ -2929,6 +2945,18 @@
           ? ' <button class="btn-action secondary" style="padding:2px 6px; font-size:0.7rem; margin-left:4px;" title="Edit Highlight tag" onclick="editQueueHighlight(' + q.id + ', _adminQueuesCache[' + idx + '].highlight)">✏️</button>'
           : '';
 
+        var isHidden = !!q.is_hidden;
+        var visBadge = isHidden
+          ? '<span style="color:#ef4444; background:rgba(239,68,68,0.12); padding:2px 8px; border-radius:4px; font-size:0.75rem; font-weight:700;">🙈 Hidden</span>'
+          : '<span style="color:#10b981; background:rgba(16,185,129,0.12); padding:2px 8px; border-radius:4px; font-size:0.75rem; font-weight:700;">👁️ Visible</span>';
+
+        var toggleHideBtn = canManage
+          ? (isHidden
+              ? '<button class="btn-action" style="padding:3px 8px; font-size:0.72rem; margin-right:4px;" title="Show queue in task form" onclick="toggleQueueVisibility(' + q.id + ', false)">👁️ Show</button>'
+              : '<button class="btn-action secondary" style="padding:3px 8px; font-size:0.72rem; margin-right:4px;" title="Hide queue from task form" onclick="toggleQueueVisibility(' + q.id + ', true)">🙈 Hide</button>'
+            )
+          : '';
+
         var delBtn = canManage
           ? '<button class="del-btn" onclick="deleteQueueFromDashboard(' + q.id + ')">🗑️ Delete</button>'
           : '<span style="color:var(--text-muted); font-size:0.75rem;">View Only</span>';
@@ -2937,8 +2965,9 @@
           + '<td style="color:var(--text-muted);">' + (idx + 1) + '</td>'
           + '<td><code style="font-weight:700; color:var(--primary-dark); font-size:0.85rem;">' + q.name + '</code></td>'
           + '<td>' + hlBadge + editHlBtn + '</td>'
+          + '<td style="text-align:center;">' + visBadge + '</td>'
           + '<td style="color:var(--text-secondary); font-size:0.75rem;">' + q.created_at + '</td>'
-          + '<td style="text-align:center;">' + delBtn + '</td>'
+          + '<td style="text-align:center;">' + toggleHideBtn + delBtn + '</td>'
           + '</tr>';
       });
       tbody.innerHTML = html;
@@ -3009,6 +3038,23 @@
       });
     }
 
+    
+    function toggleQueueVisibility(id, setHidden) {
+      apiFetch("/api/queues/" + encodeURIComponent(id), {
+        method: "PUT",
+        body: JSON.stringify({ is_hidden: setHidden ? 1 : 0 })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (!data.ok) throw new Error(data.message || "Failed to update queue visibility");
+        loadLiveQueuesAdmin();
+      })
+      .catch(function(err) {
+        alert("Failed to toggle queue visibility: " + err.message);
+      });
+    }
+
+    
     function deleteQueueFromDashboard(id) {
       var item = _adminQueuesCache.find(function(x) { return x.id == id; });
       var name = item ? item.name : "ID #" + id;
@@ -3072,12 +3118,78 @@
           + '<td style="color:var(--text-muted);">' + (idx + 1) + '</td>'
           + '<td><span class="badge-shift">' + m.shift + '</span></td>'
           + '<td style="font-weight:700; color:var(--primary-dark); font-size:0.88rem;">' + m.name + '</td>'
-          + '<td><span style="color:var(--primary); font-weight:600;">' + (m.role || "QTC") + '</span></td>'
+          + '<td>' + renderQTCRoleCell(m) + '</td>'
           + '<td style="color:var(--text-secondary); font-size:0.75rem;">' + m.created_at + '</td>'
           + '' + ((_currentUser && (_currentUser.role === "admin" || _currentUser.role === "sv" || _currentUser.role === "wla" || _currentUser.role === "shift sv" || _currentUser.role === "floor sv")) ? '<td style="text-align:center;"><button class="del-btn" onclick="deleteQTCFromDashboard(' + m.id + ')">🗑️ Delete</button></td>' : '<td style="text-align:center; color:var(--text-muted); font-size:0.75rem;">View Only</td>') + ''
           + '</tr>';
       });
       tbody.innerHTML = html;
+    }
+
+    
+    function renderQTCRoleCell(m) {
+      var canManageQTC = (_currentUser && (isAdminOrSuperRole(_currentUser.role) || ["sv","wla","shift sv","floor sv"].includes((_currentUser.role||"").toLowerCase())));
+      var curRole = (m.role || "QTC").toUpperCase();
+      if (!canManageQTC) {
+        return '<span style="color:var(--primary); font-weight:600;">' + curRole + '</span>';
+      }
+      return '<select class="form-input" style="padding:3px 6px; font-size:0.75rem; border:1.5px solid var(--border); border-radius:4px; font-weight:700; color:var(--primary);" onchange="changeQTCRole(' + m.id + ', this.value)">'
+        + '<option value="QTC"' + (curRole === "QTC" ? ' selected' : '') + '>QTC</option>'
+        + '<option value="SV"' + (curRole === "SV" ? ' selected' : '') + '>SV</option>'
+        + '<option value="QC"' + (curRole === "QC" ? ' selected' : '') + '>QC</option>'
+        + '<option value="TL"' + (curRole === "TL" ? ' selected' : '') + '>TL</option>'
+        + '<option value="QT"' + (curRole === "QT" ? ' selected' : '') + '>QT</option>'
+        + '</select>';
+    }
+
+    function changeQTCRole(id, newRole) {
+      apiFetch("/api/qtc/" + id, {
+        method: "PUT",
+        body: JSON.stringify({ role: newRole })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (!data.ok) throw new Error(data.message || "Failed to update QTC role");
+        var item = _adminQTCCache.find(function(x) { return x.id == id; });
+        if (item) item.role = newRole;
+      })
+      .catch(function(err) {
+        alert("Failed to update role: " + err.message);
+        loadLiveQTCAdmin();
+      });
+    }
+
+    
+    function renderQTCRoleCell(m) {
+      var canManageQTC = (_currentUser && (isAdminOrSuperRole(_currentUser.role) || ["sv","wla","shift sv","floor sv"].includes((_currentUser.role||"").toLowerCase())));
+      var curRole = (m.role || "QTC").toUpperCase();
+      if (!canManageQTC) {
+        return '<span style="color:var(--primary); font-weight:600;">' + curRole + '</span>';
+      }
+      return '<select class="form-input" style="padding:3px 6px; font-size:0.75rem; border:1.5px solid var(--border); border-radius:4px; font-weight:700; color:var(--primary);" onchange="changeQTCRole(' + m.id + ', this.value)">'
+        + '<option value="QTC"' + (curRole === "QTC" ? ' selected' : '') + '>QTC</option>'
+        + '<option value="SV"' + (curRole === "SV" ? ' selected' : '') + '>SV</option>'
+        + '<option value="QC"' + (curRole === "QC" ? ' selected' : '') + '>QC</option>'
+        + '<option value="TL"' + (curRole === "TL" ? ' selected' : '') + '>TL</option>'
+        + '<option value="QT"' + (curRole === "QT" ? ' selected' : '') + '>QT</option>'
+        + '</select>';
+    }
+
+    function changeQTCRole(id, newRole) {
+      apiFetch("/api/qtc/" + id, {
+        method: "PUT",
+        body: JSON.stringify({ role: newRole })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (!data.ok) throw new Error(data.message || "Failed to update QTC role");
+        var item = _adminQTCCache.find(function(x) { return x.id == id; });
+        if (item) item.role = newRole;
+      })
+      .catch(function(err) {
+        alert("Failed to update role: " + err.message);
+        loadLiveQTCAdmin();
+      });
     }
 
     function addNewQTCFromDashboard() {
@@ -4050,7 +4162,7 @@
             + '<td><code style="font-weight:700; color:var(--primary);">' + uName + '</code></td>'
             + '<td>' + fName + '</td>'
             + '<td>' + emailHtml + '</td>'
-            + '<td><span class="' + roleBadgeClass + '">' + role.toUpperCase() + '</span></td>'
+            + '<td>' + renderUserRoleCell(u) + '</td>'
             + '<td>' + statusHtml + '</td>'
             + '<td><code style="font-size:0.8rem; letter-spacing:1px; font-weight:700;">' + pin + '</code></td>'
             + '<td>' + permSummary + '</td>'
@@ -4065,6 +4177,56 @@
         });
     }
 
+    
+    function renderUserRoleCell(u) {
+      var isCallerSuper = _currentUser && isSuperAdminRole(_currentUser.role);
+      var isTargetSuper = isSuperAdminRole(u.role);
+      var canEditRole = _currentUser && isAdminOrSuperRole(_currentUser.role);
+      var role = (u.role || "").toLowerCase().trim();
+      var roleBadgeClass = "role-badge role-badge-" + (role.replace(/\s+/g, '').toLowerCase() || "qt");
+
+      if (isTargetSuper) {
+        return '<span class="role-badge role-badge-superadmin">⭐ SUPER ADMIN</span>';
+      }
+      if (!canEditRole) {
+        return '<span class="' + roleBadgeClass + '">' + role.toUpperCase() + '</span>';
+      }
+
+      return '<select class="form-input" style="padding:3px 6px; font-size:0.75rem; border:1.5px solid var(--border); border-radius:4px; font-weight:700; color:var(--text);" onchange="changeUserRole(' + u.id + ', this.value, \'' + u.username + '\')">'
+        + (isCallerSuper ? '<option value="super admin">⭐ Super Admin</option>' : '')
+        + '<option value="admin"' + (role === "admin" ? ' selected' : '') + '>Admin</option>'
+        + '<option value="shift sv"' + (role === "shift sv" ? ' selected' : '') + '>Shift SV</option>'
+        + '<option value="floor sv"' + (role === "floor sv" ? ' selected' : '') + '>Floor SV</option>'
+        + '<option value="traning sv"' + (role === "traning sv" || role === "training sv" ? ' selected' : '') + '>Training SV</option>'
+        + '<option value="qtc"' + (role === "qtc" ? ' selected' : '') + '>QTC</option>'
+        + '<option value="sv"' + (role === "sv" ? ' selected' : '') + '>SV</option>'
+        + '<option value="wla"' + (role === "wla" ? ' selected' : '') + '>WLA</option>'
+        + '<option value="qt"' + (role === "qt" ? ' selected' : '') + '>QT</option>'
+        + '</select>';
+    }
+
+    function changeUserRole(id, newRole, username) {
+      if (!confirm("Are you sure you want to change role for @" + username + " to " + newRole.toUpperCase() + "?")) {
+        loadUsersList();
+        return;
+      }
+      apiFetch("/api/users/" + id, {
+        method: "PUT",
+        body: JSON.stringify({ role: newRole })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (!data.ok) throw new Error(data.message || "Failed to update role");
+        alert("Role for @" + username + " updated to " + newRole.toUpperCase());
+        loadUsersList();
+      })
+      .catch(function(err) {
+        alert("Failed to update user role: " + err.message);
+        loadUsersList();
+      });
+    }
+
+    
     function openPermissionsModal(userId) {
       _editingPermissionsUserId = userId;
       var user = _usersCache.find(function(u) { return u.id == userId; });

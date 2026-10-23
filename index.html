@@ -3525,7 +3525,8 @@ function loadLiveQueuesFromTurso() {
     .then(function(data) {
       if (data && data.queues) {
         _cachedAdminQueues = data.queues;
-        renderQueueList(data.queues);
+        var activeQueues = data.queues.filter(function(q) { return !q.is_hidden; });
+        renderQueueList(activeQueues);
       }
     })
     .catch(function(err) { console.warn("Failed to load queues:", err); });

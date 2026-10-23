@@ -514,6 +514,9 @@ let dailyReportCompareMode = false;
 
 const analysisFilters={from:'',to:'',modality:'all',shift:'',unit:'',qtc:'',category:'',chartCategory:'all'};
 const perfFilters={from:'',to:'',day:'',week:'',category:'',query:'',person:'',page:0};
+
+let _shiftReportViewMode = 'queues'; // 'queues' | 'floors' | 'qcs' | 'labelers'
+
 const gmReportFilters = { query: '', shift: '', floor: '', modality: 'all', from: '', to: '', sortCol: 'id', sortAsc: true };
 const shiftCompFilters = { shiftA: 'all', shiftB: 'all', floor: '', modality: 'all', from: '', to: '', subTab: 'floor', query: '' };
 const queuesFilters={query:'',shift:'',floor:'',category:'',sortCol:'totalSubmit',sortAsc:false,page:0,pageSize:25};
@@ -1498,9 +1501,9 @@ function renderOverview(){
         + (topQueues.map(([q, cnt], idx) => {
           const maxQ = topQueues[0][1] || 1;
           return '<div style="padding:4px 0; border-bottom:1px solid var(--border-light);">'
-            + '<div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:2px;">'
-              + '<span><b style="color:var(--text-soft); font-size:10px; margin-right:4px;">#' + (idx+1) + '</b> ' + esc(q) + '</span>'
-              + '<b>' + cnt.toLocaleString() + '</b>'
+            + '<div style="display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:12px; margin-bottom:2px;">'
+              + '<span style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:pointer;" data-tooltip-queue="' + esc(q) + '" title="' + esc(q) + '"><b style="color:var(--text-soft); font-size:10px; margin-right:4px;">#' + (idx+1) + '</b> ' + esc(q) + '</span>'
+              + '<b style="flex-shrink:0; margin-left:8px; font-variant-numeric:tabular-nums;">' + cnt.toLocaleString() + '</b>'
             + '</div>'
             + '<div style="height:4px; border-radius:2px; background:var(--border); overflow:hidden;">'
               + '<div style="height:100%; width:' + ((cnt/maxQ)*100) + '%; background:var(--accent);"></div>'
@@ -1520,9 +1523,9 @@ function renderOverview(){
         + (topQtcs.map(([qc, cnt], idx) => {
           const maxQc = topQtcs[0][1] || 1;
           return '<div style="padding:4px 0; border-bottom:1px solid var(--border-light);">'
-            + '<div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:2px;">'
-              + '<span><b style="color:var(--text-soft); font-size:10px; margin-right:4px;">#' + (idx+1) + '</b> ' + esc(qc) + '</span>'
-              + '<b>' + cnt.toLocaleString() + '</b>'
+            + '<div style="display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:12px; margin-bottom:2px;">'
+              + '<span style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="' + esc(qc) + '"><b style="color:var(--text-soft); font-size:10px; margin-right:4px;">#' + (idx+1) + '</b> ' + esc(qc) + '</span>'
+              + '<b style="flex-shrink:0; margin-left:8px; font-variant-numeric:tabular-nums;">' + cnt.toLocaleString() + '</b>'
             + '</div>'
             + '<div style="height:4px; border-radius:2px; background:var(--border); overflow:hidden;">'
               + '<div style="height:100%; width:' + ((cnt/maxQc)*100) + '%; background:#df8b24;"></div>'
@@ -1542,9 +1545,9 @@ function renderOverview(){
         + (topLabelers.map(([lbl, cnt], idx) => {
           const maxL = topLabelers[0][1] || 1;
           return '<div style="padding:4px 0; border-bottom:1px solid var(--border-light);">'
-            + '<div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:2px;">'
-              + '<span><b style="color:var(--text-soft); font-size:10px; margin-right:4px;">#' + (idx+1) + '</b> ' + esc(lbl) + '</span>'
-              + '<b>' + cnt.toLocaleString() + '</b>'
+            + '<div style="display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:12px; margin-bottom:2px;">'
+              + '<span style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="' + esc(lbl) + '"><b style="color:var(--text-soft); font-size:10px; margin-right:4px;">#' + (idx+1) + '</b> ' + esc(lbl) + '</span>'
+              + '<b style="flex-shrink:0; margin-left:8px; font-variant-numeric:tabular-nums;">' + cnt.toLocaleString() + '</b>'
             + '</div>'
             + '<div style="height:4px; border-radius:2px; background:var(--border); overflow:hidden;">'
               + '<div style="height:100%; width:' + ((cnt/maxL)*100) + '%; background:#10b981;"></div>'
@@ -3694,7 +3697,7 @@ function renderQueuesAnalysis(){
       + '<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:12px;">'
         + '<div style="background:var(--bg-3); padding:10px 14px; border-radius:8px; border-left:3px solid #10b981;">'
           + '<span class="ux-note">Top Queue by Volume</span>'
-          + '<div style="font-weight:700; font-size:13px; color:var(--text); margin-top:2px;">' + (topQueue ? esc(topQueue.name) + ' (' + topQueue.totalSubmit.toLocaleString() + ' tasks)' : '—') + '</div>'
+          + '<div style="font-weight:700; font-size:13px; color:var(--text); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="' + (topQueue ? esc(topQueue.name) + ' (' + topQueue.totalSubmit.toLocaleString() + ' tasks)' : '') + '">' + (topQueue ? esc(topQueue.name) + ' <span style="color:var(--text-soft); font-weight:500;">(' + topQueue.totalSubmit.toLocaleString() + ')</span>' : '—') + '</div>'
         + '</div>'
         + '<div style="background:var(--bg-3); padding:10px 14px; border-radius:8px; border-left:3px solid #8b5cf6;">'
           + '<span class="ux-note">Workload Concentration (Top 3 Queues)</span>'
@@ -3702,7 +3705,7 @@ function renderQueuesAnalysis(){
         + '</div>'
         + '<div style="background:var(--bg-3); padding:10px 14px; border-radius:8px; border-left:3px solid #f59e0b;">'
           + '<span class="ux-note">Lowest Volume Queue</span>'
-          + '<div style="font-weight:700; font-size:13px; color:var(--text); margin-top:2px;">' + (lowestQueue ? esc(lowestQueue.name) + ' (' + lowestQueue.totalSubmit.toLocaleString() + ' tasks)' : '—') + '</div>'
+          + '<div style="font-weight:700; font-size:13px; color:var(--text); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="' + (lowestQueue ? esc(lowestQueue.name) + ' (' + lowestQueue.totalSubmit.toLocaleString() + ' tasks)' : '') + '">' + (lowestQueue ? esc(lowestQueue.name) + ' <span style="color:var(--text-soft); font-weight:500;">(' + lowestQueue.totalSubmit.toLocaleString() + ')</span>' : '—') + '</div>'
         + '</div>'
         + '<div style="background:var(--bg-3); padding:10px 14px; border-radius:8px; border-left:3px solid #ef4444;">'
           + '<span class="ux-note">Declining / Low Activity Queues</span>'
@@ -4108,6 +4111,319 @@ function gmQueueReport(rows, universe = rows) {
   };
 }
 
+
+function buildShiftTableHTML(rep, sRows, viewMode, sortCol, sortAsc) {
+  const idx = name => hdrs ? hdrs.findIndex(h => h.trim().toLowerCase() === name.toLowerCase()) : -1;
+  const qi = idx('Queue Name');
+  const mi = idx('Modality');
+  const pi = idx('Pass');
+  const ni = idx('National Id');
+  const li = idx('Labeler Name');
+  const qci = idx('QTC Name');
+  const fi = hdrs ? hdrs.findIndex(h => ['floor', 'unit', 'location'].includes(h.toLowerCase())) : -1;
+
+  const getModality = r => {
+    const raw = mi >= 0 ? String(r[mi] || '').trim() : '';
+    const key = raw.toLowerCase().replace(/[\s_-]+/g, '');
+    if (key === 'lidar') return 'Lidar';
+    if (key === 'laneline' || key === 'lane') return 'Lane Line';
+    return raw || 'Unspecified';
+  };
+
+  const getModBadge = mod => {
+    if (mod === 'Lidar') return '<span class="daily-mod daily-lidar">(Lidar)</span>';
+    if (mod === 'Lane Line') return '<span class="daily-mod daily-lane">(Lane Line)</span>';
+    return '<span class="daily-mod daily-lidar">(' + esc(mod) + ')</span>';
+  };
+
+  // 1. QUEUES VIEW (Screenshot layout)
+  if (viewMode === 'queues') {
+    return `
+      <div class="daily-table-wrap">
+        <table class="daily-queue-table">
+          <thead>
+            <tr>
+              <th class="sortable" data-sort="name">QUEUE ${sortCol==='name'?(sortAsc?'▲':'▼'):''}</th>
+              <th class="sortable" data-sort="fpLabelers">UNIQUE LABELERS (FP) ${sortCol==='fpLabelers'?(sortAsc?'▲':'▼'):''}</th>
+              <th class="sortable" data-sort="fp">TOTAL SUBMIT (FP) ${sortCol==='fp'?(sortAsc?'▲':'▼'):''}</th>
+              <th class="sortable" data-sort="qaLabelers">UNIQUE LABELERS (QA) ${sortCol==='qaLabelers'?(sortAsc?'▲':'▼'):''}</th>
+              <th class="sortable" data-sort="qa">TOTAL SUBMIT (QA) ${sortCol==='qa'?(sortAsc?'▲':'▼'):''}</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rep.groups.map(g => {
+              let badges = g.isRelabel ? '<span class="daily-mod daily-relabel">(Relabeling)</span> ' : '';
+              badges += getModBadge(g.mod);
+              return `
+                <tr class="daily-queue-row" data-tooltip-queue="${esc(g.name)}">
+                  <td class="daily-queue-cell">
+                    <span class="daily-queue-name">${esc(g.name)}</span>
+                    ${badges}
+                  </td>
+                  <td class="daily-num-cell">${g.fpIds.size.toLocaleString()}</td>
+                  <td class="daily-num-cell highlight-fp">${g.fp.toLocaleString()}</td>
+                  <td class="daily-num-cell">${g.qaIds.size.toLocaleString()}</td>
+                  <td class="daily-num-cell highlight-qa">${g.qa.toLocaleString()}</td>
+                </tr>
+              `;
+            }).join('')}
+            ${!rep.groups.length ? `
+              <tr>
+                <td colspan="5" class="ux-empty" style="text-align:center; padding:32px; color:var(--muted);">
+                  No submissions recorded during ${rep.meta.name} (${rep.meta.timeWindow}).
+                </td>
+              </tr>
+            ` : ''}
+          </tbody>
+          <tfoot>
+            <tr class="daily-total-row">
+              <td style="padding:14px 18px; font-weight:800; color:var(--text);">
+                <div>TOTAL ${rep.meta.name} (${rep.groups.length} active queues):</div>
+                <div style="font-size:11px; font-weight:600; color:var(--text-soft); margin-top:4px; display:flex; flex-wrap:wrap; gap:12px;">
+                  <span>📡 Lidar: <b style="color:#38bdf8;">FP ${rep.lidarFp.toLocaleString()}</b> | <b style="color:#34d399;">QA ${rep.lidarQa.toLocaleString()}</b></span>
+                  <span>🛣️ Lane Line: <b style="color:#38bdf8;">FP ${rep.laneFp.toLocaleString()}</b> | <b style="color:#34d399;">QA ${rep.laneQa.toLocaleString()}</b></span>
+                  ${rep.relabelTotal > 0 ? `<span>🔄 Relabeling: <b style="color:#38bdf8;">FP ${rep.relabelFp.toLocaleString()}</b> | <b style="color:#34d399;">QA ${rep.relabelQa.toLocaleString()}</b></span>` : ''}
+                </div>
+              </td>
+              <td class="daily-num-cell"><b>${rep.uniqueFp.toLocaleString()}</b></td>
+              <td class="daily-num-cell highlight-fp"><b>${rep.totalFp.toLocaleString()}</b></td>
+              <td class="daily-num-cell"><b>${rep.uniqueQa.toLocaleString()}</b></td>
+              <td class="daily-num-cell highlight-qa"><b>${rep.totalQa.toLocaleString()}</b></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    `;
+  }
+
+  // 2. FLOOR PRODUCTIVITY VIEW
+  if (viewMode === 'floors') {
+    const floorMap = new Map();
+    sRows.forEach(r => {
+      const fl = (typeof deriveFloor === 'function' && fi >= 0) ? deriveFloor(r[fi]) : (fi >= 0 && r[fi] ? String(r[fi]).trim() : 'Floor Room');
+      const q = qi >= 0 ? String(r[qi]||'').trim() : 'Unknown';
+      const mod = getModality(r);
+      const pass = pi >= 0 ? String(r[pi]||'').trim().toUpperCase() : '';
+      const labId = ni >= 0 && r[ni] ? String(r[ni]).trim() : (li >= 0 ? String(r[li]||'').trim() : '');
+      const key = fl + '___' + q + '___' + mod;
+
+      if (!floorMap.has(key)) {
+        floorMap.set(key, { floor: fl, queue: q, mod, fp: 0, qa: 0, total: 0, labelers: new Set() });
+      }
+      const e = floorMap.get(key);
+      if (pass === 'FP') e.fp++;
+      if (pass === 'QA') e.qa++;
+      e.total++;
+      if (labId) e.labelers.add(labId);
+    });
+
+    const floorList = [...floorMap.values()].sort((a,b) => a.floor.localeCompare(b.floor) || b.total - a.total);
+    let totFp = 0, totQa = 0, grandTot = 0;
+    const allLabs = new Set();
+    floorList.forEach(f => {
+      totFp += f.fp;
+      totQa += f.qa;
+      grandTot += f.total;
+      f.labelers.forEach(l => allLabs.add(l));
+    });
+
+    return `
+      <div class="daily-table-wrap">
+        <table class="daily-queue-table">
+          <thead>
+            <tr>
+              <th>FLOOR / UNIT</th>
+              <th>QUEUE NAME</th>
+              <th>MODALITY</th>
+              <th>FP SUBMITS</th>
+              <th>QA SUBMITS</th>
+              <th>TOTAL SUBMITS</th>
+              <th>UNIQUE LABELERS</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${floorList.map(f => `
+              <tr class="daily-queue-row" data-tooltip-queue="${esc(f.queue)}">
+                <td style="font-weight:700; color:var(--primary); font-size:12.5px;">🏢 ${esc(f.floor)}</td>
+                <td class="daily-queue-cell"><span class="daily-queue-name">${esc(f.queue)}</span></td>
+                <td>${getModBadge(f.mod)}</td>
+                <td class="daily-num-cell highlight-fp">${f.fp.toLocaleString()}</td>
+                <td class="daily-num-cell highlight-qa">${f.qa.toLocaleString()}</td>
+                <td class="daily-num-cell" style="font-weight:800; color:var(--text);">${f.total.toLocaleString()}</td>
+                <td class="daily-num-cell">${f.labelers.size.toLocaleString()}</td>
+              </tr>
+            `).join('')}
+            ${!floorList.length ? '<tr><td colspan="7" class="ux-empty" style="text-align:center; padding:32px;">No floor records for this shift.</td></tr>' : ''}
+          </tbody>
+          <tfoot>
+            <tr class="daily-total-row">
+              <td colspan="3" style="padding:14px 18px; font-weight:800;">
+                TOTAL ${rep.meta.name} (Floor Breakdown):
+                <div style="font-size:11px; font-weight:600; color:var(--text-soft); margin-top:4px;">
+                  📡 Lidar: FP ${rep.lidarFp.toLocaleString()} | QA ${rep.lidarQa.toLocaleString()} &nbsp;•&nbsp; 🛣️ Lane Line: FP ${rep.laneFp.toLocaleString()} | QA ${rep.laneQa.toLocaleString()}
+                </div>
+              </td>
+              <td class="daily-num-cell highlight-fp"><b>${totFp.toLocaleString()}</b></td>
+              <td class="daily-num-cell highlight-qa"><b>${totQa.toLocaleString()}</b></td>
+              <td class="daily-num-cell" style="font-size:14px;"><b>${grandTot.toLocaleString()}</b></td>
+              <td class="daily-num-cell"><b>${allLabs.size.toLocaleString()}</b></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    `;
+  }
+
+  // 3. QC / QTC SUPERVISORS VIEW
+  if (viewMode === 'qcs') {
+    const qcMap = new Map();
+    sRows.forEach(r => {
+      const qc = qci >= 0 && r[qci] ? String(r[qci]).trim() : 'Unassigned QC';
+      const q = qi >= 0 ? String(r[qi]||'').trim() : 'Unknown';
+      const mod = getModality(r);
+      const pass = pi >= 0 ? String(r[pi]||'').trim().toUpperCase() : '';
+      const labId = ni >= 0 && r[ni] ? String(r[ni]).trim() : (li >= 0 ? String(r[li]||'').trim() : '');
+      const key = qc + '___' + q + '___' + mod;
+
+      if (!qcMap.has(key)) {
+        qcMap.set(key, { qc, queue: q, mod, fp: 0, qa: 0, total: 0, labelers: new Set() });
+      }
+      const e = qcMap.get(key);
+      if (pass === 'FP') e.fp++;
+      if (pass === 'QA') e.qa++;
+      e.total++;
+      if (labId) e.labelers.add(labId);
+    });
+
+    const qcList = [...qcMap.values()].sort((a,b) => a.qc.localeCompare(b.qc) || b.total - a.total);
+    let totFp = 0, totQa = 0, grandTot = 0;
+    qcList.forEach(qc => {
+      totFp += qc.fp;
+      totQa += qc.qa;
+      grandTot += qc.total;
+    });
+
+    return `
+      <div class="daily-table-wrap">
+        <table class="daily-queue-table">
+          <thead>
+            <tr>
+              <th>QC / QTC SUPERVISOR</th>
+              <th>QUEUE NAME</th>
+              <th>MODALITY</th>
+              <th>FP REVIEWED</th>
+              <th>QA REVIEWED</th>
+              <th>TOTAL SUBMISSIONS</th>
+              <th>LABELERS SERVED</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${qcList.map(qc => `
+              <tr class="daily-queue-row" data-tooltip-queue="${esc(qc.queue)}">
+                <td style="font-weight:700; color:var(--text); font-size:12.5px;">👥 ${esc(qc.qc)}</td>
+                <td class="daily-queue-cell"><span class="daily-queue-name">${esc(qc.queue)}</span></td>
+                <td>${getModBadge(qc.mod)}</td>
+                <td class="daily-num-cell highlight-fp">${qc.fp.toLocaleString()}</td>
+                <td class="daily-num-cell highlight-qa">${qc.qa.toLocaleString()}</td>
+                <td class="daily-num-cell" style="font-weight:800; color:var(--text);">${qc.total.toLocaleString()}</td>
+                <td class="daily-num-cell">${qc.labelers.size.toLocaleString()}</td>
+              </tr>
+            `).join('')}
+            ${!qcList.length ? '<tr><td colspan="7" class="ux-empty" style="text-align:center; padding:32px;">No QC submissions recorded for this shift.</td></tr>' : ''}
+          </tbody>
+          <tfoot>
+            <tr class="daily-total-row">
+              <td colspan="3" style="padding:14px 18px; font-weight:800;">
+                TOTAL ${rep.meta.name} (QC Productivity):
+                <div style="font-size:11px; font-weight:600; color:var(--text-soft); margin-top:4px;">
+                  📡 Lidar: FP ${rep.lidarFp.toLocaleString()} | QA ${rep.lidarQa.toLocaleString()} &nbsp;•&nbsp; 🛣️ Lane Line: FP ${rep.laneFp.toLocaleString()} | QA ${rep.laneQa.toLocaleString()}
+                </div>
+              </td>
+              <td class="daily-num-cell highlight-fp"><b>${totFp.toLocaleString()}</b></td>
+              <td class="daily-num-cell highlight-qa"><b>${totQa.toLocaleString()}</b></td>
+              <td class="daily-num-cell" style="font-size:14px;"><b>${grandTot.toLocaleString()}</b></td>
+              <td class="daily-num-cell">—</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    `;
+  }
+
+  // 4. LABELERS PRODUCTIVITY VIEW
+  if (viewMode === 'labelers') {
+    const labMap = new Map();
+    sRows.forEach(r => {
+      const lab = li >= 0 && r[li] ? String(r[li]).trim() : 'Unknown Labeler';
+      const q = qi >= 0 ? String(r[qi]||'').trim() : 'Unknown';
+      const mod = getModality(r);
+      const pass = pi >= 0 ? String(r[pi]||'').trim().toUpperCase() : '';
+      const key = lab + '___' + q + '___' + mod;
+
+      if (!labMap.has(key)) {
+        labMap.set(key, { labeler: lab, queue: q, mod, fp: 0, qa: 0, total: 0 });
+      }
+      const e = labMap.get(key);
+      if (pass === 'FP') e.fp++;
+      if (pass === 'QA') e.qa++;
+      e.total++;
+    });
+
+    const labList = [...labMap.values()].sort((a,b) => a.labeler.localeCompare(b.labeler) || b.total - a.total);
+    let totFp = 0, totQa = 0, grandTot = 0;
+    labList.forEach(l => {
+      totFp += l.fp;
+      totQa += l.qa;
+      grandTot += l.total;
+    });
+
+    return `
+      <div class="daily-table-wrap">
+        <table class="daily-queue-table">
+          <thead>
+            <tr>
+              <th>LABELER NAME</th>
+              <th>QUEUE NAME</th>
+              <th>MODALITY</th>
+              <th>FP SUBMITS</th>
+              <th>QA SUBMITS</th>
+              <th>TOTAL SUBMISSIONS</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${labList.map(l => `
+              <tr class="daily-queue-row" data-tooltip-queue="${esc(l.queue)}">
+                <td style="font-weight:700; color:var(--text); font-size:12.5px;">✍️ ${esc(l.labeler)}</td>
+                <td class="daily-queue-cell"><span class="daily-queue-name">${esc(l.queue)}</span></td>
+                <td>${getModBadge(l.mod)}</td>
+                <td class="daily-num-cell highlight-fp">${l.fp.toLocaleString()}</td>
+                <td class="daily-num-cell highlight-qa">${l.qa.toLocaleString()}</td>
+                <td class="daily-num-cell" style="font-weight:800; color:var(--text);">${l.total.toLocaleString()}</td>
+              </tr>
+            `).join('')}
+            ${!labList.length ? '<tr><td colspan="6" class="ux-empty" style="text-align:center; padding:32px;">No labeler submissions for this shift.</td></tr>' : ''}
+          </tbody>
+          <tfoot>
+            <tr class="daily-total-row">
+              <td colspan="3" style="padding:14px 18px; font-weight:800;">
+                TOTAL ${rep.meta.name} (Labeler Productivity):
+                <div style="font-size:11px; font-weight:600; color:var(--text-soft); margin-top:4px;">
+                  📡 Lidar: FP ${rep.lidarFp.toLocaleString()} | QA ${rep.lidarQa.toLocaleString()} &nbsp;•&nbsp; 🛣️ Lane Line: FP ${rep.laneFp.toLocaleString()} | QA ${rep.laneQa.toLocaleString()}
+                </div>
+              </td>
+              <td class="daily-num-cell highlight-fp"><b>${totFp.toLocaleString()}</b></td>
+              <td class="daily-num-cell highlight-qa"><b>${totQa.toLocaleString()}</b></td>
+              <td class="daily-num-cell" style="font-size:14px;"><b>${grandTot.toLocaleString()}</b></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    `;
+  }
+
+  return '';
+}
+
 function renderGmReport(){
   const page = $('uxGmReport');
   if(!page || page.hidden) return;
@@ -4364,6 +4680,22 @@ function renderGmReport(){
           }).join('')}
         </div>
 
+        <!-- 4 Distinct Shift Report View Mode Switcher -->
+        <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:16px; border-bottom:1px solid var(--border); padding-bottom:12px;">
+          <button type="button" class="btn ${_shiftReportViewMode==='queues'?'btn-c':''}" data-shift-view="queues" style="font-weight:700; font-size:12px;">
+            🗂️ 1. Queue Productivity (Screenshot Layout)
+          </button>
+          <button type="button" class="btn ${_shiftReportViewMode==='floors'?'btn-c':''}" data-shift-view="floors" style="font-weight:700; font-size:12px;">
+            🏢 2. Floor / Room Breakdown
+          </button>
+          <button type="button" class="btn ${_shiftReportViewMode==='qcs'?'btn-c':''}" data-shift-view="qcs" style="font-weight:700; font-size:12px;">
+            👥 3. QC / QTC Supervisors Breakdown
+          </button>
+          <button type="button" class="btn ${_shiftReportViewMode==='labelers'?'btn-c':''}" data-shift-view="labelers" style="font-weight:700; font-size:12px;">
+            👤 4. Labelers Productivity Breakdown
+          </button>
+        </div>
+
         <!-- Toolbar for Real-time Searching & Modality Filter across all 3 tables -->
         <div class="daily-toolbar-row" style="margin-top:16px;">
           <div class="daily-search-box">
@@ -4416,75 +4748,12 @@ function renderGmReport(){
               </div>
             </div>
 
-            <!-- Table Matching Reference Screenshot Exactly -->
-            <div class="daily-table-wrap">
-              <table class="daily-queue-table">
-                <thead>
-                  <tr>
-                    <th class="sortable" data-sort="name">QUEUE ${sortCol==='name'?(sortAsc?'▲':'▼'):''}</th>
-                    <th class="sortable" data-sort="fpLabelers">UNIQUE LABELERS (FP) ${sortCol==='fpLabelers'?(sortAsc?'▲':'▼'):''}</th>
-                    <th class="sortable" data-sort="fp">TOTAL SUBMIT (FP) ${sortCol==='fp'?(sortAsc?'▲':'▼'):''}</th>
-                    <th class="sortable" data-sort="qaLabelers">UNIQUE LABELERS (QA) ${sortCol==='qaLabelers'?(sortAsc?'▲':'▼'):''}</th>
-                    <th class="sortable" data-sort="qa">TOTAL SUBMIT (QA) ${sortCol==='qa'?(sortAsc?'▲':'▼'):''}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${rep.groups.map(g => {
-                    let badges = '';
-                    if (g.isRelabel) {
-                      badges += '<span class="daily-mod daily-relabel">(Relabeling)</span> ';
-                    }
-                    if (g.mod === 'Lidar') {
-                      badges += '<span class="daily-mod daily-lidar">(Lidar)</span>';
-                    } else if (g.mod === 'Lane Line') {
-                      badges += '<span class="daily-mod daily-lane">(Lane Line)</span>';
-                    } else if (g.mod && g.mod !== 'Unspecified') {
-                      badges += '<span class="daily-mod daily-lidar">(' + esc(g.mod) + ')</span>';
-                    }
-
-                    return `
-                      <tr class="daily-queue-row">
-                        <td class="daily-queue-cell">
-                          <span class="daily-queue-name">${esc(g.name)}</span>
-                          ${badges}
-                        </td>
-                        <td class="daily-num-cell">${g.fpIds.size.toLocaleString()}</td>
-                        <td class="daily-num-cell highlight-fp">${g.fp.toLocaleString()}</td>
-                        <td class="daily-num-cell">${g.qaIds.size.toLocaleString()}</td>
-                        <td class="daily-num-cell highlight-qa">${g.qa.toLocaleString()}</td>
-                      </tr>
-                    `;
-                  }).join('')}
-                  ${!rep.groups.length ? `
-                    <tr>
-                      <td colspan="5" class="ux-empty" style="text-align:center; padding:32px; color:var(--muted);">
-                        No submissions recorded for this queue during ${rep.meta.name} (${rep.meta.timeWindow}).
-                      </td>
-                    </tr>
-                  ` : ''}
-                </tbody>
-                <tfoot>
-                  <tr class="daily-total-row">
-                    <td style="padding:14px 18px; font-weight:800; color:var(--text);">
-                      <div>TOTAL ${rep.meta.name} (${rep.groups.length} active queues):</div>
-                      <div style="font-size:11px; font-weight:600; color:var(--text-soft); margin-top:4px; display:flex; flex-wrap:wrap; gap:12px;">
-                        <span>📡 Lidar: <b style="color:#38bdf8;">FP ${rep.lidarFp.toLocaleString()}</b> | <b style="color:#34d399;">QA ${rep.lidarQa.toLocaleString()}</b></span>
-                        <span>🛣️ Lane Line: <b style="color:#38bdf8;">FP ${rep.laneFp.toLocaleString()}</b> | <b style="color:#34d399;">QA ${rep.laneQa.toLocaleString()}</b></span>
-                        ${rep.relabelTotal > 0 ? `<span>🔄 Relabeling: <b style="color:#38bdf8;">FP ${rep.relabelFp.toLocaleString()}</b> | <b style="color:#34d399;">QA ${rep.relabelQa.toLocaleString()}</b></span>` : ''}
-                      </div>
-                    </td>
-                    <td class="daily-num-cell"><b>${rep.uniqueFp.toLocaleString()}</b></td>
-                    <td class="daily-num-cell highlight-fp"><b>${rep.totalFp.toLocaleString()}</b></td>
-                    <td class="daily-num-cell"><b>${rep.uniqueQa.toLocaleString()}</b></td>
-                    <td class="daily-num-cell highlight-qa"><b>${rep.totalQa.toLocaleString()}</b></td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
+            <!-- Dynamic Shift Report Table (Queues, Floors, QCs, Labelers) -->
+            ${buildShiftTableHTML(rep, sRows, _shiftReportViewMode, sortCol, sortAsc)}
 
             <p class="an-context" style="margin-top:12px; font-size:11px; color:var(--muted);">
               ${rep.missing > 0 ? (rep.missing + ' FP/QA entries de-duplicated by name. ') : ''}
-              Unique Labelers use valid National Id, once per Queue + Modality + Pass. Period: ${rep.meta.timeWindow}.
+              Period window: ${rep.meta.timeWindow}. Verified live from Turso database.
             </p>
           </section>
         `;
@@ -4508,6 +4777,14 @@ function renderGmReport(){
       }
     };
   }
+
+  // Shift view modes binding
+  page.querySelectorAll('[data-shift-view]').forEach(btn => {
+    btn.onclick = () => {
+      _shiftReportViewMode = btn.dataset.shiftView;
+      renderGmReport();
+    };
+  });
 
   // Modality pills binding
   page.querySelectorAll('[data-gm-mod]').forEach(btn => {
@@ -6218,3 +6495,143 @@ function openLabelerDetailModal(personKey) {
   }
 }
 window.openLabelerDetailModal = openLabelerDetailModal;
+
+
+// ============================================================
+// GLOBAL METI METRIC TOOLTIP ENGINE
+// ============================================================
+let _metiTooltipEl = null;
+
+function initGlobalTooltipEngine() {
+  if (_metiTooltipEl) return;
+  _metiTooltipEl = document.createElement('div');
+  _metiTooltipEl.id = 'metiGlobalTooltip';
+  _metiTooltipEl.className = 'meti-global-tooltip';
+  _metiTooltipEl.style.cssText = 'position:fixed; z-index:999999; display:none; pointer-events:none; background:#0f172a; color:#f8fafc; border:1px solid #334155; border-radius:10px; box-shadow:0 12px 28px -4px rgba(0,0,0,0.7); padding:12px 14px; font-size:12px; line-height:1.45; min-width:240px; max-width:340px; font-family:inherit;';
+  document.body.appendChild(_metiTooltipEl);
+
+  document.addEventListener('mouseover', function(e) {
+    const target = e.target.closest('[data-tooltip-queue], .daily-queue-row, [data-metric-tooltip]');
+    if (!target) {
+      if (_metiTooltipEl) _metiTooltipEl.style.display = 'none';
+      return;
+    }
+    const qName = target.getAttribute('data-tooltip-queue') || target.querySelector('.daily-queue-name')?.textContent || target.textContent;
+    if (!qName) return;
+    renderTooltipContent(qName.trim());
+    _metiTooltipEl.style.display = 'block';
+    positionTooltip(e);
+  });
+
+  document.addEventListener('mousemove', function(e) {
+    if (_metiTooltipEl && _metiTooltipEl.style.display !== 'none') {
+      positionTooltip(e);
+    }
+  });
+
+  document.addEventListener('mouseout', function(e) {
+    const target = e.target.closest('[data-tooltip-queue], .daily-queue-row, [data-metric-tooltip]');
+    if (target && _metiTooltipEl) {
+      _metiTooltipEl.style.display = 'none';
+    }
+  });
+}
+
+function positionTooltip(e) {
+  if (!_metiTooltipEl) return;
+  const pad = 15;
+  let left = e.clientX + pad;
+  let top = e.clientY + pad;
+  const rect = _metiTooltipEl.getBoundingClientRect();
+  if (left + rect.width > window.innerWidth - 10) {
+    left = e.clientX - rect.width - pad;
+  }
+  if (top + rect.height > window.innerHeight - 10) {
+    top = e.clientY - rect.height - pad;
+  }
+  _metiTooltipEl.style.left = Math.max(10, left) + 'px';
+  _metiTooltipEl.style.top = Math.max(10, top) + 'px';
+}
+
+function renderTooltipContent(queueName) {
+  if (!_metiTooltipEl) return;
+  const rows = typeof rowsInView === 'function' ? rowsInView() : [];
+  const idx = name => hdrs ? hdrs.findIndex(h => h.trim().toLowerCase() === name.toLowerCase()) : -1;
+  const qi = idx('Queue Name');
+  const mi = idx('Modality');
+  const pi = idx('Pass');
+  const ni = idx('National Id');
+  const li = idx('Labeler Name');
+  const qci = idx('QTC Name');
+
+  let fpLidar = 0, qaLidar = 0, fpLane = 0, qaLane = 0;
+  const labLidar = new Set(), labLane = new Set();
+  const qtcLidar = new Set(), qtcLane = new Set();
+
+  rows.forEach(r => {
+    if (queueName && qi >= 0) {
+      const q = String(r[qi] || '').trim();
+      if (q !== queueName) return;
+    }
+    const rawMod = mi >= 0 ? String(r[mi] || '').toLowerCase() : '';
+    const pass = pi >= 0 ? String(r[pi] || '').trim().toUpperCase() : '';
+    const isLidar = rawMod.includes('lidar');
+    const isLane = rawMod.includes('lane');
+
+    let labId = ni >= 0 ? String(r[ni] || '').trim() : '';
+    if (!labId || labId.length < 5) labId = li >= 0 ? String(r[li] || '').trim() : '';
+    const qtcName = qci >= 0 ? String(r[qci] || '').trim() : '';
+
+    if (isLidar) {
+      if (pass === 'FP') { fpLidar++; if (labId) labLidar.add(labId); }
+      if (pass === 'QA') { qaLidar++; if (labId) labLidar.add(labId); }
+      if (qtcName) qtcLidar.add(qtcName);
+    } else if (isLane) {
+      if (pass === 'FP') { fpLane++; if (labId) labLane.add(labId); }
+      if (pass === 'QA') { qaLane++; if (labId) labLane.add(labId); }
+      if (qtcName) qtcLane.add(qtcName);
+    }
+  });
+
+  _metiTooltipEl.innerHTML = `
+    <div style="font-weight:700; font-size:12.5px; color:#38bdf8; margin-bottom:8px; border-bottom:1px solid #334155; padding-bottom:5px; word-break:break-all;">
+      ${esc(queueName || 'Operational Queue Overview')}
+    </div>
+    <div style="display:flex; flex-direction:column; gap:4px; font-size:11.5px;">
+      <div style="display:flex; justify-content:space-between; gap:12px;">
+        <span style="color:#94a3b8;">📡 Total FP Lidar:</span>
+        <b style="color:#10b981; font-weight:700;">${fpLidar.toLocaleString()}</b>
+      </div>
+      <div style="display:flex; justify-content:space-between; gap:12px;">
+        <span style="color:#94a3b8;">🔍 QA Lidar:</span>
+        <b style="color:#60a5fa; font-weight:700;">${qaLidar.toLocaleString()}</b>
+      </div>
+      <div style="display:flex; justify-content:space-between; gap:12px;">
+        <span style="color:#94a3b8;">🛣️ Lane Line FP:</span>
+        <b style="color:#34d399; font-weight:700;">${fpLane.toLocaleString()}</b>
+      </div>
+      <div style="display:flex; justify-content:space-between; gap:12px;">
+        <span style="color:#94a3b8;">📐 Lane Line QA:</span>
+        <b style="color:#a78bfa; font-weight:700;">${qaLane.toLocaleString()}</b>
+      </div>
+      <div style="border-top:1px dashed #334155; margin:4px 0;"></div>
+      <div style="display:flex; justify-content:space-between; gap:12px;">
+        <span style="color:#94a3b8;">👤 Unique Labelers:</span>
+        <b style="color:#f1f5f9;">Lidar: ${labLidar.size} | Lane: ${labLane.size}</b>
+      </div>
+      <div style="display:flex; justify-content:space-between; gap:12px;">
+        <span style="color:#94a3b8;">👥 Unique QTC:</span>
+        <b style="color:#f1f5f9;">Lidar: ${qtcLidar.size} | Lane: ${qtcLane.size}</b>
+      </div>
+    </div>
+  `;
+}
+
+// Auto-initialize tooltip engine
+if (typeof document !== 'undefined') {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initGlobalTooltipEngine);
+  } else {
+    initGlobalTooltipEngine();
+  }
+}
