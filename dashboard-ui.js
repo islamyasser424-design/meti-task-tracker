@@ -3338,7 +3338,7 @@ loadData=function(){
     try{
       const token = (typeof getAuthToken === "function" ? getAuthToken() : (sessionStorage.getItem("meeg_auth_token") || ""));
       const apiBase = window.MEEG_API_URL || localStorage.getItem("meeg_api_url") || "https://meeg-secure-api.islamyasser424.workers.dev";
-      const res = await (typeof apiFetch === "function" ? apiFetch("/api/analytics/dataset?limit=100000") : fetch(apiBase + "/api/analytics/dataset?limit=100000", {
+      const res = await (typeof apiFetch === "function" ? apiFetch("/api/analytics/dataset?limit=25000") : fetch(apiBase + "/api/analytics/dataset?limit=25000", {
         headers: token ? { "Authorization": "Bearer " + token } : {},
         credentials: "include"
       }));

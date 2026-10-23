@@ -503,9 +503,20 @@ async function syncGoogleSheetsToTurso(env) {
     }
   }
 
-  // Sync custom queues
-  for (const q of newQueues) {
-    await db(env, "INSERT OR IGNORE INTO custom_queues (queue_name, description) VALUES (?, 'Auto-synced from Google Sheets')", [q]).catch(() => {});
+  // Sync custom queues in a single batch request
+  if (newQueues.size > 0) {
+    const queueBatch = Array.from(newQueues).map(q => ({
+      type: "execute",
+      stmt: {
+        sql: "INSERT OR IGNORE INTO custom_queues (name, highlight, created_at) VALUES (?, 'Live', datetime('now'))",
+        args: [{ type: "text", value: q }]
+      }
+    }));
+    await fetch(env.TURSO_URL, {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${env.TURSO_TOKEN}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ requests: queueBatch })
+    }).catch(e => console.warn("Queue batch sync error:", e));
   }
 
   const countRes = await db(env, "SELECT count(*) as total FROM task_submissions");
@@ -889,8 +900,8 @@ export default {
       if (pathname === "/api/analytics/dataset" && request.method === "GET") {
         const maybeUser = await verifySession(request, env);
         const role = maybeUser ? maybeUser.role : "qt";
-        const limitParam = parseInt(url.searchParams.get("limit") || "60000", 10);
-        const limit = Math.min(100000, Math.max(1, isNaN(limitParam) ? 60000 : limitParam));
+        const limitParam = parseInt(url.searchParams.get("limit") || "20000", 10);
+        const limit = Math.min(25000, Math.max(1, isNaN(limitParam) ? 20000 : limitParam));
         const rawRows = await db(
           env,
           `SELECT id, timestamp, shift, unit, pc_no, labeler_name, national_id, qtc_shift, yubikey_email, qtc_name, stage, task_link, pass, modality, queue_name, object_count, created_at 

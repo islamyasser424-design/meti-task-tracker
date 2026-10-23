@@ -1873,7 +1873,7 @@
           <!-- Right: Database Volume & Chunk Loading Actions -->
           <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
             <span id="dbStreamStatus" style="font-size: 0.78rem; font-weight: 600; color: var(--text-secondary); background: #f1f5f9; padding: 4px 10px; border-radius: 6px; border: 1px solid #e2e8f0;">
-              Loaded 5,000 of 51,845 records
+              Loading live database records...
             </span>
 
             <button class="btn-action secondary" id="btnLoadMore" onclick="loadMoreRecords()" title="Fetch next 5,000 records from database" style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; font-size: 0.78rem; font-weight: 700;">
@@ -4732,7 +4732,7 @@ function fetchLiveDataOnly() {
   var sync = document.getElementById("syncStatus");
   if (sync) sync.textContent = "⚡ Loading from database...";
 
-  apiFetch("/api/tasks?limit=5000")
+  apiFetch("/api/tasks?limit=2000")
     .then(function(r) { return r.json(); })
     .then(function(data) {
       if (!data.ok) throw new Error(data.message || "Failed to load tasks");
@@ -4761,12 +4761,7 @@ function fetchLiveDataOnly() {
 }
 
 function fetchLiveData() {
-  // 1. Instantly fetch from database to render UI in ~1s
   fetchLiveDataOnly();
-  // 2. Schedule non-blocking silent Google Sheets auto-sync in background
-  setTimeout(function() {
-    syncGoogleSheetsClient(true);
-  }, 1200);
 }
 
 function loadMoreRecords() {
@@ -4917,12 +4912,12 @@ function searchFullDatabase() {
     });
 }
 
-// 25-second continuous background polling for live submissions
+// 30-second continuous background polling for live submissions
 setInterval(function() {
-  if (document.getElementById('dashView').style.display !== 'none') {
-    syncGoogleSheetsClient(true);
+  if (document.getElementById('dashView') && document.getElementById('dashView').style.display !== 'none' && _activeTab === 'tasks') {
+    fetchLiveDataOnly();
   }
-}, 25000);
+}, 30000);
 
 // Attach Enter key listener to Search input
 document.addEventListener("DOMContentLoaded", function() {
