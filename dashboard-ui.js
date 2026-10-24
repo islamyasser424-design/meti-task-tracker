@@ -7,6 +7,27 @@ let protectedOptions=null;
 const escHtml = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const esc = window.esc || escHtml;
 
+if (typeof window.showToast !== 'function') {
+  window.showToast = function(msg) {
+    if (typeof document === 'undefined') return;
+    try {
+      let ex = document.querySelector('.toast');
+      if (ex) ex.remove();
+      const t = document.createElement('div');
+      t.className = 'toast';
+      t.style.cssText = 'position:fixed; bottom:24px; right:24px; background:#0f172a; color:#fff; padding:10px 18px; border-radius:8px; z-index:999999; font-size:13px; font-weight:600; box-shadow:0 10px 25px rgba(0,0,0,0.4); border:1px solid rgba(255,255,255,0.1); transition:all 0.3s ease;';
+      t.textContent = msg;
+      document.body.appendChild(t);
+      setTimeout(() => {
+        t.style.opacity = '0';
+        t.style.transform = 'translateY(10px)';
+        setTimeout(() => t.remove(), 300);
+      }, 3200);
+    } catch(e) {}
+  };
+}
+const showToast = window.showToast;
+
 function cairoToday() {
   if (typeof window.cairoToday === 'function') return window.cairoToday();
   try {
@@ -726,8 +747,24 @@ const globalUnifiedFilters = {
   to: '',      // YYYY-MM-DD
   floor: '',   // Unit / Floor
   qtc: '',     // QTC Supervisor Name
-  shift: ''    // Shift Name
+  shift: '',   // Shift Name
+  queue: '',   // Queue Name
+  labeler: '', // Labeler Name
+  modality: '',// 'lidar' | 'laneline'
+  pass: ''     // 'FP' | 'QA'
 };
+
+function toggleGlobalFilter(field, val) {
+  if (!field) return;
+  const target = String(val || '').trim();
+  if (globalUnifiedFilters[field] === target) {
+    globalUnifiedFilters[field] = '';
+  } else {
+    globalUnifiedFilters[field] = target;
+  }
+  applyGlobalFilters();
+}
+window.toggleGlobalFilter = toggleGlobalFilter;
 
 function getGlobalFilterOptions() {
   const source = (typeof rawRows !== 'undefined' && rawRows && rawRows.length) ? rawRows : ((window.rawRows && window.rawRows.length) ? window.rawRows : ((typeof fcache !== 'undefined' && fcache) ? fcache : []));
@@ -758,7 +795,8 @@ function renderUniversalFilterBar(pageKey) {
 
   const hasAnyFilter = Boolean(
     globalUnifiedFilters.date || globalUnifiedFilters.from || globalUnifiedFilters.to ||
-    globalUnifiedFilters.floor || globalUnifiedFilters.qtc || globalUnifiedFilters.shift
+    globalUnifiedFilters.floor || globalUnifiedFilters.qtc || globalUnifiedFilters.shift ||
+    globalUnifiedFilters.queue || globalUnifiedFilters.labeler || globalUnifiedFilters.modality || globalUnifiedFilters.pass
   );
 
   let activeTagsHtml = '';
@@ -771,6 +809,10 @@ function renderUniversalFilterBar(pageKey) {
       + (globalUnifiedFilters.floor ? '<span class="uf-tag">🏢 Floor: <b>' + esc(globalUnifiedFilters.floor) + '</b> <button type="button" class="uf-tag-del" data-clear="floor">✕</button></span>' : '')
       + (globalUnifiedFilters.qtc ? '<span class="uf-tag">👤 QTC: <b>' + esc(globalUnifiedFilters.qtc) + '</b> <button type="button" class="uf-tag-del" data-clear="qtc">✕</button></span>' : '')
       + (globalUnifiedFilters.shift ? '<span class="uf-tag">⏱️ Shift: <b>' + esc(globalUnifiedFilters.shift) + '</b> <button type="button" class="uf-tag-del" data-clear="shift">✕</button></span>' : '')
+      + (globalUnifiedFilters.queue ? '<span class="uf-tag">🗂️ Queue: <b>' + esc(globalUnifiedFilters.queue) + '</b> <button type="button" class="uf-tag-del" data-clear="queue">✕</button></span>' : '')
+      + (globalUnifiedFilters.labeler ? '<span class="uf-tag">👤 Labeler: <b>' + esc(globalUnifiedFilters.labeler) + '</b> <button type="button" class="uf-tag-del" data-clear="labeler">✕</button></span>' : '')
+      + (globalUnifiedFilters.modality ? '<span class="uf-tag">📦 Modality: <b>' + esc(globalUnifiedFilters.modality.toUpperCase()) + '</b> <button type="button" class="uf-tag-del" data-clear="modality">✕</button></span>' : '')
+      + (globalUnifiedFilters.pass ? '<span class="uf-tag">🎯 Pass: <b>' + esc(globalUnifiedFilters.pass) + '</b> <button type="button" class="uf-tag-del" data-clear="pass">✕</button></span>' : '')
       + '<button type="button" class="uf-clear-all-link" id="ufClearAllLink_' + pageKey + '">Clear All Filters</button>'
       + '</div>';
   }
@@ -942,6 +984,10 @@ function resetUniversalFilters() {
   globalUnifiedFilters.floor = '';
   globalUnifiedFilters.qtc = '';
   globalUnifiedFilters.shift = '';
+  globalUnifiedFilters.queue = '';
+  globalUnifiedFilters.labeler = '';
+  globalUnifiedFilters.modality = '';
+  globalUnifiedFilters.pass = '';
   applyGlobalFilters();
   if (typeof showToast === 'function') {
     showToast('✓ All operational filters reset');
@@ -966,6 +1012,10 @@ function rowsInView(){
   const si = idx('shift');
   const fi = hdrs ? hdrs.findIndex(h => ['floor', 'unit'].includes(h.trim().toLowerCase())) : -1;
   const qi = hdrs ? hdrs.findIndex(h => ['qtc name', 'qtc', 'supervisor'].includes(h.trim().toLowerCase())) : -1;
+  const queueIdx = hdrs ? hdrs.findIndex(h => ['queue name', 'queue'].includes(h.trim().toLowerCase())) : -1;
+  const modIdx = hdrs ? hdrs.findIndex(h => ['modality', 'mod'].includes(h.trim().toLowerCase())) : -1;
+  const passIdx = hdrs ? hdrs.findIndex(h => ['pass', 'stage'].includes(h.trim().toLowerCase())) : -1;
+  const labIdx = hdrs ? hdrs.findIndex(h => ['labeler name', 'labeler'].includes(h.trim().toLowerCase())) : -1;
 
   return rows.filter(r => {
     const d = typeof rDate === 'function' ? rDate(r) : '';
@@ -982,6 +1032,18 @@ function rowsInView(){
     if (globalUnifiedFilters.floor && fi >= 0 && deriveFloor(r[fi]) !== globalUnifiedFilters.floor) return false;
     // QTC filter
     if (globalUnifiedFilters.qtc && qi >= 0 && String(r[qi] || '').trim() !== globalUnifiedFilters.qtc) return false;
+    // Queue filter
+    if (globalUnifiedFilters.queue && queueIdx >= 0 && String(r[queueIdx] || '').trim() !== globalUnifiedFilters.queue) return false;
+    // Modality filter
+    if (globalUnifiedFilters.modality && modIdx >= 0) {
+      const m = String(r[modIdx] || '').toLowerCase().replace(/[\s_-]+/g, '');
+      const targetM = globalUnifiedFilters.modality.toLowerCase().replace(/[\s_-]+/g, '');
+      if (!m.includes(targetM)) return false;
+    }
+    // Pass filter
+    if (globalUnifiedFilters.pass && passIdx >= 0 && String(r[passIdx] || '').trim().toUpperCase() !== globalUnifiedFilters.pass.toUpperCase()) return false;
+    // Labeler filter
+    if (globalUnifiedFilters.labeler && labIdx >= 0 && String(r[labIdx] || '').trim().toLowerCase() !== globalUnifiedFilters.labeler.toLowerCase()) return false;
 
     return true;
   });
@@ -1258,34 +1320,73 @@ function renderOverview(){
   dateMap.forEach((cnt, d) => { if (d >= last7Start && d <= cToday) last7Total += cnt; });
   const last7Avg = Math.round(last7Total / 7);
 
-  // Top rankings
+  // Top rankings with FP and QA breakdown
   const qMap = new Map();
   const qtcMap = new Map();
   const labMap = new Map();
   const qi = hdrs.findIndex(h => h.toLowerCase() === 'queue name');
   const qcI = hdrs.findIndex(h => h.toLowerCase() === 'qtc name');
   const li = hdrs.findIndex(h => h.toLowerCase() === 'labeler name');
+  const pi = hdrs.findIndex(h => h.toLowerCase() === 'pass');
 
   rows.forEach(r => {
-    if (qi >= 0 && r[qi]) qMap.set(r[qi], (qMap.get(r[qi]) || 0) + 1);
-    if (qcI >= 0 && r[qcI]) qtcMap.set(r[qcI], (qtcMap.get(r[qcI]) || 0) + 1);
-    if (li >= 0 && r[li]) labMap.set(r[li], (labMap.get(r[li]) || 0) + 1);
+    const isFP = pi >= 0 && String(r[pi] || '').trim().toUpperCase() === 'FP';
+    const isQA = pi >= 0 && String(r[pi] || '').trim().toUpperCase() === 'QA';
+
+    if (qi >= 0 && r[qi]) {
+      const q = String(r[qi]).trim();
+      if (!qMap.has(q)) qMap.set(q, { total: 0, fp: 0, qa: 0 });
+      const ent = qMap.get(q);
+      ent.total++;
+      if (isFP) ent.fp++;
+      if (isQA) ent.qa++;
+    }
+    if (qcI >= 0 && r[qcI]) {
+      const qc = String(r[qcI]).trim();
+      if (!qtcMap.has(qc)) qtcMap.set(qc, { total: 0, fp: 0, qa: 0 });
+      const ent = qtcMap.get(qc);
+      ent.total++;
+      if (isFP) ent.fp++;
+      if (isQA) ent.qa++;
+    }
+    if (li >= 0 && r[li]) {
+      const l = String(r[li]).trim();
+      if (!labMap.has(l)) labMap.set(l, { total: 0, fp: 0, qa: 0 });
+      const ent = labMap.get(l);
+      ent.total++;
+      if (isFP) ent.fp++;
+      if (isQA) ent.qa++;
+    }
   });
 
-  const topQueues = [...qMap.entries()].sort((a,b) => b[1] - a[1]).slice(0, 10);
-  const topQtcs = [...qtcMap.entries()].sort((a,b) => b[1] - a[1]).slice(0, 10);
-  const topLabelers = [...labMap.entries()].sort((a,b) => b[1] - a[1]).slice(0, 10);
+  const topQueues = [...qMap.entries()].sort((a,b) => b[1].total - a[1].total).slice(0, 10);
+  const topQtcs = [...qtcMap.entries()].sort((a,b) => b[1].total - a[1].total).slice(0, 10);
+  const topLabelers = [...labMap.entries()].sort((a,b) => b[1].total - a[1].total).slice(0, 10);
 
-  // Shift & Floor distribution (Floor = Unit)
+  // Shift & Floor distribution (Floor = Unit) with FP/QA breakdown
   const si = hdrs.findIndex(h => h.toLowerCase() === 'shift');
   const fi = hdrs.findIndex(h => ['floor', 'unit'].includes(h.toLowerCase()));
   const shiftMap = new Map();
   const floorMap = new Map();
   rows.forEach(r => {
-    if (si >= 0 && r[si]) shiftMap.set(r[si], (shiftMap.get(r[si]) || 0) + 1);
+    const isFP = pi >= 0 && String(r[pi] || '').trim().toUpperCase() === 'FP';
+    const isQA = pi >= 0 && String(r[pi] || '').trim().toUpperCase() === 'QA';
+
+    if (si >= 0 && r[si]) {
+      const s = String(r[si]).trim();
+      if (!shiftMap.has(s)) shiftMap.set(s, { total: 0, fp: 0, qa: 0 });
+      const ent = shiftMap.get(s);
+      ent.total++;
+      if (isFP) ent.fp++;
+      if (isQA) ent.qa++;
+    }
     if (fi >= 0 && r[fi]) {
       const fl = deriveFloor(r[fi]);
-      floorMap.set(fl, (floorMap.get(fl) || 0) + 1);
+      if (!floorMap.has(fl)) floorMap.set(fl, { total: 0, fp: 0, qa: 0 });
+      const ent = floorMap.get(fl);
+      ent.total++;
+      if (isFP) ent.fp++;
+      if (isQA) ent.qa++;
     }
   });
 
@@ -1315,8 +1416,8 @@ function renderOverview(){
     { label: 'Lane Line QA', cnt: laneQA, tone: '#ec4899' }
   ].sort((a,b) => b.cnt - a.cnt);
   const topWorkstream = workstreamRank[0] || { label: '—', cnt: 0, tone: '#0d9488' };
-  const topShift = [...shiftMap.entries()].sort((a,b) => b[1] - a[1])[0] || ['—', 0];
-  const topUnit = [...floorMap.entries()].sort((a,b) => b[1] - a[1])[0] || ['—', 0];
+  const topShift = [...shiftMap.entries()].sort((a,b) => b[1].total - a[1].total)[0] || ['—', { total: 0 }];
+  const topUnit = [...floorMap.entries()].sort((a,b) => b[1].total - a[1].total)[0] || ['—', { total: 0 }];
   const avgDaily = activeDays > 0 ? Math.round(totalSubmissions / activeDays) : 0;
 
   // Largest increase/decrease between consecutive days
@@ -1398,13 +1499,13 @@ function renderOverview(){
         + '<span class="ux-note">Highest-Volume Workstream</span>'
         + '<div style="font-weight:700; font-size:14px; color:var(--text); margin-top:3px;">' + topWorkstream.label + ' (' + topWorkstream.cnt.toLocaleString() + ' tasks)</div>'
       + '</div>'
-      + '<div style="background:var(--bg-3); padding:12px 14px; border-radius:8px; border-left:3px solid #3b82f6;">'
-        + '<span class="ux-note">Highest-Volume Shift</span>'
-        + '<div style="font-weight:700; font-size:14px; color:var(--text); margin-top:3px;">' + esc(topShift[0]) + ' (' + topShift[1].toLocaleString() + ' tasks)</div>'
+      + '<div style="background:var(--bg-3); padding:12px 14px; border-radius:8px; border-left:3px solid #3b82f6; cursor:pointer;" onclick="window.toggleGlobalFilter && window.toggleGlobalFilter(\'shift\', \'' + esc(topShift[0]) + '\')" title="Click to filter by ' + esc(topShift[0]) + '">'
+        + '<span class="ux-note">Highest-Volume Shift (Click to filter)</span>'
+        + '<div style="font-weight:700; font-size:14px; color:var(--text); margin-top:3px;">' + esc(topShift[0]) + ' (' + (topShift[1] && topShift[1].total !== undefined ? topShift[1].total : topShift[1]).toLocaleString() + ' tasks)</div>'
       + '</div>'
-      + '<div style="background:var(--bg-3); padding:12px 14px; border-radius:8px; border-left:3px solid #ed9a35;">'
+      + '<div style="background:var(--bg-3); padding:12px 14px; border-radius:8px; border-left:3px solid #ed9a35; cursor:pointer;" onclick="window.toggleGlobalFilter && window.toggleGlobalFilter(\'floor\', \'' + esc(topUnit[0]) + '\')" title="Click to filter by Unit ' + esc(topUnit[0]) + '">'
         + '<span class="ux-note">Highest-Volume Floor / Unit</span>'
-        + '<div style="font-weight:700; font-size:14px; color:var(--text); margin-top:3px;">Unit ' + esc(topUnit[0]) + ' (' + topUnit[1].toLocaleString() + ' tasks)</div>'
+        + '<div style="font-weight:700; font-size:14px; color:var(--text); margin-top:3px;">Unit ' + esc(topUnit[0]) + ' (' + (topUnit[1] && topUnit[1].total !== undefined ? topUnit[1].total : topUnit[1]).toLocaleString() + ' tasks)</div>'
       + '</div>'
       + '<div style="background:var(--bg-3); padding:12px 14px; border-radius:8px; border-left:3px solid #8b5cf6;">'
         + '<span class="ux-note">Average Daily Submissions</span>'
@@ -1419,21 +1520,69 @@ function renderOverview(){
 
   // Top Charts Grid: Daily Trend & Hourly Production
   + '<div class="ux-panels" style="margin-top:20px;">'
-    // Chart 1: Daily Submission Trend Line (Last 21 active dates)
+    // Chart 1: Daily Submission Area Line Chart (Last 21 active dates)
     + '<section class="ux-panel" style="flex:1.6;">'
-      + '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">'
-        + '<div><h3 style="margin:0 0 4px;">📈 Daily Submission Activity (Last 21 Dates)</h3><p style="margin:0;">Recent 21 active dates with task count. Select a bar to filter dashboard.</p></div>'
+      + '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">'
+        + '<div><h3 style="margin:0 0 4px;">📈 Daily Submission Activity (Last 21 Dates)</h3><p style="margin:0;">Interactive line chart with area trend & 7-day average. Click any dot to filter.</p></div>'
         + '<span class="ux-note">' + last21.length + ' active days</span>'
       + '</div>'
-      + '<div class="ux-bars">'
-        + (last21.length
-          ? last21.map(([d, c]) => '<button class="ux-bar" style="height:' + Math.max(6, (c / maxDay) * 100) + '%;" data-date="' + d + '" data-count="' + c + '" aria-label="' + d + ': ' + c + ' submissions"></button>').join('')
-          : '<div class="ux-empty">No dated submissions in current view.</div>')
-      + '</div>'
-      + '<div style="display:flex; justify-content:space-between; margin-top:8px; font-size:11px; color:var(--text-soft);">'
-        + '<span>' + (last21.length ? last21[0][0] : '') + '</span>'
-        + '<span>Peak: ' + maxDay.toLocaleString() + ' tasks</span>'
-        + '<span>' + (last21.length ? last21[last21.length - 1][0] : '') + '</span>'
+      + (() => {
+        if (!last21.length) return '<div class="ux-empty" style="height:150px; display:flex; align-items:center; justify-content:center;">No dated submissions in current view.</div>';
+
+        // 7-day moving average
+        const movingAvg = last21.map((p, i) => {
+          const start = Math.max(0, i - 6);
+          const slice = last21.slice(start, i + 1);
+          const sum = slice.reduce((acc, pt) => acc + pt[1], 0);
+          return [p[0], Math.round(sum / slice.length)];
+        });
+
+        const W = 680, H = 190, L = 50, R = 25, T = 20, B = 40;
+        const maxV = Math.max(1, ...last21.map(p => p[1]));
+        const x = i => L + (last21.length <= 1 ? (W - L - R) / 2 : (i / (last21.length - 1)) * (W - L - R));
+        const y = v => H - B - (v / maxV) * (H - T - B);
+
+        let svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%; height:auto; display:block; overflow:visible;" role="group" aria-label="Daily submission activity line chart">';
+        svg += '<defs><linearGradient id="ovLineGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#0d9488" stop-opacity="0.38"/><stop offset="100%" stop-color="#0d9488" stop-opacity="0.02"/></linearGradient></defs>';
+
+        // Horizontal Gridlines
+        for (let i = 0; i < 4; i++) {
+          const val = (maxV * i) / 3;
+          const yy = y(val);
+          svg += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + yy + '" y2="' + yy + '" stroke="var(--border)" stroke-dasharray="3 3"/>';
+          svg += '<text x="' + (L - 8) + '" y="' + (yy + 4) + '" fill="var(--text-soft)" font-size="10" text-anchor="end">' + Math.round(val).toLocaleString() + '</text>';
+        }
+
+        // Area polygon fill & lines
+        if (last21.length > 1) {
+          const polyPoints = [L + ',' + (H - B), ...last21.map((p, i) => x(i) + ',' + y(p[1])), x(last21.length - 1) + ',' + (H - B)].join(' ');
+          svg += '<polygon fill="url(#ovLineGrad)" points="' + polyPoints + '"/>';
+          svg += '<polyline fill="none" stroke="#ef4444" stroke-width="2" stroke-dasharray="4 3" stroke-linecap="round" points="' + movingAvg.map((p, i) => x(i) + ',' + y(p[1])).join(' ') + '"/>';
+          svg += '<polyline fill="none" stroke="#0d9488" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" points="' + last21.map((p, i) => x(i) + ',' + y(p[1])).join(' ') + '"/>';
+        } else if (last21.length === 1) {
+          svg += '<line x1="' + (L + 20) + '" x2="' + (W - R - 20) + '" y1="' + y(last21[0][1]) + '" y2="' + y(last21[0][1]) + '" stroke="#0d9488" stroke-width="2" stroke-dasharray="5 5" opacity="0.6"/>';
+        }
+
+        // Circular Dots & X-axis Labels
+        last21.forEach(([d, c], i) => {
+          const cx = x(i), cy = y(c);
+          const isFilterActive = globalUnifiedFilters.date === d;
+          svg += '<circle class="ov-chart-dot" cx="' + cx + '" cy="' + cy + '" r="' + (isFilterActive ? '7' : '5') + '" fill="' + (isFilterActive ? '#38bdf8' : '#0d9488') + '" stroke="var(--bg-1)" stroke-width="2" style="cursor:pointer; transition:all 0.15s ease;" data-date="' + esc(d) + '" data-count="' + c + '" onclick="window.toggleGlobalFilter && window.toggleGlobalFilter(\'date\', \'' + esc(d) + '\')" title="' + esc(d) + ': ' + c.toLocaleString() + ' tasks"></circle>';
+
+          if (last21.length <= 7 || i === 0 || i === last21.length - 1 || i === Math.floor(last21.length / 2)) {
+            svg += '<text x="' + cx + '" y="' + (H - 12) + '" fill="var(--text-soft)" font-size="10" text-anchor="' + (i === 0 ? 'start' : i === last21.length - 1 ? 'end' : 'middle') + '">' + d + '</text>';
+          }
+        });
+
+        svg += '</svg>';
+        return svg;
+      })()
+      + '<div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px; font-size:11px; color:var(--text-soft); flex-wrap:wrap; gap:8px;">'
+        + '<div style="display:flex; gap:14px; align-items:center;">'
+          + '<span><span style="display:inline-block; width:10px; height:10px; background:#0d9488; border-radius:50%; vertical-align:middle; margin-right:4px;"></span> Daily Submissions</span>'
+          + '<span><span style="display:inline-block; width:14px; height:0; border-top:2px dashed #ef4444; vertical-align:middle; margin-right:4px;"></span> 7-Day Moving Avg</span>'
+        + '</div>'
+        + '<span>Peak: <b>' + maxDay.toLocaleString() + '</b> tasks · 💡 Click any dot to filter</span>'
       + '</div>'
     + '</section>'
 
@@ -1455,64 +1604,80 @@ function renderOverview(){
     // Chart 3 & 4: Modality & Pass Visual Distribution
     + '<div class="ux-panel">'
       + '<h3>📦 Workstream & Pass Share</h3>'
-      + '<p>Distribution across work types and validation stages.</p>'
+      + '<p>Distribution across work types and validation stages. Click any bar to filter.</p>'
       + '<div style="display:flex; flex-direction:column; gap:12px; margin-top:14px;">'
         + '<div>'
           + '<div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px;"><b>Lidar vs Lane Line</b><span>' + (totalSubmissions ? ((totalLidar/totalSubmissions)*100).toFixed(1) : 0) + '% / ' + (totalSubmissions ? ((totalLane/totalSubmissions)*100).toFixed(1) : 0) + '%</span></div>'
-          + '<div style="display:flex; height:12px; border-radius:6px; overflow:hidden; background:var(--border);">'
-            + '<div style="width:' + (totalSubmissions ? (totalLidar/totalSubmissions)*100 : 50) + '%; background:#0d9488;"></div>'
-            + '<div style="width:' + (totalSubmissions ? (totalLane/totalSubmissions)*100 : 50) + '%; background:#ed9a35;"></div>'
+          + '<div style="display:flex; height:12px; border-radius:6px; overflow:hidden; background:var(--border); cursor:pointer;">'
+            + '<div style="width:' + (totalSubmissions ? (totalLidar/totalSubmissions)*100 : 50) + '%; background:#0d9488;" onclick="window.toggleGlobalFilter && window.toggleGlobalFilter(\'modality\', \'lidar\')" title="Click to filter Lidar"></div>'
+            + '<div style="width:' + (totalSubmissions ? (totalLane/totalSubmissions)*100 : 50) + '%; background:#ed9a35;" onclick="window.toggleGlobalFilter && window.toggleGlobalFilter(\'modality\', \'laneline\')" title="Click to filter Lane Line"></div>'
           + '</div>'
           + '<div style="display:flex; justify-content:space-between; font-size:11px; color:var(--text-soft); margin-top:3px;">'
-            + '<span><span style="color:#0d9488">●</span> Lidar: ' + totalLidar.toLocaleString() + '</span>'
-            + '<span><span style="color:#ed9a35">●</span> Lane Line: ' + totalLane.toLocaleString() + '</span>'
+            + '<span style="cursor:pointer;" onclick="window.toggleGlobalFilter && window.toggleGlobalFilter(\'modality\', \'lidar\')"><span style="color:#0d9488">●</span> Lidar: <b>' + totalLidar.toLocaleString() + '</b></span>'
+            + '<span style="cursor:pointer;" onclick="window.toggleGlobalFilter && window.toggleGlobalFilter(\'modality\', \'laneline\')"><span style="color:#ed9a35">●</span> Lane Line: <b>' + totalLane.toLocaleString() + '</b></span>'
           + '</div>'
         + '</div>'
         + '<div style="margin-top:6px;">'
           + '<div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px;"><b>First Pass vs QA</b><span>' + (totalSubmissions ? ((totalFP/totalSubmissions)*100).toFixed(1) : 0) + '% / ' + (totalSubmissions ? ((totalQA/totalSubmissions)*100).toFixed(1) : 0) + '%</span></div>'
-          + '<div style="display:flex; height:12px; border-radius:6px; overflow:hidden; background:var(--border);">'
-            + '<div style="width:' + (totalSubmissions ? (totalFP/totalSubmissions)*100 : 50) + '%; background:#3b82f6;"></div>'
-            + '<div style="width:' + (totalSubmissions ? (totalQA/totalSubmissions)*100 : 50) + '%; background:#8b5cf6;"></div>'
+          + '<div style="display:flex; height:12px; border-radius:6px; overflow:hidden; background:var(--border); cursor:pointer;">'
+            + '<div style="width:' + (totalSubmissions ? (totalFP/totalSubmissions)*100 : 50) + '%; background:#3b82f6;" onclick="window.toggleGlobalFilter && window.toggleGlobalFilter(\'pass\', \'FP\')" title="Click to filter First Pass"></div>'
+            + '<div style="width:' + (totalSubmissions ? (totalQA/totalSubmissions)*100 : 50) + '%; background:#8b5cf6;" onclick="window.toggleGlobalFilter && window.toggleGlobalFilter(\'pass\', \'QA\')" title="Click to filter QA"></div>'
           + '</div>'
           + '<div style="display:flex; justify-content:space-between; font-size:11px; color:var(--text-soft); margin-top:3px;">'
-            + '<span><span style="color:#3b82f6">●</span> FP: ' + totalFP.toLocaleString() + '</span>'
-            + '<span><span style="color:#8b5cf6">●</span> QA: ' + totalQA.toLocaleString() + '</span>'
+            + '<span style="cursor:pointer;" onclick="window.toggleGlobalFilter && window.toggleGlobalFilter(\'pass\', \'FP\')"><span style="color:#3b82f6">●</span> FP: <b>' + totalFP.toLocaleString() + '</b></span>'
+            + '<span style="cursor:pointer;" onclick="window.toggleGlobalFilter && window.toggleGlobalFilter(\'pass\', \'QA\')"><span style="color:#8b5cf6">●</span> QA: <b>' + totalQA.toLocaleString() + '</b></span>'
           + '</div>'
         + '</div>'
       + '</div>'
     + '</div>'
 
-    // Chart 5: Shift Productivity
+    // Chart 5: Shift Productivity (Clickable to Filter & FP/QA breakdown)
     + '<div class="ux-panel">'
       + '<h3>☀️ Shift Productivity Comparison</h3>'
-      + '<p>Volume of submissions contributed by each shift.</p>'
+      + '<p>Volume contributed by each shift. Click any shift to filter.</p>'
       + '<div style="display:flex; flex-direction:column; gap:8px; margin-top:12px;">'
-        + ([...shiftMap.entries()].sort((a,b)=>b[1]-a[1]).map(([s, cnt]) => {
-          const maxS = Math.max(1, ...shiftMap.values());
-          const pct = ((cnt / Math.max(1, totalSubmissions)) * 100).toFixed(1);
-          return '<div>'
-            + '<div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:3px;"><span>' + esc(s) + '</span><b>' + cnt.toLocaleString() + ' (' + pct + '%)</b></div>'
+        + ([...shiftMap.entries()].sort((a,b)=>b[1].total - a[1].total).map(([s, ent]) => {
+          const maxS = Math.max(1, ...[...shiftMap.values()].map(v => v.total));
+          const pct = ((ent.total / Math.max(1, totalSubmissions)) * 100).toFixed(1);
+          const isFilterActive = globalUnifiedFilters.shift === s;
+          return '<div style="cursor:pointer; padding:3px 4px; border-radius:6px; transition:background 0.15s; background:' + (isFilterActive ? 'var(--accent-light)' : 'transparent') + ';" onclick="window.toggleGlobalFilter && window.toggleGlobalFilter(\'shift\', \'' + esc(s) + '\')" title="Click to filter by ' + esc(s) + '" data-shift="' + esc(s) + '">'
+            + '<div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; margin-bottom:3px;">'
+              + '<span><b>' + esc(s) + '</b></span>'
+              + '<div style="display:flex; align-items:center; gap:6px;">'
+                + '<span class="q-badge" style="background:rgba(13,148,136,0.15); color:#0d9488; font-size:10px; font-weight:700; padding:1px 5px; border-radius:4px;">FP: ' + ent.fp.toLocaleString() + '</span>'
+                + '<span class="q-badge" style="background:rgba(20,184,166,0.15); color:#14b8a6; font-size:10px; font-weight:700; padding:1px 5px; border-radius:4px;">QA: ' + ent.qa.toLocaleString() + '</span>'
+                + '<b>' + ent.total.toLocaleString() + ' (' + pct + '%)</b>'
+              + '</div>'
+            + '</div>'
             + '<div style="height:8px; border-radius:4px; background:var(--border); overflow:hidden;">'
-              + '<div style="height:100%; width:' + ((cnt/maxS)*100) + '%; background:var(--primary);"></div>'
+              + '<div style="height:100%; width:' + ((ent.total/maxS)*100) + '%; background:' + (isFilterActive ? '#38bdf8' : 'var(--primary)') + ';"></div>'
             + '</div>'
           + '</div>';
         }).join('') || '<div class="ux-empty">No shift data available.</div>')
       + '</div>'
     + '</div>'
 
-    // Chart 6: Floor Productivity (Floor = Unit)
+    // Chart 6: Floor Productivity (Floor = Unit, Clickable & FP/QA breakdown)
     + '<div class="ux-panel">'
       + '<h3>🏢 Floor / Unit Productivity Comparison</h3>'
-      + '<p>Throughput by floor based on operational Unit mapping.</p>'
+      + '<p>Throughput by floor based on operational Unit. Click to filter.</p>'
       + '<div style="display:flex; flex-direction:column; gap:8px; margin-top:12px;">'
         + (([...floorMap.keys()].sort().map(fl => {
-          const cnt = floorMap.get(fl) || 0;
-          const maxF = Math.max(1, ...floorMap.values());
-          const pct = totalSubmissions ? ((cnt / totalSubmissions) * 100).toFixed(1) : 0;
-          return '<div>'
-            + '<div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:3px;"><span>Unit ' + esc(fl) + '</span><b>' + cnt.toLocaleString() + ' (' + pct + '%)</b></div>'
+          const ent = floorMap.get(fl) || { total: 0, fp: 0, qa: 0 };
+          const maxF = Math.max(1, ...[...floorMap.values()].map(v => v.total));
+          const pct = totalSubmissions ? ((ent.total / totalSubmissions) * 100).toFixed(1) : 0;
+          const isFilterActive = globalUnifiedFilters.floor === fl;
+          return '<div style="cursor:pointer; padding:3px 4px; border-radius:6px; transition:background 0.15s; background:' + (isFilterActive ? 'var(--accent-light)' : 'transparent') + ';" onclick="window.toggleGlobalFilter && window.toggleGlobalFilter(\'floor\', \'' + esc(fl) + '\')" title="Click to filter by Unit ' + esc(fl) + '" data-floor="' + esc(fl) + '">'
+            + '<div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; margin-bottom:3px;">'
+              + '<span><b>Unit ' + esc(fl) + '</b></span>'
+              + '<div style="display:flex; align-items:center; gap:6px;">'
+                + '<span class="q-badge" style="background:rgba(13,148,136,0.15); color:#0d9488; font-size:10px; font-weight:700; padding:1px 5px; border-radius:4px;">FP: ' + ent.fp.toLocaleString() + '</span>'
+                + '<span class="q-badge" style="background:rgba(20,184,166,0.15); color:#14b8a6; font-size:10px; font-weight:700; padding:1px 5px; border-radius:4px;">QA: ' + ent.qa.toLocaleString() + '</span>'
+                + '<b>' + ent.total.toLocaleString() + ' (' + pct + '%)</b>'
+              + '</div>'
+            + '</div>'
             + '<div style="height:8px; border-radius:4px; background:var(--border); overflow:hidden;">'
-              + '<div style="height:100%; width:' + ((cnt/maxF)*100) + '%; background:#df8b24;"></div>'
+              + '<div style="height:100%; width:' + ((ent.total/maxF)*100) + '%; background:' + (isFilterActive ? '#38bdf8' : '#df8b24') + ';"></div>'
             + '</div>'
           + '</div>';
         }).join('')) || '<div class="ux-empty">No floor/unit records available.</div>')
@@ -1520,24 +1685,29 @@ function renderOverview(){
     + '</div>'
   + '</div>'
 
-  // Bottom Rankings: Top 10 Queues, Top 10 QTCs, Top 10 Labelers
+  // Bottom Rankings: Top 10 Queues, Top 10 QTCs, Top 10 Labelers (With FP/QA and Click-to-Filter)
   + '<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:16px; margin-top:20px;">'
     // Chart 7: Top 10 Queues
     + '<div class="ux-panel">'
       + '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">'
         + '<h3 style="margin:0;">🗂️ Top 10 Queues</h3>'
-        + '<span class="ux-note">By Submissions</span>'
+        + '<span class="ux-note">FP &amp; QA Split · Click to filter</span>'
       + '</div>'
       + '<div style="display:flex; flex-direction:column; gap:6px;">'
-        + (topQueues.map(([q, cnt], idx) => {
-          const maxQ = topQueues[0][1] || 1;
-          return '<div style="padding:4px 0; border-bottom:1px solid var(--border-light);">'
+        + (topQueues.map(([q, ent], idx) => {
+          const maxQ = topQueues[0] ? topQueues[0][1].total : 1;
+          const isFilterActive = globalUnifiedFilters.queue === q;
+          return '<div style="padding:4px 4px; border-bottom:1px solid var(--border-light); cursor:pointer; border-radius:4px; background:' + (isFilterActive ? 'var(--accent-light)' : 'transparent') + ';" onclick="window.toggleGlobalFilter && window.toggleGlobalFilter(\'queue\', \'' + esc(q) + '\')" title="Click to filter by ' + esc(q) + '" data-tooltip-queue="' + esc(q) + '">'
             + '<div style="display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:12px; margin-bottom:2px;">'
-              + '<span style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:pointer;" data-tooltip-queue="' + esc(q) + '" title="' + esc(q) + '"><b style="color:var(--text-soft); font-size:10px; margin-right:4px;">#' + (idx+1) + '</b> ' + esc(q) + '</span>'
-              + '<b style="flex-shrink:0; margin-left:8px; font-variant-numeric:tabular-nums;">' + cnt.toLocaleString() + '</b>'
+              + '<span style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"><b style="color:var(--text-soft); font-size:10px; margin-right:4px;">#' + (idx+1) + '</b> ' + esc(q) + '</span>'
+              + '<div style="display:flex; align-items:center; gap:5px; flex-shrink:0;">'
+                + '<span class="q-badge" style="background:rgba(13,148,136,0.15); color:#0d9488; font-size:10px; font-weight:700; padding:1px 5px; border-radius:4px;">FP: ' + ent.fp.toLocaleString() + '</span>'
+                + '<span class="q-badge" style="background:rgba(20,184,166,0.15); color:#14b8a6; font-size:10px; font-weight:700; padding:1px 5px; border-radius:4px;">QA: ' + ent.qa.toLocaleString() + '</span>'
+                + '<b style="font-variant-numeric:tabular-nums; font-size:11px;">(' + ent.total.toLocaleString() + ')</b>'
+              + '</div>'
             + '</div>'
             + '<div style="height:4px; border-radius:2px; background:var(--border); overflow:hidden;">'
-              + '<div style="height:100%; width:' + ((cnt/maxQ)*100) + '%; background:var(--accent);"></div>'
+              + '<div style="height:100%; width:' + ((ent.total/maxQ)*100) + '%; background:' + (isFilterActive ? '#38bdf8' : 'var(--accent)') + ';"></div>'
             + '</div>'
           + '</div>';
         }).join('') || '<div class="ux-empty">No queue data available.</div>')
@@ -1548,40 +1718,49 @@ function renderOverview(){
     + '<div class="ux-panel">'
       + '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">'
         + '<h3 style="margin:0;">👥 Top 10 QTC Supervisors</h3>'
-        + '<span class="ux-note">By Team Volume</span>'
+        + '<span class="ux-note">FP &amp; QA Split · Click to filter</span>'
       + '</div>'
       + '<div style="display:flex; flex-direction:column; gap:6px;">'
-        + (topQtcs.map(([qc, cnt], idx) => {
-          const maxQc = topQtcs[0][1] || 1;
-          return '<div style="padding:4px 0; border-bottom:1px solid var(--border-light);">'
+        + (topQtcs.map(([qc, ent], idx) => {
+          const maxQc = topQtcs[0] ? topQtcs[0][1].total : 1;
+          const isFilterActive = globalUnifiedFilters.qtc === qc;
+          return '<div style="padding:4px 4px; border-bottom:1px solid var(--border-light); cursor:pointer; border-radius:4px; background:' + (isFilterActive ? 'var(--accent-light)' : 'transparent') + ';" onclick="window.toggleGlobalFilter && window.toggleGlobalFilter(\'qtc\', \'' + esc(qc) + '\')" title="Click to filter by ' + esc(qc) + '">'
             + '<div style="display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:12px; margin-bottom:2px;">'
-              + '<span style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="' + esc(qc) + '"><b style="color:var(--text-soft); font-size:10px; margin-right:4px;">#' + (idx+1) + '</b> ' + esc(qc) + '</span>'
-              + '<b style="flex-shrink:0; margin-left:8px; font-variant-numeric:tabular-nums;">' + cnt.toLocaleString() + '</b>'
+              + '<span style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"><b style="color:var(--text-soft); font-size:10px; margin-right:4px;">#' + (idx+1) + '</b> ' + esc(qc) + '</span>'
+              + '<div style="display:flex; align-items:center; gap:5px; flex-shrink:0;">'
+                + '<span class="q-badge" style="background:rgba(13,148,136,0.15); color:#0d9488; font-size:10px; font-weight:700; padding:1px 5px; border-radius:4px;">FP: ' + ent.fp.toLocaleString() + '</span>'
+                + '<span class="q-badge" style="background:rgba(20,184,166,0.15); color:#14b8a6; font-size:10px; font-weight:700; padding:1px 5px; border-radius:4px;">QA: ' + ent.qa.toLocaleString() + '</span>'
+                + '<b style="font-variant-numeric:tabular-nums; font-size:11px;">(' + ent.total.toLocaleString() + ')</b>'
+              + '</div>'
             + '</div>'
             + '<div style="height:4px; border-radius:2px; background:var(--border); overflow:hidden;">'
-              + '<div style="height:100%; width:' + ((cnt/maxQc)*100) + '%; background:#df8b24;"></div>'
+              + '<div style="height:100%; width:' + ((ent.total/maxQc)*100) + '%; background:' + (isFilterActive ? '#38bdf8' : '#df8b24') + ';"></div>'
             + '</div>'
           + '</div>';
         }).join('') || '<div class="ux-empty">No QTC data available.</div>')
       + '</div>'
     + '</div>'
 
-    // Chart 9: Top 10 Labelers
+    // Chart 9: Top 10 Labelers (Click to open detail modal)
     + '<div class="ux-panel">'
       + '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">'
         + '<h3 style="margin:0;">👤 Top 10 Labelers</h3>'
-        + '<span class="ux-note">By Submissions</span>'
+        + '<span class="ux-note">FP &amp; QA Split · Click for Detail</span>'
       + '</div>'
       + '<div style="display:flex; flex-direction:column; gap:6px;">'
-        + (topLabelers.map(([lbl, cnt], idx) => {
-          const maxL = topLabelers[0][1] || 1;
-          return '<div style="padding:4px 0; border-bottom:1px solid var(--border-light);">'
+        + (topLabelers.map(([lbl, ent], idx) => {
+          const maxL = topLabelers[0] ? topLabelers[0][1].total : 1;
+          return '<div style="padding:4px 4px; border-bottom:1px solid var(--border-light); cursor:pointer; border-radius:4px;" onclick="window.openLabelerDetailModal && window.openLabelerDetailModal(\'' + esc(lbl) + '\')" title="Click to view ' + esc(lbl) + ' task history" class="labeler-row-item" data-person-key="' + esc(lbl) + '">'
             + '<div style="display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:12px; margin-bottom:2px;">'
-              + '<span style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="' + esc(lbl) + '"><b style="color:var(--text-soft); font-size:10px; margin-right:4px;">#' + (idx+1) + '</b> ' + esc(lbl) + '</span>'
-              + '<b style="flex-shrink:0; margin-left:8px; font-variant-numeric:tabular-nums;">' + cnt.toLocaleString() + '</b>'
+              + '<span style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--primary); font-weight:600;"><b style="color:var(--text-soft); font-size:10px; margin-right:4px;">#' + (idx+1) + '</b> ' + esc(lbl) + '</span>'
+              + '<div style="display:flex; align-items:center; gap:5px; flex-shrink:0;">'
+                + '<span class="q-badge" style="background:rgba(13,148,136,0.15); color:#0d9488; font-size:10px; font-weight:700; padding:1px 5px; border-radius:4px;">FP: ' + ent.fp.toLocaleString() + '</span>'
+                + '<span class="q-badge" style="background:rgba(20,184,166,0.15); color:#14b8a6; font-size:10px; font-weight:700; padding:1px 5px; border-radius:4px;">QA: ' + ent.qa.toLocaleString() + '</span>'
+                + '<b style="font-variant-numeric:tabular-nums; font-size:11px;">(' + ent.total.toLocaleString() + ')</b>'
+              + '</div>'
             + '</div>'
             + '<div style="height:4px; border-radius:2px; background:var(--border); overflow:hidden;">'
-              + '<div style="height:100%; width:' + ((cnt/maxL)*100) + '%; background:#10b981;"></div>'
+              + '<div style="height:100%; width:' + ((ent.total/maxL)*100) + '%; background:#10b981;"></div>'
             + '</div>'
           + '</div>';
         }).join('') || '<div class="ux-empty">No labeler data available.</div>')
@@ -1872,7 +2051,7 @@ function renderAnalysis(){
   const lidarPct = totalSelected ? ((totalLidar / totalSelected) * 100).toFixed(1) : '0';
   const lanePct = totalSelected ? ((totalLane / totalSelected) * 100).toFixed(1) : '0';
 
-  // Lidar sub-aggregations
+  // Lidar sub-aggregations (with FP/QA split)
   const lidarRows = a.selected.filter(r => {
     const mi = hdrs.findIndex(h => h.toLowerCase() === 'modality');
     return mi >= 0 && String(r[mi] || '').toLowerCase().replace(/[\s_-]+/g,'') === 'lidar';
@@ -1883,14 +2062,30 @@ function renderAnalysis(){
   const lidarLabMap = new Map();
   const lidarQtcMap = new Map();
   lidarRows.forEach(r => {
-    if (qi >= 0 && r[qi]) lidarQueueMap.set(r[qi], (lidarQueueMap.get(r[qi]) || 0) + 1);
+    const isFP = isModPass(r, 'lidar', 'FP');
+    const isQA = isModPass(r, 'lidar', 'QA');
+    if (qi >= 0 && r[qi]) {
+      const q = String(r[qi]).trim();
+      if (!lidarQueueMap.has(q)) lidarQueueMap.set(q, { total: 0, fp: 0, qa: 0 });
+      const ent = lidarQueueMap.get(q);
+      ent.total++;
+      if (isFP) ent.fp++;
+      if (isQA) ent.qa++;
+    }
     if (si >= 0 && r[si]) lidarShiftMap.set(r[si], (lidarShiftMap.get(r[si]) || 0) + 1);
     if (fi >= 0 && r[fi]) { const fl = deriveFloor(r[fi]); lidarFloorMap.set(fl, (lidarFloorMap.get(fl) || 0) + 1); }
-    if (li >= 0 && r[li]) lidarLabMap.set(r[li], (lidarLabMap.get(r[li]) || 0) + 1);
+    if (li >= 0 && r[li]) {
+      const l = String(r[li]).trim();
+      if (!lidarLabMap.has(l)) lidarLabMap.set(l, { total: 0, fp: 0, qa: 0 });
+      const ent = lidarLabMap.get(l);
+      ent.total++;
+      if (isFP) ent.fp++;
+      if (isQA) ent.qa++;
+    }
     if (qcI >= 0 && r[qcI]) lidarQtcMap.set(r[qcI], (lidarQtcMap.get(r[qcI]) || 0) + 1);
   });
 
-  // Lane Line sub-aggregations
+  // Lane Line sub-aggregations (with FP/QA split)
   const laneRows = a.selected.filter(r => {
     const mi = hdrs.findIndex(h => h.toLowerCase() === 'modality');
     const m = String(r[mi] || '').toLowerCase().replace(/[\s_-]+/g,'');
@@ -1902,10 +2097,26 @@ function renderAnalysis(){
   const laneLabMap = new Map();
   const laneQtcMap = new Map();
   laneRows.forEach(r => {
-    if (qi >= 0 && r[qi]) laneQueueMap.set(r[qi], (laneQueueMap.get(r[qi]) || 0) + 1);
+    const isFP = isModPass(r, 'laneline', 'FP');
+    const isQA = isModPass(r, 'laneline', 'QA');
+    if (qi >= 0 && r[qi]) {
+      const q = String(r[qi]).trim();
+      if (!laneQueueMap.has(q)) laneQueueMap.set(q, { total: 0, fp: 0, qa: 0 });
+      const ent = laneQueueMap.get(q);
+      ent.total++;
+      if (isFP) ent.fp++;
+      if (isQA) ent.qa++;
+    }
     if (si >= 0 && r[si]) laneShiftMap.set(r[si], (laneShiftMap.get(r[si]) || 0) + 1);
     if (fi >= 0 && r[fi]) { const fl = deriveFloor(r[fi]); laneFloorMap.set(fl, (laneFloorMap.get(fl) || 0) + 1); }
-    if (li >= 0 && r[li]) laneLabMap.set(r[li], (laneLabMap.get(r[li]) || 0) + 1);
+    if (li >= 0 && r[li]) {
+      const l = String(r[li]).trim();
+      if (!laneLabMap.has(l)) laneLabMap.set(l, { total: 0, fp: 0, qa: 0 });
+      const ent = laneLabMap.get(l);
+      ent.total++;
+      if (isFP) ent.fp++;
+      if (isQA) ent.qa++;
+    }
     if (qcI >= 0 && r[qcI]) laneQtcMap.set(r[qcI], (laneQtcMap.get(r[qcI]) || 0) + 1);
   });
 
@@ -2019,13 +2230,13 @@ function renderAnalysis(){
           + '<div style="flex:1;"><b>QA:</b> ' + lidarQA.toLocaleString() + '</div>'
           + '<div style="flex:1;"><b>QA Share:</b> ' + (totalLidar ? ((lidarQA/totalLidar)*100).toFixed(1) : 0) + '%</div>'
         + '</div>'
-        + '<h4 style="font-size:12px; margin:10px 0 4px; color:var(--text-soft);">Top 5 Lidar Queues</h4>'
+        + '<h4 style="font-size:12px; margin:10px 0 4px; color:var(--text-soft);">Top 5 Lidar Queues (FP &amp; QA Split)</h4>'
         + '<div style="display:flex; flex-direction:column; gap:4px; font-size:12px;">'
-          + ([...lidarQueueMap.entries()].sort((a,b)=>b[1]-a[1]).slice(0,5).map(([q,c])=>'<div style="display:flex; justify-content:space-between; padding:3px 0; border-bottom:1px solid var(--border-light);"><span style="text-overflow:ellipsis; overflow:hidden; white-space:nowrap; max-width:220px;">' + esc(q) + '</span><b>' + c.toLocaleString() + '</b></div>').join('') || '<span class="ux-note">No Lidar queue data</span>')
+          + ([...lidarQueueMap.entries()].sort((a,b)=>b[1].total - a[1].total).slice(0,5).map(([q, ent]) => '<div style="display:flex; justify-content:space-between; align-items:center; padding:3px 4px; border-bottom:1px solid var(--border-light); cursor:pointer; border-radius:4px;" onclick="window.toggleGlobalFilter && window.toggleGlobalFilter(\'queue\', \'' + esc(q) + '\')" title="Click to filter by ' + esc(q) + '"><span style="text-overflow:ellipsis; overflow:hidden; white-space:nowrap; max-width:200px;">' + esc(q) + '</span><div style="display:flex; align-items:center; gap:5px;"><span class="q-badge" style="background:rgba(13,148,136,0.15); color:#0d9488; font-size:10px; font-weight:700; padding:1px 5px; border-radius:4px;">FP: ' + ent.fp.toLocaleString() + '</span><span class="q-badge" style="background:rgba(20,184,166,0.15); color:#14b8a6; font-size:10px; font-weight:700; padding:1px 5px; border-radius:4px;">QA: ' + ent.qa.toLocaleString() + '</span><b style="font-size:11px;">(' + ent.total.toLocaleString() + ')</b></div></div>').join('') || '<span class="ux-note">No Lidar queue data</span>')
         + '</div>'
-        + '<h4 style="font-size:12px; margin:12px 0 4px; color:var(--text-soft);">Top 5 Lidar Labelers</h4>'
+        + '<h4 style="font-size:12px; margin:12px 0 4px; color:var(--text-soft);">Top 5 Lidar Labelers (FP &amp; QA Split)</h4>'
         + '<div style="display:flex; flex-direction:column; gap:4px; font-size:12px;">'
-          + ([...lidarLabMap.entries()].sort((a,b)=>b[1]-a[1]).slice(0,5).map(([l,c])=>'<div style="display:flex; justify-content:space-between; padding:3px 0; border-bottom:1px solid var(--border-light);"><span style="text-overflow:ellipsis; overflow:hidden; white-space:nowrap; max-width:220px;">' + esc(l) + '</span><b style="color:#0d9488;">' + c.toLocaleString() + '</b></div>').join('') || '<span class="ux-note">No Lidar labelers</span>')
+          + ([...lidarLabMap.entries()].sort((a,b)=>b[1].total - a[1].total).slice(0,5).map(([l, ent]) => '<div style="display:flex; justify-content:space-between; align-items:center; padding:3px 4px; border-bottom:1px solid var(--border-light); cursor:pointer; border-radius:4px;" onclick="window.openLabelerDetailModal && window.openLabelerDetailModal(\'' + esc(l) + '\')" title="Click for details of ' + esc(l) + '"><span style="text-overflow:ellipsis; overflow:hidden; white-space:nowrap; max-width:200px; color:var(--primary); font-weight:600;">' + esc(l) + '</span><div style="display:flex; align-items:center; gap:5px;"><span class="q-badge" style="background:rgba(13,148,136,0.15); color:#0d9488; font-size:10px; font-weight:700; padding:1px 5px; border-radius:4px;">FP: ' + ent.fp.toLocaleString() + '</span><span class="q-badge" style="background:rgba(20,184,166,0.15); color:#14b8a6; font-size:10px; font-weight:700; padding:1px 5px; border-radius:4px;">QA: ' + ent.qa.toLocaleString() + '</span><b style="font-size:11px; color:#0d9488;">(' + ent.total.toLocaleString() + ')</b></div></div>').join('') || '<span class="ux-note">No Lidar labelers</span>')
         + '</div>'
       + '</div>'
 
@@ -2040,13 +2251,13 @@ function renderAnalysis(){
           + '<div style="flex:1;"><b>QA:</b> ' + laneQA.toLocaleString() + '</div>'
           + '<div style="flex:1;"><b>QA Share:</b> ' + (totalLane ? ((laneQA/totalLane)*100).toFixed(1) : 0) + '%</div>'
         + '</div>'
-        + '<h4 style="font-size:12px; margin:10px 0 4px; color:var(--text-soft);">Top 5 Lane Line Queues</h4>'
+        + '<h4 style="font-size:12px; margin:10px 0 4px; color:var(--text-soft);">Top 5 Lane Line Queues (FP &amp; QA Split)</h4>'
         + '<div style="display:flex; flex-direction:column; gap:4px; font-size:12px;">'
-          + ([...laneQueueMap.entries()].sort((a,b)=>b[1]-a[1]).slice(0,5).map(([q,c])=>'<div style="display:flex; justify-content:space-between; padding:3px 0; border-bottom:1px solid var(--border-light);"><span style="text-overflow:ellipsis; overflow:hidden; white-space:nowrap; max-width:220px;">' + esc(q) + '</span><b>' + c.toLocaleString() + '</b></div>').join('') || '<span class="ux-note">No Lane Line queue data</span>')
+          + ([...laneQueueMap.entries()].sort((a,b)=>b[1].total - a[1].total).slice(0,5).map(([q, ent]) => '<div style="display:flex; justify-content:space-between; align-items:center; padding:3px 4px; border-bottom:1px solid var(--border-light); cursor:pointer; border-radius:4px;" onclick="window.toggleGlobalFilter && window.toggleGlobalFilter(\'queue\', \'' + esc(q) + '\')" title="Click to filter by ' + esc(q) + '"><span style="text-overflow:ellipsis; overflow:hidden; white-space:nowrap; max-width:200px;">' + esc(q) + '</span><div style="display:flex; align-items:center; gap:5px;"><span class="q-badge" style="background:rgba(237,154,53,0.15); color:#ed9a35; font-size:10px; font-weight:700; padding:1px 5px; border-radius:4px;">FP: ' + ent.fp.toLocaleString() + '</span><span class="q-badge" style="background:rgba(236,72,153,0.15); color:#ec4899; font-size:10px; font-weight:700; padding:1px 5px; border-radius:4px;">QA: ' + ent.qa.toLocaleString() + '</span><b style="font-size:11px;">(' + ent.total.toLocaleString() + ')</b></div></div>').join('') || '<span class="ux-note">No Lane Line queue data</span>')
         + '</div>'
-        + '<h4 style="font-size:12px; margin:12px 0 4px; color:var(--text-soft);">Top 5 Lane Line Labelers</h4>'
+        + '<h4 style="font-size:12px; margin:12px 0 4px; color:var(--text-soft);">Top 5 Lane Line Labelers (FP &amp; QA Split)</h4>'
         + '<div style="display:flex; flex-direction:column; gap:4px; font-size:12px;">'
-          + ([...laneLabMap.entries()].sort((a,b)=>b[1]-a[1]).slice(0,5).map(([l,c])=>'<div style="display:flex; justify-content:space-between; padding:3px 0; border-bottom:1px solid var(--border-light);"><span style="text-overflow:ellipsis; overflow:hidden; white-space:nowrap; max-width:220px;">' + esc(l) + '</span><b style="color:#ed9a35;">' + c.toLocaleString() + '</b></div>').join('') || '<span class="ux-note">No Lane Line labelers</span>')
+          + ([...laneLabMap.entries()].sort((a,b)=>b[1].total - a[1].total).slice(0,5).map(([l, ent]) => '<div style="display:flex; justify-content:space-between; align-items:center; padding:3px 4px; border-bottom:1px solid var(--border-light); cursor:pointer; border-radius:4px;" onclick="window.openLabelerDetailModal && window.openLabelerDetailModal(\'' + esc(l) + '\')" title="Click for details of ' + esc(l) + '"><span style="text-overflow:ellipsis; overflow:hidden; white-space:nowrap; max-width:200px; color:var(--primary); font-weight:600;">' + esc(l) + '</span><div style="display:flex; align-items:center; gap:5px;"><span class="q-badge" style="background:rgba(237,154,53,0.15); color:#ed9a35; font-size:10px; font-weight:700; padding:1px 5px; border-radius:4px;">FP: ' + ent.fp.toLocaleString() + '</span><span class="q-badge" style="background:rgba(236,72,153,0.15); color:#ec4899; font-size:10px; font-weight:700; padding:1px 5px; border-radius:4px;">QA: ' + ent.qa.toLocaleString() + '</span><b style="font-size:11px; color:#ed9a35;">(' + ent.total.toLocaleString() + ')</b></div></div>').join('') || '<span class="ux-note">No Lane Line labelers</span>')
         + '</div>'
       + '</div>'
     + '</div>'
@@ -2626,7 +2837,7 @@ function renderPerformance(){
           + '<tbody>'
             + visiblePeople.map((p, idx) => {
               const rank = (perfFilters.page * pageSize) + idx + 1;
-              return '<tr class="labeler-row-item" data-person-key="' + esc(p.key) + '" style="cursor:pointer;" title="Click to view detailed employee task history">'
+              return '<tr class="labeler-row-item" data-person-key="' + esc(p.key) + '" onclick="window.openLabelerDetailModal && window.openLabelerDetailModal(\'' + esc(p.key) + '\')" style="cursor:pointer;" title="Click to view detailed employee task history">'
                 + '<td><b style="color:var(--text-soft); font-size:11px;">' + rank + '</b></td>'
                 + '<td><strong style="color:var(--primary);">' + esc(p.name) + '</strong></td>'
                 + '<td><span class="ux-note" style="font-family:monospace; font-size:11px;">' + esc(p.maskedId) + '</span></td>'
@@ -2640,7 +2851,7 @@ function renderPerformance(){
                 + '<td><span style="color:#14b8a6;">' + p.lidarQA.toLocaleString() + '</span></td>'
                 + '<td><span style="color:#ed9a35;">' + p.laneFP.toLocaleString() + '</span></td>'
                 + '<td><span style="color:#ec4899;">' + p.laneQA.toLocaleString() + '</span></td>'
-                + '<td><button class="btn btn-c lab-drill-btn" data-person-key="' + esc(p.key) + '" style="font-size:10px; padding:3px 8px;">🔍 Detail</button></td>'
+                + '<td><button type="button" class="btn btn-c lab-drill-btn" data-person-key="' + esc(p.key) + '" onclick="event.stopPropagation(); window.openLabelerDetailModal && window.openLabelerDetailModal(\'' + esc(p.key) + '\');" style="font-size:10px; padding:3px 8px; cursor:pointer;">🔍 Detail</button></td>'
               + '</tr>';
             }).join('')
           + '</tbody>'
@@ -3331,36 +3542,25 @@ loadData=function(){
  // Fast cache hydration: immediately render from IndexedDB if memory is empty
 
  if(!rawRows.length&&!_instantCacheAttempted){
+    _instantCacheAttempted=true;
+    idbGet('meti_dataset_cache_v2').then(cached=>{
+      if(cached&&cached.table&&cached.table.length&&!rawRows.length){
+        onCsvTable(cached.table);
+        setTrafficLight('yellow');
+        if (typeof showToast === 'function') {
+          showToast('⚡ Loaded from instant local cache — syncing latest updates…');
+        }
+      } else {
+        idbGet('csv-two-sources-v1').then(c=>{
+          if(c&&c.text&&!rawRows.length){
+            parseCSVAsync(c.text).then(t=>{ if(!rawRows.length&&t&&t.length){ onCsvTable(t); setTrafficLight('yellow'); } }).catch(()=>{});
+          }
+        }).catch(()=>{});
+      }
+    }).catch(()=>{});
+  }
 
-   _instantCacheAttempted=true;
-
-   idbGet('csv-two-sources-v1').then(cached=>{
-
-     if(cached&&cached.v===AUTH_VER&&cached.text&&!rawRows.length){
-
-       parseCSVAsync(cached.text).then(table=>{
-
-         if(!rawRows.length&&table&&table.length){
-
-           onCsvTable(table);
-
-           setTrafficLight('yellow');
-
-           showToast('⚡ Showing cached data — syncing latest updates…');
-
-         }
-
-       }).catch(()=>{});
-
-     }
-
-   }).catch(()=>{});
-
- }
-
-
-
- if(!rawRows.length)$('mainContent').innerHTML='<div class="loader"><div class="spin"></div><span class="ltxt">Loading source data…</span></div>';
+  if(!rawRows.length)$('mainContent').innerHTML='<div class="loader"><div class="spin"></div><span class="ltxt">Loading source data…</span></div>';
 
  
 
@@ -3401,6 +3601,11 @@ loadData=function(){
       }
       onCsvTable(table);
       setTrafficLight('green');
+      try {
+        if (typeof idbSet === 'function') {
+          idbSet('meti_dataset_cache_v2', { v: (typeof AUTH_VER !== 'undefined' ? AUTH_VER : '1'), timestamp: Date.now(), table });
+        }
+      } catch (e) {}
       return;
    }catch(e){
       failure = e;
@@ -7033,21 +7238,188 @@ function openQueueDetailModal(queueName) {
 }
 window.openQueueDetailModal = openQueueDetailModal;
 
+// ============================================================
+// EMPLOYEE PERFORMANCE DRILLDOWN MODAL & DATA BUILDER
+// ============================================================
+
+function findColIndex(aliases) {
+  const headers = (typeof hdrs !== 'undefined' && hdrs && hdrs.length)
+    ? hdrs
+    : ((typeof window !== 'undefined' && window.hdrs && window.hdrs.length)
+      ? window.hdrs
+      : ((typeof global !== 'undefined' && global.hdrs && global.hdrs.length) ? global.hdrs : []));
+  if (!headers || !headers.length) return -1;
+  const list = Array.isArray(aliases) ? aliases : [aliases];
+  return headers.findIndex(h => {
+    const clean = String(h || '').trim().toLowerCase().replace(/[_s]+/g, ' ');
+    return list.some(a => {
+      const aClean = String(a).trim().toLowerCase().replace(/[_s]+/g, ' ');
+      return clean === aClean || clean.includes(aClean);
+    });
+  });
+}
+
+function buildEmployeeRecordFromData(personKey) {
+  if (!personKey) return null;
+  const normKey = String(personKey).trim().toLowerCase();
+  if (!normKey) return null;
+
+  const sourceRows = (typeof rawRows !== 'undefined' && rawRows && rawRows.length)
+    ? rawRows
+    : ((typeof window !== 'undefined' && window.rawRows && window.rawRows.length)
+      ? window.rawRows
+      : ((typeof fcache !== 'undefined' && fcache && fcache.length)
+        ? fcache
+        : ((typeof window !== 'undefined' && window.fcache && window.fcache.length)
+          ? window.fcache
+          : ((typeof global !== 'undefined' && global.rawRows && global.rawRows.length)
+            ? global.rawRows
+            : ((typeof rowsInView === 'function') ? rowsInView() : [])))));
+  if (!sourceRows || !sourceRows.length) return null;
+
+  const ni = findColIndex(['national id', 'nid', 'national_id', 'nationalid']);
+  const li = findColIndex(['labeler name', 'labeler_name', 'labeler', 'name']);
+  const si = findColIndex(['shift', 'shift_name']);
+  const fi = findColIndex(['floor', 'unit']);
+  const qcI = findColIndex(['qtc name', 'qtc_name', 'qtc']);
+  const qi = findColIndex(['queue name', 'queue_name', 'queue']);
+  const pcI = findColIndex(['pc no', 'pc_no', 'pc']);
+  const mi = findColIndex(['modality']);
+  const pi = findColIndex(['pass', 'stage']);
+  const ti = findColIndex(['task id', 'task_id', 'id']);
+  const oi = findColIndex(['object count', 'object_count', 'objects']);
+  const tlIdx = findColIndex(['task link', 'task_link', 'link']);
+
+  let resolvedName = '';
+  let resolvedId = '';
+  let resolvedPc = '';
+  const matchingTasks = [];
+  const shifts = new Set();
+  const units = new Set();
+  const qtcs = new Set();
+  const queues = new Set();
+  const dates = new Set();
+  let totalObjects = 0;
+  let largestTask = 0;
+  let lidarFP = 0, lidarQA = 0, laneFP = 0, laneQA = 0;
+
+  sourceRows.forEach(r => {
+    const rawName = li >= 0 ? String(r[li] || '').trim() : '';
+    const rawId = ni >= 0 ? String(r[ni] || '').trim() : '';
+    const nameMatch = rawName && (rawName.toLowerCase() === normKey || rawName.toLowerCase().includes(normKey) || normKey.includes(rawName.toLowerCase()));
+    const idMatch = rawId && (rawId === personKey || rawId.toLowerCase() === normKey);
+
+    if (!nameMatch && !idMatch) return;
+
+    if (!resolvedName && rawName) resolvedName = rawName;
+    if (!resolvedId && rawId) resolvedId = rawId;
+    if (!resolvedPc && pcI >= 0 && r[pcI]) resolvedPc = String(r[pcI]).trim();
+
+    const objCount = parseFloat(oi >= 0 ? r[oi] : 0) || 0;
+    totalObjects += objCount;
+    if (objCount > largestTask) largestTask = objCount;
+
+    if (si >= 0 && r[si]) shifts.add(r[si]);
+    const flVal = fi >= 0 ? (typeof deriveFloor === 'function' ? deriveFloor(r[fi]) : r[fi]) : '';
+    if (flVal) units.add(flVal);
+    if (qcI >= 0 && r[qcI]) qtcs.add(r[qcI]);
+    if (qi >= 0 && r[qi]) queues.add(r[qi]);
+
+    const d = typeof rDate === 'function' ? rDate(r) : '';
+    if (d) dates.add(d);
+
+    if (typeof isModPass === 'function') {
+      if (isModPass(r, 'lidar', 'FP')) lidarFP++;
+      if (isModPass(r, 'lidar', 'QA')) lidarQA++;
+      if (isModPass(r, 'laneline', 'FP')) laneFP++;
+      if (isModPass(r, 'laneline', 'QA')) laneQA++;
+    }
+
+    matchingTasks.push({
+      id: ti >= 0 ? r[ti] : '—',
+      date: d || 'Unknown',
+      shift: si >= 0 ? r[si] : '—',
+      unit: flVal || '—',
+      queue: qi >= 0 ? r[qi] : '—',
+      qtc: qcI >= 0 ? r[qcI] : '—',
+      mod: mi >= 0 ? r[mi] : '—',
+      pass: pi >= 0 ? r[pi] : '—',
+      objects: objCount,
+      link: tlIdx >= 0 ? r[tlIdx] : ''
+    });
+  });
+
+  if (!matchingTasks.length) return null;
+
+  const finalName = resolvedName || (resolvedId ? ('Labeler ' + resolvedId.slice(-4)) : personKey);
+  const maskedId = typeof maskEmployeeId === 'function' ? maskEmployeeId(resolvedId, resolvedPc || finalName) : resolvedId;
+
+  return {
+    key: personKey,
+    name: finalName,
+    rawId: resolvedId,
+    maskedId,
+    shifts,
+    units,
+    qtcs,
+    queues,
+    dates,
+    tasks: matchingTasks,
+    total: matchingTasks.length,
+    totalObjects,
+    largestTask,
+    lidarFP,
+    lidarQA,
+    laneFP,
+    laneQA
+  };
+}
+window.buildEmployeeRecordFromData = buildEmployeeRecordFromData;
+
 function openLabelerDetailModal(personKey) {
+  if (!personKey) return;
+  let p = null;
   const peopleMap = window._allPeoplePerfMap;
-  if (!peopleMap || !peopleMap.has(personKey)) {
-    showToast('Could not load employee details for: ' + personKey);
+
+  if (peopleMap && peopleMap.size) {
+    if (peopleMap.has(personKey)) {
+      p = peopleMap.get(personKey);
+    } else {
+      const norm = String(personKey).trim().toLowerCase();
+      if (peopleMap.has(norm)) {
+        p = peopleMap.get(norm);
+      } else {
+        for (const item of peopleMap.values()) {
+          if (item.key === norm || (item.name && item.name.toLowerCase() === norm) || item.rawId === personKey || item.maskedId === personKey) {
+            p = item;
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  // Fallback: build employee record directly from database
+  if (!p) {
+    p = buildEmployeeRecordFromData(personKey);
+  }
+
+  if (!p) {
+    if (typeof showToast === 'function') {
+      showToast('Could not load employee details for: ' + personKey);
+    } else {
+      alert('Could not load employee details for: ' + personKey);
+    }
     return;
   }
-  const p = peopleMap.get(personKey);
 
-  let modal = $('uxLabelerDetailModal');
+  let modal = document.getElementById('uxLabelerDetailModal');
   if (modal) modal.remove();
 
   modal = document.createElement('div');
   modal.id = 'uxLabelerDetailModal';
   modal.className = 'modal-overlay show';
-  modal.style.cssText = 'display:flex; position:fixed; inset:0; background:rgba(15,23,42,0.7); backdrop-filter:blur(4px); z-index:9999; align-items:center; justify-content:center; padding:16px;';
+  modal.style.cssText = 'display:flex; position:fixed; inset:0; background:rgba(15,23,42,0.75); backdrop-filter:blur(5px); z-index:999999; align-items:center; justify-content:center; padding:16px;';
 
   const shiftsStr = [...p.shifts].map(esc).join(', ') || '—';
   const unitsStr = [...p.units].map(u => 'Unit ' + esc(u)).join(', ') || '—';
@@ -7060,25 +7432,32 @@ function openLabelerDetailModal(personKey) {
   const sortedDates = [...dateCounts.keys()].sort();
   const maxDay = Math.max(1, ...dateCounts.values());
 
-  modal.innerHTML = '<div class="modal-box" style="width:100%; max-width:900px; max-height:90vh; overflow-y:auto; background:var(--bg-1); border-radius:14px; border:1px solid var(--border); box-shadow:0 24px 48px rgba(0,0,0,0.3);">'
-    + '<div class="modal-hd" style="display:flex; justify-content:space-between; align-items:center; padding:16px 22px; border-bottom:1px solid var(--border); background:var(--bg-2);">'
+  modal.innerHTML = '<div class="modal-box" style="width:100%; max-width:920px; max-height:92vh; display:flex; flex-direction:column; background:var(--bg-1, #1e293b); border-radius:14px; border:1px solid var(--border, #334155); box-shadow:0 24px 48px rgba(0,0,0,0.5); overflow:hidden;">'
+    + '<div class="modal-hd" style="display:flex; justify-content:space-between; align-items:center; padding:16px 22px; border-bottom:1px solid var(--border, #334155); background:var(--bg-2, #0f172a); flex-shrink:0;">'
       + '<div>'
-        + '<div style="font-size:11px; font-weight:700; color:var(--primary); text-transform:uppercase;">Employee Performance Intelligence · ID Masked</div>'
-        + '<h3 style="margin:2px 0 0; font-size:18px; color:var(--text);">' + esc(p.name) + ' <span style="font-family:monospace; font-size:12px; color:var(--text-soft); font-weight:400;">(' + esc(p.maskedId) + ')</span></h3>'
+        + '<div style="font-size:11px; font-weight:700; color:var(--primary, #0284c7); text-transform:uppercase; letter-spacing:0.5px;">Employee Performance Intelligence · ID Masked</div>'
+        + '<h3 style="margin:2px 0 0; font-size:18px; color:var(--text, #f8fafc); font-weight:700;">' + esc(p.name) + ' <span style="font-family:monospace; font-size:12px; color:var(--text-soft, #94a3b8); font-weight:400;">(' + esc(p.maskedId) + ')</span></h3>'
       + '</div>'
-      + '<button class="modal-close" id="closeLabModalBtn" style="background:none; border:none; font-size:20px; cursor:pointer; color:var(--text-soft);">&times;</button>'
+      + '<button class="modal-close" id="closeLabModalBtn" style="background:none; border:none; font-size:24px; cursor:pointer; color:var(--text-soft, #94a3b8); line-height:1; padding:4px 8px;">&times;</button>'
     + '</div>'
-    + '<div class="modal-bd" style="padding:20px 22px;">'
+    + '<div class="modal-bd" style="padding:20px 22px; overflow-y:auto; flex:1;">'
       // Stats KPI Grid
       + '<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:10px; margin-bottom:18px;">'
-        + '<div style="background:var(--bg-2); padding:10px; border-radius:8px; border:1px solid var(--border); text-align:center;"><div class="ux-note">Total Objects</div><div style="font-size:18px; font-weight:800; color:#0284c7;">' + p.totalObjects.toLocaleString() + '</div></div>'
-        + '<div style="background:var(--bg-2); padding:10px; border-radius:8px; border:1px solid var(--border); text-align:center;"><div class="ux-note">Total Tasks</div><div style="font-size:18px; font-weight:800; color:var(--primary);">' + p.total.toLocaleString() + '</div></div>'
-        + '<div style="background:var(--bg-2); padding:10px; border-radius:8px; border:1px solid var(--border); text-align:center;"><div class="ux-note">Avg Obj / Task</div><div style="font-size:18px; font-weight:800; color:var(--accent);">' + (p.total > 0 ? (p.totalObjects/p.total).toFixed(1) : 0) + '</div></div>'
-        + '<div style="background:var(--bg-2); padding:10px; border-radius:8px; border:1px solid var(--border); text-align:center;"><div class="ux-note">Active Days</div><div style="font-size:18px; font-weight:800; color:var(--text);">' + p.dates.size + '</div></div>'
-        + '<div style="background:var(--bg-2); padding:10px; border-radius:8px; border:1px solid var(--border); text-align:center;"><div class="ux-note">Avg Tasks/Day</div><div style="font-size:18px; font-weight:800; color:#10b981;">' + (p.dates.size > 0 ? (p.total/p.dates.size).toFixed(1) : 0) + '</div></div>'
+        + '<div style="background:var(--bg-2, #0f172a); padding:10px; border-radius:8px; border:1px solid var(--border, #334155); text-align:center;"><div class="ux-note">Total Objects</div><div style="font-size:18px; font-weight:800; color:#0284c7;">' + p.totalObjects.toLocaleString() + '</div></div>'
+        + '<div style="background:var(--bg-2, #0f172a); padding:10px; border-radius:8px; border:1px solid var(--border, #334155); text-align:center;"><div class="ux-note">Total Tasks</div><div style="font-size:18px; font-weight:800; color:var(--primary, #0d9488);">' + p.total.toLocaleString() + '</div></div>'
+        + '<div style="background:var(--bg-2, #0f172a); padding:10px; border-radius:8px; border:1px solid var(--border, #334155); text-align:center;"><div class="ux-note">Avg Obj / Task</div><div style="font-size:18px; font-weight:800; color:var(--accent, #f59e0b);">' + (p.total > 0 ? (p.totalObjects/p.total).toFixed(1) : 0) + '</div></div>'
+        + '<div style="background:var(--bg-2, #0f172a); padding:10px; border-radius:8px; border:1px solid var(--border, #334155); text-align:center;"><div class="ux-note">Active Days</div><div style="font-size:18px; font-weight:800; color:var(--text, #f8fafc);">' + p.dates.size + '</div></div>'
+        + '<div style="background:var(--bg-2, #0f172a); padding:10px; border-radius:8px; border:1px solid var(--border, #334155); text-align:center;"><div class="ux-note">Avg Tasks/Day</div><div style="font-size:18px; font-weight:800; color:#10b981;">' + (p.dates.size > 0 ? (p.total/p.dates.size).toFixed(1) : 0) + '</div></div>'
+      + '</div>'
+      // Modality Breakdown Grid
+      + '<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:10px; margin-bottom:18px;">'
+        + '<div style="background:var(--bg-2, #0f172a); padding:8px; border-radius:8px; border:1px solid var(--border, #334155); text-align:center;"><div class="ux-note" style="color:#0d9488;">Lidar FP</div><div style="font-size:15px; font-weight:700; color:#0d9488;">' + (p.lidarFP || 0).toLocaleString() + '</div></div>'
+        + '<div style="background:var(--bg-2, #0f172a); padding:8px; border-radius:8px; border:1px solid var(--border, #334155); text-align:center;"><div class="ux-note" style="color:#14b8a6;">Lidar QA</div><div style="font-size:15px; font-weight:700; color:#14b8a6;">' + (p.lidarQA || 0).toLocaleString() + '</div></div>'
+        + '<div style="background:var(--bg-2, #0f172a); padding:8px; border-radius:8px; border:1px solid var(--border, #334155); text-align:center;"><div class="ux-note" style="color:#ed9a35;">Lane FP</div><div style="font-size:15px; font-weight:700; color:#ed9a35;">' + (p.laneFP || 0).toLocaleString() + '</div></div>'
+        + '<div style="background:var(--bg-2, #0f172a); padding:8px; border-radius:8px; border:1px solid var(--border, #334155); text-align:center;"><div class="ux-note" style="color:#ec4899;">Lane QA</div><div style="font-size:15px; font-weight:700; color:#ec4899;">' + (p.laneQA || 0).toLocaleString() + '</div></div>'
       + '</div>'
       // Operational Context Meta Box
-      + '<div style="background:var(--bg-2); padding:12px 16px; border-radius:10px; margin-bottom:18px; border:1px solid var(--border); font-size:12px; display:grid; grid-template-columns:1fr 1fr; gap:10px;">'
+      + '<div style="background:var(--bg-2, #0f172a); padding:12px 16px; border-radius:10px; margin-bottom:18px; border:1px solid var(--border, #334155); font-size:12px; display:grid; grid-template-columns:1fr 1fr; gap:10px;">'
         + '<div><b>Shifts:</b> <span class="ux-note">' + shiftsStr + '</span></div>'
         + '<div><b>Floors / Units:</b> <span class="ux-note">' + unitsStr + '</span></div>'
         + '<div><b>QTC Supervisors:</b> <span class="ux-note">' + qtcsStr + '</span></div>'
@@ -7087,22 +7466,22 @@ function openLabelerDetailModal(personKey) {
       // Daily Production Trend
       + '<div style="margin-bottom:18px;">'
         + '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;"><span style="font-weight:700; font-size:12px;">Daily Output Timeline (' + sortedDates.length + ' active dates)</span><span class="ux-note">Peak: ' + maxDay + ' tasks</span></div>'
-        + '<div class="ux-bars" style="height:80px;">'
-          + (sortedDates.length ? sortedDates.map(d => '<button class="ux-bar" style="height:' + Math.max(8, ((dateCounts.get(d)||0) / maxDay) * 100) + '%;" title="' + d + ': ' + (dateCounts.get(d)||0) + ' tasks"></button>').join('') : '<div class="ux-empty">No dated tasks</div>')
+        + '<div class="ux-bars" style="height:80px; display:flex; align-items:flex-end; gap:3px;">'
+          + (sortedDates.length ? sortedDates.map(d => '<div style="flex:1; height:' + Math.max(8, ((dateCounts.get(d)||0) / maxDay) * 100) + '%; background:#0d9488; border-radius:2px 2px 0 0;" title="' + d + ': ' + (dateCounts.get(d)||0) + ' tasks"></div>').join('') : '<div class="ux-empty">No dated tasks</div>')
         + '</div>'
-        + '<div style="display:flex; justify-content:space-between; font-size:10px; color:var(--text-soft); margin-top:4px;"><span>' + (sortedDates[0] || '') + '</span><span>' + (sortedDates[sortedDates.length - 1] || '') + '</span></div>'
+        + '<div style="display:flex; justify-content:space-between; font-size:10px; color:var(--text-soft, #94a3b8); margin-top:4px;"><span>' + (sortedDates[0] || '') + '</span><span>' + (sortedDates[sortedDates.length - 1] || '') + '</span></div>'
       + '</div>'
       // Searchable Task History Table
-      + '<div style="border-top:1px solid var(--border); padding-top:14px;">'
-        + '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">'
+      + '<div style="border-top:1px solid var(--border, #334155); padding-top:14px;">'
+        + '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:8px;">'
           + '<div style="font-weight:700; font-size:13px;">Task History (' + p.tasks.length + ' tasks):</div>'
-          + '<input id="labTaskSearch" placeholder="Filter tasks by date, queue, stage…" style="padding:4px 10px; border-radius:6px; border:1px solid var(--border); font-size:11px; width:220px; background:var(--bg-3); color:var(--text);">'
+          + '<input id="labTaskSearch" placeholder="Filter tasks by date, queue, stage…" style="padding:6px 12px; border-radius:6px; border:1px solid var(--border, #334155); font-size:11px; width:220px; background:var(--bg-3, #0f172a); color:var(--text, #f8fafc);">'
         + '</div>'
-        + '<div style="max-height:260px; overflow-y:auto; border:1px solid var(--border); border-radius:8px;">'
+        + '<div style="max-height:260px; overflow-y:auto; border:1px solid var(--border, #334155); border-radius:8px;">'
           + '<table style="width:100%; border-collapse:collapse; font-size:11px; text-align:left;">'
-            + '<thead><tr style="background:var(--bg-2); position:sticky; top:0;"><th style="padding:6px 10px;">Task ID</th><th style="padding:6px 10px;">Date</th><th style="padding:6px 10px;">Shift</th><th style="padding:6px 10px;">Queue</th><th style="padding:6px 10px;">Unit</th><th style="padding:6px 10px;">QTC</th><th style="padding:6px 10px;">Stage</th><th style="padding:6px 10px; text-align:right;">Objects</th><th style="padding:6px 10px; text-align:center;">Link</th></tr></thead>'
+            + '<thead><tr style="background:var(--bg-2, #0f172a); position:sticky; top:0;"><th style="padding:6px 10px;">Task ID</th><th style="padding:6px 10px;">Date</th><th style="padding:6px 10px;">Shift</th><th style="padding:6px 10px;">Queue</th><th style="padding:6px 10px;">Unit</th><th style="padding:6px 10px;">QTC</th><th style="padding:6px 10px;">Stage</th><th style="padding:6px 10px; text-align:right;">Objects</th><th style="padding:6px 10px; text-align:center;">Link</th></tr></thead>'
             + '<tbody id="labTaskTableBody">'
-              + p.tasks.map(t => '<tr style="border-bottom:1px solid var(--border);"><td style="padding:5px 10px; font-weight:600;">' + esc(t.id) + '</td><td style="padding:5px 10px;">' + esc(t.date) + '</td><td style="padding:5px 10px;">' + esc(t.shift) + '</td><td style="padding:5px 10px;">' + esc(t.queue) + '</td><td style="padding:5px 10px;">Unit ' + esc(t.unit) + '</td><td style="padding:5px 10px;">' + esc(t.qtc) + '</td><td style="padding:5px 10px;">' + esc(t.pass) + '</td><td style="padding:5px 10px; text-align:right; font-weight:700; color:#0284c7;">' + esc(t.objects) + '</td><td style="padding:5px 10px; text-align:center;">' + (t.link ? '<a href="' + esc(t.link) + '" target="_blank" rel="noopener noreferrer" style="color:var(--primary);">🔗 Open</a>' : '—') + '</td></tr>').join('')
+              + p.tasks.map(t => '<tr style="border-bottom:1px solid var(--border, #334155);"><td style="padding:5px 10px; font-weight:600;">' + esc(t.id) + '</td><td style="padding:5px 10px;">' + esc(t.date) + '</td><td style="padding:5px 10px;">' + esc(t.shift) + '</td><td style="padding:5px 10px;">' + esc(t.queue) + '</td><td style="padding:5px 10px;">Unit ' + esc(t.unit) + '</td><td style="padding:5px 10px;">' + esc(t.qtc) + '</td><td style="padding:5px 10px;">' + esc(t.pass) + '</td><td style="padding:5px 10px; text-align:right; font-weight:700; color:#0284c7;">' + esc(t.objects) + '</td><td style="padding:5px 10px; text-align:center;">' + (t.link ? '<a href="' + esc(t.link) + '" target="_blank" rel="noopener noreferrer" style="color:var(--primary, #38bdf8);">🔗 Open</a>' : '—') + '</td></tr>').join('')
             + '</tbody>'
           + '</table>'
         + '</div>'
@@ -7111,8 +7490,23 @@ function openLabelerDetailModal(personKey) {
   + '</div>';
 
   document.body.appendChild(modal);
-  const hide = () => modal.remove();
-  modal.querySelector('#closeLabModalBtn').onclick = hide;
+
+  const prevOverflow = document.body.style.overflow;
+  document.body.style.overflow = 'hidden';
+
+  const hide = () => {
+    document.body.style.overflow = prevOverflow;
+    document.removeEventListener('keydown', onEsc);
+    if (modal && modal.parentNode) modal.remove();
+  };
+
+  const onEsc = (e) => {
+    if (e.key === 'Escape') hide();
+  };
+  document.addEventListener('keydown', onEsc);
+
+  const closeBtn = modal.querySelector('#closeLabModalBtn');
+  if (closeBtn) closeBtn.onclick = hide;
   modal.onclick = e => { if (e.target === modal) hide(); };
 
   // Task filter inside modal
@@ -7121,37 +7515,116 @@ function openLabelerDetailModal(personKey) {
     sInput.oninput = e => {
       const q = e.target.value.toLowerCase().trim();
       const filtered = p.tasks.filter(t => !q || [t.id, t.date, t.shift, t.queue, t.unit, t.qtc, t.pass, String(t.objects)].some(v => String(v).toLowerCase().includes(q)));
-      modal.querySelector('#labTaskTableBody').innerHTML = filtered.map(t => '<tr style="border-bottom:1px solid var(--border);"><td style="padding:5px 10px; font-weight:600;">' + esc(t.id) + '</td><td style="padding:5px 10px;">' + esc(t.date) + '</td><td style="padding:5px 10px;">' + esc(t.shift) + '</td><td style="padding:5px 10px;">' + esc(t.queue) + '</td><td style="padding:5px 10px;">Unit ' + esc(t.unit) + '</td><td style="padding:5px 10px;">' + esc(t.qtc) + '</td><td style="padding:5px 10px;">' + esc(t.pass) + '</td><td style="padding:5px 10px; text-align:right; font-weight:700; color:#0284c7;">' + esc(t.objects) + '</td><td style="padding:5px 10px; text-align:center;">' + (t.link ? '<a href="' + esc(t.link) + '" target="_blank" rel="noopener noreferrer" style="color:var(--primary);">🔗 Open</a>' : '—') + '</td></tr>').join('');
+      const tbody = modal.querySelector('#labTaskTableBody');
+      if (tbody) {
+        tbody.innerHTML = filtered.map(t => '<tr style="border-bottom:1px solid var(--border, #334155);"><td style="padding:5px 10px; font-weight:600;">' + esc(t.id) + '</td><td style="padding:5px 10px;">' + esc(t.date) + '</td><td style="padding:5px 10px;">' + esc(t.shift) + '</td><td style="padding:5px 10px;">' + esc(t.queue) + '</td><td style="padding:5px 10px;">Unit ' + esc(t.unit) + '</td><td style="padding:5px 10px;">' + esc(t.qtc) + '</td><td style="padding:5px 10px;">' + esc(t.pass) + '</td><td style="padding:5px 10px; text-align:right; font-weight:700; color:#0284c7;">' + esc(t.objects) + '</td><td style="padding:5px 10px; text-align:center;">' + (t.link ? '<a href="' + esc(t.link) + '" target="_blank" rel="noopener noreferrer" style="color:var(--primary, #38bdf8);">🔗 Open</a>' : '—') + '</td></tr>').join('');
+      }
     };
   }
 }
 window.openLabelerDetailModal = openLabelerDetailModal;
 
+// Document-level event delegation for drill-down buttons
+if (typeof document !== 'undefined') {
+  document.addEventListener('click', function(e) {
+    const drillBtn = e.target.closest('.lab-drill-btn');
+    if (drillBtn) {
+      e.stopPropagation();
+      const pKey = drillBtn.dataset.personKey || drillBtn.getAttribute('data-person-key');
+      if (pKey && typeof window.openLabelerDetailModal === 'function') {
+        window.openLabelerDetailModal(pKey);
+        return;
+      }
+    }
+    const labRow = e.target.closest('.labeler-row-item');
+    if (labRow && !e.target.closest('button, a, input, select')) {
+      const pKey = labRow.dataset.personKey || labRow.getAttribute('data-person-key');
+      if (pKey && typeof window.openLabelerDetailModal === 'function') {
+        window.openLabelerDetailModal(pKey);
+        return;
+      }
+    }
+  });
+}
 
 // ============================================================
-// GLOBAL METI METRIC TOOLTIP ENGINE
+// GLOBAL UNIFIED METRIC & ELEMENT TOOLTIP ENGINE
 // ============================================================
 let _metiTooltipEl = null;
 
 function initGlobalTooltipEngine() {
+  if (typeof document === 'undefined') return;
   if (_metiTooltipEl) return;
+
   _metiTooltipEl = document.createElement('div');
   _metiTooltipEl.id = 'metiGlobalTooltip';
   _metiTooltipEl.className = 'meti-global-tooltip';
-  _metiTooltipEl.style.cssText = 'position:fixed; z-index:999999; display:none; pointer-events:none; background:#0f172a; color:#f8fafc; border:1px solid #334155; border-radius:10px; box-shadow:0 12px 28px -4px rgba(0,0,0,0.7); padding:12px 14px; font-size:12px; line-height:1.45; min-width:240px; max-width:340px; font-family:inherit;';
+  _metiTooltipEl.style.cssText = 'position:fixed; z-index:999999; display:none; pointer-events:none; background:#0f172a; color:#f8fafc; border:1px solid #334155; border-radius:10px; box-shadow:0 12px 28px -4px rgba(0,0,0,0.7); padding:12px 14px; font-size:12px; line-height:1.45; min-width:240px; max-width:340px; font-family:inherit; transition:opacity 0.1s ease;';
   document.body.appendChild(_metiTooltipEl);
 
   document.addEventListener('mouseover', function(e) {
-    const target = e.target.closest('[data-tooltip-queue], .daily-queue-row, [data-metric-tooltip]');
-    if (!target) {
-      if (_metiTooltipEl) _metiTooltipEl.style.display = 'none';
-      return;
+    // 1. Chart date dots
+    const dateDot = e.target.closest('.ov-chart-dot, [data-date]');
+    if (dateDot) {
+      const d = dateDot.getAttribute('data-date');
+      const c = dateDot.getAttribute('data-count');
+      if (d) {
+        renderDateDotTooltip(d, c);
+        _metiTooltipEl.style.display = 'block';
+        positionTooltip(e);
+        return;
+      }
     }
-    const qName = target.getAttribute('data-tooltip-queue') || target.querySelector('.daily-queue-name')?.textContent || target.textContent;
-    if (!qName) return;
-    renderTooltipContent(qName.trim());
-    _metiTooltipEl.style.display = 'block';
-    positionTooltip(e);
+
+    // 2. Shift bars / elements
+    const shiftEl = e.target.closest('[data-shift]');
+    if (shiftEl) {
+      const s = shiftEl.getAttribute('data-shift');
+      if (s) {
+        renderShiftTooltip(s);
+        _metiTooltipEl.style.display = 'block';
+        positionTooltip(e);
+        return;
+      }
+    }
+
+    // 3. Floor bars / elements
+    const floorEl = e.target.closest('[data-floor]');
+    if (floorEl) {
+      const fl = floorEl.getAttribute('data-floor');
+      if (fl) {
+        renderFloorTooltip(fl);
+        _metiTooltipEl.style.display = 'block';
+        positionTooltip(e);
+        return;
+      }
+    }
+
+    // 4. Queue rows & queue badges
+    const queueEl = e.target.closest('[data-tooltip-queue], [data-queue], .daily-queue-row, [data-metric-tooltip]');
+    if (queueEl) {
+      const qName = queueEl.getAttribute('data-tooltip-queue') || queueEl.getAttribute('data-queue') || queueEl.querySelector('.daily-queue-name')?.textContent || queueEl.textContent;
+      if (qName) {
+        renderQueueTooltipContent(qName.trim());
+        _metiTooltipEl.style.display = 'block';
+        positionTooltip(e);
+        return;
+      }
+    }
+
+    // 5. Generic custom tooltips
+    const tipEl = e.target.closest('[data-tooltip]');
+    if (tipEl) {
+      const text = tipEl.getAttribute('data-tooltip');
+      if (text) {
+        _metiTooltipEl.innerHTML = '<div style="font-size:11.5px; color:#f1f5f9;">' + esc(text) + '</div>';
+        _metiTooltipEl.style.display = 'block';
+        positionTooltip(e);
+        return;
+      }
+    }
+
+    if (_metiTooltipEl) _metiTooltipEl.style.display = 'none';
   });
 
   document.addEventListener('mousemove', function(e) {
@@ -7161,7 +7634,7 @@ function initGlobalTooltipEngine() {
   });
 
   document.addEventListener('mouseout', function(e) {
-    const target = e.target.closest('[data-tooltip-queue], .daily-queue-row, [data-metric-tooltip]');
+    const target = e.target.closest('.ov-chart-dot, [data-date], [data-shift], [data-floor], [data-tooltip-queue], [data-queue], .daily-queue-row, [data-metric-tooltip], [data-tooltip]');
     if (target && _metiTooltipEl) {
       _metiTooltipEl.style.display = 'none';
     }
@@ -7184,16 +7657,118 @@ function positionTooltip(e) {
   _metiTooltipEl.style.top = Math.max(10, top) + 'px';
 }
 
-function renderTooltipContent(queueName) {
+function renderDateDotTooltip(dateStr, countStr) {
+  if (!_metiTooltipEl) return;
+  const count = countStr ? Number(countStr).toLocaleString() : '—';
+  _metiTooltipEl.innerHTML = '<div style="font-weight:700; font-size:13px; color:#38bdf8; margin-bottom:6px; border-bottom:1px solid #334155; padding-bottom:4px; display:flex; justify-content:space-between; align-items:center;">'
+    + '<span>📅 ' + esc(dateStr) + '</span>'
+    + '<span style="font-size:10px; background:rgba(56,189,248,0.2); color:#38bdf8; padding:1px 6px; border-radius:4px;">Daily Volume</span>'
+  + '</div>'
+  + '<div style="display:flex; flex-direction:column; gap:4px; font-size:11.5px;">'
+    + '<div style="display:flex; justify-content:space-between;">'
+      + '<span style="color:#94a3b8;">Total Submissions:</span>'
+      + '<b style="color:#10b981; font-weight:700;">' + count + ' tasks</b>'
+    + '</div>'
+    + '<div style="color:#38bdf8; font-size:10.5px; margin-top:4px; border-top:1px dashed #334155; padding-top:4px;">'
+      + '💡 Click dot to toggle filter for this date'
+    + '</div>'
+  + '</div>';
+}
+
+function renderShiftTooltip(shiftName) {
   if (!_metiTooltipEl) return;
   const rows = typeof rowsInView === 'function' ? rowsInView() : [];
-  const idx = name => hdrs ? hdrs.findIndex(h => h.trim().toLowerCase() === name.toLowerCase()) : -1;
-  const qi = idx('Queue Name');
-  const mi = idx('Modality');
-  const pi = idx('Pass');
-  const ni = idx('National Id');
-  const li = idx('Labeler Name');
-  const qci = idx('QTC Name');
+  const si = findColIndex(['shift', 'shift_name']);
+  const pi = findColIndex(['pass', 'stage']);
+  const li = findColIndex(['labeler name', 'labeler_name', 'labeler', 'name']);
+
+  let fp = 0, qa = 0;
+  const labelers = new Set();
+  rows.forEach(r => {
+    if (si >= 0 && String(r[si] || '').trim() === shiftName) {
+      const p = pi >= 0 ? String(r[pi] || '').trim().toUpperCase() : '';
+      if (p === 'FP') fp++;
+      if (p === 'QA') qa++;
+      if (li >= 0 && r[li]) labelers.add(String(r[li]).trim());
+    }
+  });
+  const total = fp + qa;
+
+  _metiTooltipEl.innerHTML = '<div style="font-weight:700; font-size:13px; color:#38bdf8; margin-bottom:6px; border-bottom:1px solid #334155; padding-bottom:4px; display:flex; justify-content:space-between; align-items:center;">'
+    + '<span>☀️ ' + esc(shiftName) + '</span>'
+    + '<b style="color:#f1f5f9; font-size:11px;">' + total.toLocaleString() + ' tasks</b>'
+  + '</div>'
+  + '<div style="display:flex; flex-direction:column; gap:4px; font-size:11.5px;">'
+    + '<div style="display:flex; justify-content:space-between;">'
+      + '<span style="color:#94a3b8;">First Pass (FP):</span>'
+      + '<b style="color:#0d9488;">' + fp.toLocaleString() + '</b>'
+    + '</div>'
+    + '<div style="display:flex; justify-content:space-between;">'
+      + '<span style="color:#94a3b8;">Quality Review (QA):</span>'
+      + '<b style="color:#14b8a6;">' + qa.toLocaleString() + '</b>'
+    + '</div>'
+    + '<div style="display:flex; justify-content:space-between;">'
+      + '<span style="color:#94a3b8;">Active Contributors:</span>'
+      + '<b style="color:#f8fafc;">' + labelers.size + ' labelers</b>'
+    + '</div>'
+    + '<div style="color:#38bdf8; font-size:10.5px; margin-top:4px; border-top:1px dashed #334155; padding-top:4px;">'
+      + '💡 Click shift to toggle filter'
+    + '</div>'
+  + '</div>';
+}
+
+function renderFloorTooltip(floorName) {
+  if (!_metiTooltipEl) return;
+  const rows = typeof rowsInView === 'function' ? rowsInView() : [];
+  const fi = findColIndex(['floor', 'unit']);
+  const pi = findColIndex(['pass', 'stage']);
+  const li = findColIndex(['labeler name', 'labeler_name', 'labeler', 'name']);
+
+  let fp = 0, qa = 0;
+  const labelers = new Set();
+  rows.forEach(r => {
+    const fl = fi >= 0 ? (typeof deriveFloor === 'function' ? deriveFloor(r[fi]) : String(r[fi] || '')) : '';
+    if (fl === floorName) {
+      const p = pi >= 0 ? String(r[pi] || '').trim().toUpperCase() : '';
+      if (p === 'FP') fp++;
+      if (p === 'QA') qa++;
+      if (li >= 0 && r[li]) labelers.add(String(r[li]).trim());
+    }
+  });
+  const total = fp + qa;
+
+  _metiTooltipEl.innerHTML = '<div style="font-weight:700; font-size:13px; color:#ed9a35; margin-bottom:6px; border-bottom:1px solid #334155; padding-bottom:4px; display:flex; justify-content:space-between; align-items:center;">'
+    + '<span>🏢 Unit ' + esc(floorName) + '</span>'
+    + '<b style="color:#f1f5f9; font-size:11px;">' + total.toLocaleString() + ' tasks</b>'
+  + '</div>'
+  + '<div style="display:flex; flex-direction:column; gap:4px; font-size:11.5px;">'
+    + '<div style="display:flex; justify-content:space-between;">'
+      + '<span style="color:#94a3b8;">First Pass (FP):</span>'
+      + '<b style="color:#0d9488;">' + fp.toLocaleString() + '</b>'
+    + '</div>'
+    + '<div style="display:flex; justify-content:space-between;">'
+      + '<span style="color:#94a3b8;">Quality Review (QA):</span>'
+      + '<b style="color:#14b8a6;">' + qa.toLocaleString() + '</b>'
+    + '</div>'
+    + '<div style="display:flex; justify-content:space-between;">'
+      + '<span style="color:#94a3b8;">Active Contributors:</span>'
+      + '<b style="color:#f8fafc;">' + labelers.size + ' labelers</b>'
+    + '</div>'
+    + '<div style="color:#38bdf8; font-size:10.5px; margin-top:4px; border-top:1px dashed #334155; padding-top:4px;">'
+      + '💡 Click unit/floor to toggle filter'
+    + '</div>'
+  + '</div>';
+}
+
+function renderQueueTooltipContent(queueName) {
+  if (!_metiTooltipEl) return;
+  const rows = typeof rowsInView === 'function' ? rowsInView() : [];
+  const qi = findColIndex(['queue name', 'queue_name', 'queue']);
+  const mi = findColIndex(['modality']);
+  const pi = findColIndex(['pass', 'stage']);
+  const ni = findColIndex(['national id', 'nid', 'national_id', 'nationalid']);
+  const li = findColIndex(['labeler name', 'labeler_name', 'labeler', 'name']);
+  const qci = findColIndex(['qtc name', 'qtc_name', 'qtc']);
 
   let fpLidar = 0, qaLidar = 0, fpLane = 0, qaLane = 0;
   const labLidar = new Set(), labLane = new Set();
@@ -7224,38 +7799,39 @@ function renderTooltipContent(queueName) {
     }
   });
 
-  _metiTooltipEl.innerHTML = `
-    <div style="font-weight:700; font-size:12.5px; color:#38bdf8; margin-bottom:8px; border-bottom:1px solid #334155; padding-bottom:5px; word-break:break-all;">
-      ${esc(queueName || 'Operational Queue Overview')}
-    </div>
-    <div style="display:flex; flex-direction:column; gap:4px; font-size:11.5px;">
-      <div style="display:flex; justify-content:space-between; gap:12px;">
-        <span style="color:#94a3b8;">📡 Total FP Lidar:</span>
-        <b style="color:#10b981; font-weight:700;">${fpLidar.toLocaleString()}</b>
-      </div>
-      <div style="display:flex; justify-content:space-between; gap:12px;">
-        <span style="color:#94a3b8;">🔍 QA Lidar:</span>
-        <b style="color:#60a5fa; font-weight:700;">${qaLidar.toLocaleString()}</b>
-      </div>
-      <div style="display:flex; justify-content:space-between; gap:12px;">
-        <span style="color:#94a3b8;">🛣️ Lane Line FP:</span>
-        <b style="color:#34d399; font-weight:700;">${fpLane.toLocaleString()}</b>
-      </div>
-      <div style="display:flex; justify-content:space-between; gap:12px;">
-        <span style="color:#94a3b8;">📐 Lane Line QA:</span>
-        <b style="color:#a78bfa; font-weight:700;">${qaLane.toLocaleString()}</b>
-      </div>
-      <div style="border-top:1px dashed #334155; margin:4px 0;"></div>
-      <div style="display:flex; justify-content:space-between; gap:12px;">
-        <span style="color:#94a3b8;">👤 Unique Labelers:</span>
-        <b style="color:#f1f5f9;">Lidar: ${labLidar.size} | Lane: ${labLane.size}</b>
-      </div>
-      <div style="display:flex; justify-content:space-between; gap:12px;">
-        <span style="color:#94a3b8;">👥 Unique QTC:</span>
-        <b style="color:#f1f5f9;">Lidar: ${qtcLidar.size} | Lane: ${qtcLane.size}</b>
-      </div>
-    </div>
-  `;
+  _metiTooltipEl.innerHTML = '<div style="font-weight:700; font-size:12.5px; color:#38bdf8; margin-bottom:8px; border-bottom:1px solid #334155; padding-bottom:5px; word-break:break-all;">'
+    + esc(queueName || 'Operational Queue Overview')
+  + '</div>'
+  + '<div style="display:flex; flex-direction:column; gap:4px; font-size:11.5px;">'
+    + '<div style="display:flex; justify-content:space-between; gap:12px;">'
+      + '<span style="color:#94a3b8;">📡 Total FP Lidar:</span>'
+      + '<b style="color:#10b981; font-weight:700;">' + fpLidar.toLocaleString() + '</b>'
+    + '</div>'
+    + '<div style="display:flex; justify-content:space-between; gap:12px;">'
+      + '<span style="color:#94a3b8;">🔍 QA Lidar:</span>'
+      + '<b style="color:#60a5fa; font-weight:700;">' + qaLidar.toLocaleString() + '</b>'
+    + '</div>'
+    + '<div style="display:flex; justify-content:space-between; gap:12px;">'
+      + '<span style="color:#94a3b8;">🛣️ Lane Line FP:</span>'
+      + '<b style="color:#34d399; font-weight:700;">' + fpLane.toLocaleString() + '</b>'
+    + '</div>'
+    + '<div style="display:flex; justify-content:space-between; gap:12px;">'
+      + '<span style="color:#94a3b8;">📐 Lane Line QA:</span>'
+      + '<b style="color:#a78bfa; font-weight:700;">' + qaLane.toLocaleString() + '</b>'
+    + '</div>'
+    + '<div style="border-top:1px dashed #334155; margin:4px 0;"></div>'
+    + '<div style="display:flex; justify-content:space-between; gap:12px;">'
+      + '<span style="color:#94a3b8;">👤 Unique Labelers:</span>'
+      + '<b style="color:#f1f5f9;">Lidar: ' + labLidar.size + ' | Lane: ' + labLane.size + '</b>'
+    + '</div>'
+    + '<div style="display:flex; justify-content:space-between; gap:12px;">'
+      + '<span style="color:#94a3b8;">👥 Unique QTC:</span>'
+      + '<b style="color:#f1f5f9;">Lidar: ' + qtcLidar.size + ' | Lane: ' + qtcLane.size + '</b>'
+    + '</div>'
+    + '<div style="color:#38bdf8; font-size:10.5px; margin-top:4px; border-top:1px dashed #334155; padding-top:4px;">'
+      + '💡 Click queue to toggle filter'
+    + '</div>'
+  + '</div>';
 }
 
 // Auto-initialize tooltip engine
@@ -7266,7 +7842,6 @@ if (typeof document !== 'undefined') {
     initGlobalTooltipEngine();
   }
 }
-
 
 // ============================================================
 // UNIVERSAL INTERACTIVE TABLE SORTER (ALL PAGES & ALL TABLES)
@@ -7426,7 +8001,7 @@ function enableUniversalTableSorting() {
     if (!table) return;
 
     // Managed pages that already have dataset re-rendering for th[data-sort]
-    const managedPage = th.closest('#uxGmReport, #uxPerfLabelers, #uxQueuesAnalysis, #uxQtcFloor');
+    const managedPage = th.closest('#uxGmReport, #uxPerformance, #uxPerfLabelers, #uxQueuesAnalysis, #uxQtcFloor');
     if (managedPage && (th.classList.contains('sortable') || th.hasAttribute('data-sort'))) {
       return; // Handled by component state
     }

@@ -207,6 +207,19 @@ try {
   console.log('Page 8 rendered HTML size:', p8.innerHTML.length, 'bytes');
   if (p8.innerHTML.length < 500) throw new Error('Daily Report HTML is unexpectedly short!');
 
+  // Verify Employee Drilldown Modal & Record Builder
+  console.log('\n--- Testing Employee Drilldown Modal & Record Builder ---');
+  const samplePersonKey = 'Ahmed Ali';
+  const rec = window.buildEmployeeRecordFromData(samplePersonKey);
+  console.log('Built employee record:', rec ? { name: rec.name, total: rec.total, totalObjects: rec.totalObjects } : 'null');
+  window.openLabelerDetailModal(samplePersonKey);
+  const modal = document.getElementById('uxLabelerDetailModal');
+  console.log('Employee modal element in DOM:', !!modal);
+  if (modal) {
+    console.log('Modal HTML content size:', modal.innerHTML.length, 'bytes');
+    if (!modal.innerHTML.includes('Employee Performance Intelligence')) throw new Error('Modal header missing!');
+  }
+
   console.log('\n================================================================');
   console.log('ALL ANALYTICS PAGES FULLY FUNCTIONAL AND VERIFIED!');
   console.log('================================================================');

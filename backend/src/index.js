@@ -1057,7 +1057,10 @@ export default {
           ...r,
           national_id: maskNationalId(r.national_id, role)
         }));
-        return json({ ok: true, count: rows.length, rows }, 200, corsHeaders);
+        return json({ ok: true, count: rows.length, rows }, 200, {
+          ...corsHeaders,
+          "Cache-Control": "public, max-age=30, s-maxage=60, stale-while-revalidate=120"
+        });
       }
 
       // Public Operational Metadata (Queues and QTC for task submission form & dashboards)
