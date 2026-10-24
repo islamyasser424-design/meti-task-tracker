@@ -1025,21 +1025,50 @@ export default {
       if (pathname === "/api/analytics/dataset" && request.method === "GET") {
         const maybeUser = await verifySession(request, env);
         const role = maybeUser ? maybeUser.role : "qt";
-        const limitParam = parseInt(url.searchParams.get("limit") || "20000", 10);
-        const limit = Math.min(25000, Math.max(1, isNaN(limitParam) ? 20000 : limitParam));
+        const limitParam = parseInt(url.searchParams.get("limit") || "25000", 10);
+        const limit = Math.min(25000, Math.max(1, isNaN(limitParam) ? 25000 : limitParam));
+        const sourceParam = (url.searchParams.get("source") || "live").toLowerCase().trim();
+
+        let sourceClause = "";
+        let params = [];
+        if (sourceParam === "all") {
+          sourceClause = "";
+        } else if (sourceParam === "arch1") {
+          sourceClause = "WHERE source = 'ارشيف 1'";
+        } else if (sourceParam === "arch2") {
+          sourceClause = "WHERE source = 'ارشيف 2'";
+        } else if (sourceParam === "archive") {
+          sourceClause = "WHERE (source = 'ارشيف 1' OR source = 'ارشيف 2')";
+        } else {
+          // Default to live operational data so historical bulk archives do not starve out current shifts
+          sourceClause = "WHERE (source = 'Live' OR source IS NULL OR source = '')";
+        }
+
         const rawRows = await db(
           env,
-          `SELECT id, timestamp, shift, unit, pc_no, labeler_name, national_id, qtc_shift, yubikey_email, qtc_name, stage, task_link, pass, modality, queue_name, object_count, created_at 
+          `SELECT id, timestamp, shift, unit, pc_no, labeler_name, national_id, qtc_shift, yubikey_email, qtc_name, stage, task_link, pass, modality, queue_name, object_count, created_at, COALESCE(source, 'Live') AS source 
            FROM task_submissions 
+           ${sourceClause} 
            ORDER BY id DESC 
            LIMIT ?`,
-          [limit]
+          [...params, limit]
         );
         const rows = rawRows.map(r => ({
           ...r,
           national_id: maskNationalId(r.national_id, role)
         }));
         return json({ ok: true, count: rows.length, rows }, 200, corsHeaders);
+      }
+
+      // Public Operational Metadata (Queues and QTC for task submission form & dashboards)
+      if (pathname === "/api/queues" && request.method === "GET") {
+        const rows = await db(env, "SELECT id, name, highlight, CAST(COALESCE(is_hidden, 0) AS INTEGER) AS is_hidden, created_at FROM custom_queues ORDER BY name ASC");
+        return json({ ok: true, queues: rows }, 200, corsHeaders);
+      }
+
+      if (pathname === "/api/qtc" && request.method === "GET") {
+        const rows = await db(env, "SELECT id, shift, name, role, created_at FROM custom_qtc ORDER BY shift ASC, name ASC");
+        return json({ ok: true, qtc: rows }, 200, corsHeaders);
       }
 
       // ============================================================
@@ -1244,19 +1273,15 @@ export default {
         if (dateFrom) { whereClauses.push("timestamp >= ?"); params.push(dateFrom); }
         if (dateTo) { whereClauses.push("timestamp <= ?"); params.push(dateTo); }
         if (search) {
-          whereClauses.push("(task_id LIKE ? OR labeler_name LIKE ? OR qtc_name LIKE ? OR queue_name LIKE ?)");
+          whereClauses.push("(task_id LIKE ? OR task_link LIKE ? OR labeler_name LIKE ? OR national_id LIKE ? OR pc_no LIKE ? OR qtc_name LIKE ? OR queue_name LIKE ?)");
           const s = `%${search}%`;
-          params.push(s, s, s, s);
+          params.push(s, s, s, s, s, s, s);
         }
-
-        const whereSql = whereClauses.length ? "WHERE " + whereClauses.join(" AND ") : "";
-        const countQuery = await db(env, `SELECT COUNT(*) AS total FROM task_submissions ${whereSql}`, params);
-        const total = parseInt(countQuery[0]?.total || 0, 10);
 
         const sourceParam = url.searchParams.get("source");
         if (sourceParam && sourceParam !== "all") {
           if (sourceParam === "live") {
-            whereClauses.push("(source = 'Live' OR source IS NULL)");
+            whereClauses.push("(source = 'Live' OR source IS NULL OR source = '')");
           } else if (sourceParam === "arch1") {
             whereClauses.push("source = 'ارشيف 1'");
           } else if (sourceParam === "arch2") {
@@ -1268,6 +1293,10 @@ export default {
             params.push(sourceParam);
           }
         }
+
+        const whereSql = whereClauses.length ? "WHERE " + whereClauses.join(" AND ") : "";
+        const countQuery = await db(env, `SELECT COUNT(*) AS total FROM task_submissions ${whereSql}`, params);
+        const total = parseInt(countQuery[0]?.total || 0, 10);
 
         const tasksQuery = `
           SELECT id, timestamp, shift, unit, pc_no, labeler_name, national_id, qtc_shift, yubikey_email, qtc_name, stage, task_link, task_id, pass, modality, queue_name, object_count, created_at, COALESCE(source, 'Live') AS source 
@@ -1327,13 +1356,8 @@ export default {
       }
 
       // ------------------------------------------------------------
-      // 12. QUEUES & QTC MANAGEMENT
+      // 12. QUEUES & QTC MANAGEMENT (Write Operations)
       // ------------------------------------------------------------
-      if (pathname === "/api/queues" && request.method === "GET") {
-        const rows = await db(env, "SELECT id, name, highlight, COALESCE(is_hidden, 0) AS is_hidden, created_at FROM custom_queues ORDER BY name ASC");
-        return json({ ok: true, queues: rows }, 200, corsHeaders);
-      }
-
       if (pathname === "/api/queues" && request.method === "POST") {
         if (!isSupervisor) return json({ error: "forbidden" }, 403, corsHeaders);
         const b = await request.json().catch(() => ({}));
@@ -1341,7 +1365,7 @@ export default {
         const highlight = String(b.highlight || "").trim();
         if (!name) return json({ error: "validation_error", message: "Queue name is required" }, 400, corsHeaders);
 
-        await db(env, "INSERT OR IGNORE INTO custom_queues (name, highlight) VALUES (?, ?)", [name, highlight]);
+        await db(env, "INSERT OR IGNORE INTO custom_queues (name, highlight, is_hidden) VALUES (?, ?, 0)", [name, highlight]);
         return json({ ok: true, message: "Queue added" }, 201, corsHeaders);
       }
 
@@ -1350,8 +1374,19 @@ export default {
         if (!isSupervisor) return json({ error: "forbidden" }, 403, corsHeaders);
         const qTarget = decodeURIComponent(queueMatch[1]);
         const b = await request.json().catch(() => ({}));
-        const highlight = String(b.highlight !== undefined ? b.highlight : "").trim();
-        await db(env, "UPDATE custom_queues SET highlight = ? WHERE id = ? OR name = ?", [highlight, qTarget, qTarget]);
+        const hasHighlight = b.highlight !== undefined;
+        const hasHidden = b.is_hidden !== undefined;
+        const highlight = hasHighlight ? String(b.highlight || "").trim() : null;
+        const isHidden = hasHidden ? (b.is_hidden ? 1 : 0) : null;
+
+        await db(
+          env, 
+          `UPDATE custom_queues 
+           SET highlight = CASE WHEN ? IS NOT NULL THEN ? ELSE highlight END,
+               is_hidden = CASE WHEN ? IS NOT NULL THEN ? ELSE is_hidden END
+           WHERE id = ? OR name = ?`,
+          [highlight, highlight, isHidden, isHidden, qTarget, qTarget]
+        );
         return json({ ok: true, message: "Queue updated" }, 200, corsHeaders);
       }
 
@@ -1360,11 +1395,6 @@ export default {
         const qTarget = decodeURIComponent(queueMatch[1]);
         await db(env, "DELETE FROM custom_queues WHERE id = ? OR name = ?", [qTarget, qTarget]);
         return json({ ok: true, message: "Queue deleted" }, 200, corsHeaders);
-      }
-
-      if (pathname === "/api/qtc" && request.method === "GET") {
-        const rows = await db(env, "SELECT id, shift, name, role, created_at FROM custom_qtc ORDER BY shift ASC, name ASC");
-        return json({ ok: true, qtc: rows }, 200, corsHeaders);
       }
 
       if (pathname === "/api/qtc" && request.method === "POST") {

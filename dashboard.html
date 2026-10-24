@@ -2919,7 +2919,7 @@
     // ============================================================
     function loadLiveQueuesAdmin() {
       var tbody = document.getElementById("queuesAdminTableBody");
-      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:18px; color:var(--text-muted);">Loading active queues from secure API...</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:18px; color:var(--text-muted);">Loading active queues from secure API...</td></tr>';
 
       apiFetch("/api/queues")
         .then(function(r) { return r.json(); })
@@ -2931,19 +2931,19 @@
           renderQueuesAdminTable(_adminQueuesCache);
         })
         .catch(function(err) {
-          if (tbody) tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:18px; color:var(--error);">Failed: ' + esc(err.message) + '</td></tr>';
+          if (tbody) tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:18px; color:var(--error);">Failed: ' + esc(err.message) + '</td></tr>';
         });
     }
 
     function renderQueuesAdminTable(list) {
       var tbody = document.getElementById("queuesAdminTableBody");
       if (!list.length) {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--text-muted);">No queues found. Add one above!</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px; color:var(--text-muted);">No queues found. Add one above!</td></tr>';
         return;
       }
 
       var role = (_currentUser && _currentUser.role ? _currentUser.role : "qt").toLowerCase().trim();
-      var canManage = (role === "admin" || role === "sv" || role === "wla" || role === "shift sv" || role === "floor sv");
+      var canManage = (_currentUser && (isAdminOrSuperRole(_currentUser.role) || ["sv", "wla", "shift sv", "floor sv", "traning sv", "training sv"].includes(role)));
 
       var html = "";
       list.forEach(function(q, idx) {
@@ -2956,20 +2956,20 @@
           ? ' <button class="btn-action secondary" style="padding:2px 6px; font-size:0.7rem; margin-left:4px;" title="Edit Highlight tag" onclick="editQueueHighlight(' + q.id + ', _adminQueuesCache[' + idx + '].highlight)">✏️</button>'
           : '';
 
-        var isHidden = !!q.is_hidden;
+        var isHidden = Number(q.is_hidden) === 1 || q.is_hidden === true || q.is_hidden === "1";
         var visBadge = isHidden
-          ? '<span style="color:#ef4444; background:rgba(239,68,68,0.12); padding:2px 8px; border-radius:4px; font-size:0.75rem; font-weight:700;">🙈 Hidden</span>'
-          : '<span style="color:#10b981; background:rgba(16,185,129,0.12); padding:2px 8px; border-radius:4px; font-size:0.75rem; font-weight:700;">👁️ Visible</span>';
+          ? '<span style="color:#ef4444; background:rgba(239,68,68,0.12); padding:3px 10px; border-radius:6px; font-size:0.75rem; font-weight:700; display:inline-flex; align-items:center; gap:4px;">🙈 Hidden</span>'
+          : '<span style="color:#10b981; background:rgba(16,185,129,0.12); padding:3px 10px; border-radius:6px; font-size:0.75rem; font-weight:700; display:inline-flex; align-items:center; gap:4px;">👁️ Visible</span>';
 
         var toggleHideBtn = canManage
           ? (isHidden
-              ? '<button class="btn-action" style="padding:3px 8px; font-size:0.72rem; margin-right:4px;" title="Show queue in task form" onclick="toggleQueueVisibility(' + q.id + ', false)">👁️ Show</button>'
-              : '<button class="btn-action secondary" style="padding:3px 8px; font-size:0.72rem; margin-right:4px;" title="Hide queue from task form" onclick="toggleQueueVisibility(' + q.id + ', true)">🙈 Hide</button>'
+              ? '<button class="btn-action" style="padding:4px 10px; font-size:0.75rem; margin-right:6px; font-weight:700; background:#10b981; color:#fff;" title="Show queue in task form" onclick="toggleQueueVisibility(' + q.id + ', false)">👁️ Show</button>'
+              : '<button class="btn-action secondary" style="padding:4px 10px; font-size:0.75rem; margin-right:6px; font-weight:700; color:#ef4444; border-color:#fca5a5;" title="Hide queue from task form" onclick="toggleQueueVisibility(' + q.id + ', true)">🙈 Hide</button>'
             )
           : '';
 
         var delBtn = canManage
-          ? '<button class="del-btn" onclick="deleteQueueFromDashboard(' + q.id + ')">🗑️ Delete</button>'
+          ? '<button class="del-btn" style="padding:4px 10px; font-size:0.75rem;" onclick="deleteQueueFromDashboard(' + q.id + ')">🗑️ Delete</button>'
           : '<span style="color:var(--text-muted); font-size:0.75rem;">View Only</span>';
 
         html += '<tr>'
