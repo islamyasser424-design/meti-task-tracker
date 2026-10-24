@@ -178,8 +178,26 @@ try {
   location.hash = '#gm-report';
   route();
   const p7 = document.getElementById('uxGmReport');
-  console.log('Page 7 rendered HTML size:', p7.innerHTML.length, 'bytes');
+  console.log('Page 7 rendered HTML size (queues mode):', p7.innerHTML.length, 'bytes');
   if (p7.innerHTML.length < 500) throw new Error('GM Report HTML is unexpectedly short!');
+
+  // Test floor_summary view mode
+  console.log('Testing GM Report with _shiftReportViewMode = "floor_summary"...');
+  if (typeof window._setShiftReportViewMode === 'function') window._setShiftReportViewMode('floor_summary');
+  renderGmReport();
+  console.log('Page 7 rendered HTML size (floor_summary mode):', p7.innerHTML.length, 'bytes');
+  if (!p7.innerHTML.includes('Summary of Floor / Room Breakdown')) throw new Error('Floor summary table not found in floor_summary mode!');
+
+  // Test floors view mode
+  console.log('Testing GM Report with _shiftReportViewMode = "floors"...');
+  if (typeof window._setShiftReportViewMode === 'function') window._setShiftReportViewMode('floors');
+  renderGmReport();
+  console.log('Page 7 rendered HTML size (floors mode):', p7.innerHTML.length, 'bytes');
+  if (!p7.innerHTML.includes('Detailed Floor & Queue Breakdown')) throw new Error('Detailed floor breakdown not found in floors mode!');
+
+  // Reset back to queues mode
+  if (typeof window._setShiftReportViewMode === 'function') window._setShiftReportViewMode('queues');
+  renderGmReport();
 
   // Verify Page 8: Daily Report
   console.log('\n--- Testing Page 8: Daily Report ---');

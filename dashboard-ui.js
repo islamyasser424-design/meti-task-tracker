@@ -515,7 +515,9 @@ let dailyReportCompareMode = false;
 const analysisFilters={from:'',to:'',modality:'all',shift:'',unit:'',qtc:'',category:'',chartCategory:'all'};
 const perfFilters={from:'',to:'',day:'',week:'',category:'',query:'',person:'',page:0};
 
-let _shiftReportViewMode = 'queues'; // 'queues' | 'floors' | 'qcs' | 'labelers'
+let _shiftReportViewMode = 'queues'; // 'queues' | 'floors' | 'floor_summary' | 'qcs' | 'labelers'
+window._setShiftReportViewMode = function(mode) { _shiftReportViewMode = mode; };
+window._getShiftReportViewMode = function() { return _shiftReportViewMode; };
 
 const gmReportFilters = { query: '', shift: '', floor: '', modality: 'all', from: '', to: '', sortCol: 'id', sortAsc: true };
 const shiftCompFilters = { shiftA: 'all', shiftB: 'all', floor: '', modality: 'all', from: '', to: '', subTab: 'floor', query: '' };
@@ -4112,6 +4114,412 @@ function gmQueueReport(rows, universe = rows) {
 }
 
 
+
+function buildFloorSummaryTableHTML(rep, sRows) {
+  const idx = name => hdrs ? hdrs.findIndex(h => h.trim().toLowerCase() === name.toLowerCase()) : -1;
+  const qi = idx('Queue Name');
+  const mi = idx('Modality');
+  const pi = idx('Pass');
+  const ni = idx('National Id');
+  const li = idx('Labeler Name');
+  const sti = idx('Stage');
+  const fi = hdrs ? hdrs.findIndex(h => ['floor', 'unit', 'location'].includes(h.toLowerCase())) : -1;
+
+  const getModality = r => {
+    const raw = mi >= 0 ? String(r[mi] || '').trim() : '';
+    const key = raw.toLowerCase().replace(/[\s_-]+/g, '');
+    if (key === 'lidar') return 'Lidar';
+    if (key === 'laneline' || key === 'lane') return 'Lane Line';
+    return raw || 'Unspecified';
+  };
+
+  const checkRelabel = (qName, r) => {
+    const qLower = String(qName || '').toLowerCase();
+    const stLower = sti >= 0 ? String(r[sti] || '').toLowerCase() : '';
+    const modLower = mi >= 0 ? String(r[mi] || '').toLowerCase() : '';
+    return qLower.includes('relabel') || stLower.includes('relabel') || modLower.includes('relabel');
+  };
+
+  const floorMap = new Map();
+
+  sRows.forEach(r => {
+    const fl = (typeof deriveFloor === 'function' && fi >= 0) ? deriveFloor(r[fi]) : (fi >= 0 && r[fi] ? String(r[fi]).trim() : 'Floor Room');
+    const mod = getModality(r);
+    const mLower = mod.toLowerCase().replace(/[\s_-]+/g, '');
+    const pass = pi >= 0 ? String(r[pi]||'').trim().toUpperCase() : '';
+    const labId = ni >= 0 && r[ni] ? String(r[ni]).trim() : (li >= 0 ? String(r[li]||'').trim() : '');
+    const q = qi >= 0 ? String(r[qi]||'').trim() : '';
+    const isRelabel = checkRelabel(q, r);
+
+    if (!floorMap.has(fl)) {
+      floorMap.set(fl, {
+        floor: fl,
+        lidarFp: 0,
+        lidarFpLabelers: new Set(),
+        lidarQa: 0,
+        lidarQaLabelers: new Set(),
+        laneFp: 0,
+        laneFpLabelers: new Set(),
+        laneQa: 0,
+        laneQaLabelers: new Set(),
+        relabelFp: 0,
+        relabelFpLabelers: new Set(),
+        relabelQa: 0,
+        relabelQaLabelers: new Set(),
+        totalTasks: 0,
+        allLabelers: new Set()
+      });
+    }
+
+    const f = floorMap.get(fl);
+    f.totalTasks++;
+    if (labId) f.allLabelers.add(labId);
+
+    if (isRelabel) {
+      if (pass === 'FP') {
+        f.relabelFp++;
+        if (labId) f.relabelFpLabelers.add(labId);
+      } else if (pass === 'QA') {
+        f.relabelQa++;
+        if (labId) f.relabelQaLabelers.add(labId);
+      }
+    }
+
+    if (mLower === 'lidar') {
+      if (pass === 'FP') {
+        f.lidarFp++;
+        if (labId) f.lidarFpLabelers.add(labId);
+      } else if (pass === 'QA') {
+        f.lidarQa++;
+        if (labId) f.lidarQaLabelers.add(labId);
+      }
+    } else if (mLower === 'laneline' || mLower === 'lane') {
+      if (pass === 'FP') {
+        f.laneFp++;
+        if (labId) f.laneFpLabelers.add(labId);
+      } else if (pass === 'QA') {
+        f.laneQa++;
+        if (labId) f.laneQaLabelers.add(labId);
+      }
+    }
+  });
+
+  const floorList = [...floorMap.values()].sort((a,b) => b.totalTasks - a.totalTasks || a.floor.localeCompare(b.floor));
+  
+  let sumLidarFp = 0, sumLidarQa = 0;
+  let sumLaneFp = 0, sumLaneQa = 0;
+  let sumRelabelFp = 0, sumRelabelQa = 0;
+  let sumGrandTasks = 0;
+  const allLidarFpLabs = new Set(), allLidarQaLabs = new Set();
+  const allLaneFpLabs = new Set(), allLaneQaLabs = new Set();
+  const allRelabelLabs = new Set();
+  const grandAllLabs = new Set();
+
+  floorList.forEach(f => {
+    sumLidarFp += f.lidarFp;
+    sumLidarQa += f.lidarQa;
+    sumLaneFp += f.laneFp;
+    sumLaneQa += f.laneQa;
+    sumRelabelFp += f.relabelFp;
+    sumRelabelQa += f.relabelQa;
+    sumGrandTasks += f.totalTasks;
+
+    f.lidarFpLabelers.forEach(l => allLidarFpLabs.add(l));
+    f.lidarQaLabelers.forEach(l => allLidarQaLabs.add(l));
+    f.laneFpLabelers.forEach(l => allLaneFpLabs.add(l));
+    f.laneQaLabelers.forEach(l => allLaneQaLabs.add(l));
+    f.relabelFpLabelers.forEach(l => allRelabelLabs.add(l));
+    f.relabelQaLabelers.forEach(l => allRelabelLabs.add(l));
+    f.allLabelers.forEach(l => grandAllLabs.add(l));
+  });
+
+  const hasRelabeling = (sumRelabelFp + sumRelabelQa) > 0;
+
+  return `
+    <div class="daily-table-wrap">
+      <table class="daily-queue-table" style="font-size:12px; border:1px solid var(--border); border-radius:8px; overflow:hidden;">
+        <thead>
+          <tr style="background:var(--bg-subtle, rgba(0,0,0,0.03)); border-bottom:1px solid var(--border);">
+            <th rowspan="2" style="vertical-align:middle; width:160px; font-weight:800; font-size:12px; background:var(--card-bg, #fff);">🏢 FLOOR / ROOM</th>
+            <th colspan="2" style="text-align:center; background:rgba(56, 189, 248, 0.1); border-left:1px solid var(--border); border-right:1px solid var(--border); color:#0284c7; font-weight:800; padding:8px 4px;">
+              📡 LIDAR FP
+            </th>
+            <th colspan="2" style="text-align:center; background:rgba(16, 185, 129, 0.1); border-right:1px solid var(--border); color:#059669; font-weight:800; padding:8px 4px;">
+              🔍 LIDAR QA
+            </th>
+            <th colspan="2" style="text-align:center; background:rgba(99, 102, 241, 0.1); border-right:1px solid var(--border); color:#4f46e5; font-weight:800; padding:8px 4px;">
+              🛣️ LANE LINE FP
+            </th>
+            <th colspan="2" style="text-align:center; background:rgba(236, 72, 153, 0.1); border-right:1px solid var(--border); color:#db2777; font-weight:800; padding:8px 4px;">
+              📐 LANE LINE QA
+            </th>
+            ${hasRelabeling ? `
+              <th colspan="2" style="text-align:center; background:rgba(245, 158, 11, 0.1); border-right:1px solid var(--border); color:#d97706; font-weight:800; padding:8px 4px;">
+                🔄 RELABELING
+              </th>
+            ` : ''}
+            <th colspan="2" style="text-align:center; background:rgba(100, 116, 139, 0.1); border-right:1px solid var(--border); color:var(--text); font-weight:800; padding:8px 4px;">
+              ⭐ TOTAL SUMMARY
+            </th>
+          </tr>
+          <tr style="font-size:10.5px; text-transform:uppercase; background:var(--bg-subtle, rgba(0,0,0,0.02)); border-bottom:1.5px solid var(--border);">
+            <th style="border-left:1px solid var(--border); text-align:right; padding:6px 10px; color:#0284c7;">Tasks</th>
+            <th style="border-right:1px solid var(--border); text-align:right; padding:6px 10px; color:var(--text-soft);">Uniq Lab</th>
+            <th style="text-align:right; padding:6px 10px; color:#059669;">Tasks</th>
+            <th style="border-right:1px solid var(--border); text-align:right; padding:6px 10px; color:var(--text-soft);">Uniq Lab</th>
+            <th style="text-align:right; padding:6px 10px; color:#4f46e5;">Tasks</th>
+            <th style="border-right:1px solid var(--border); text-align:right; padding:6px 10px; color:var(--text-soft);">Uniq Lab</th>
+            <th style="text-align:right; padding:6px 10px; color:#db2777;">Tasks</th>
+            <th style="border-right:1px solid var(--border); text-align:right; padding:6px 10px; color:var(--text-soft);">Uniq Lab</th>
+            ${hasRelabeling ? `
+              <th style="text-align:right; padding:6px 10px; color:#d97706;">Tasks</th>
+              <th style="border-right:1px solid var(--border); text-align:right; padding:6px 10px; color:var(--text-soft);">Uniq Lab</th>
+            ` : ''}
+            <th style="text-align:right; font-weight:800; padding:6px 12px; color:var(--text);">Tasks</th>
+            <th style="text-align:right; font-weight:800; padding:6px 12px; color:var(--primary);">Uniq Lab</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${floorList.map(f => `
+            <tr class="daily-queue-row">
+              <td style="font-weight:700; color:var(--primary); font-size:12.5px; white-space:nowrap; padding:10px 14px;">
+                🏢 ${esc(f.floor)}
+              </td>
+              <td class="daily-num-cell highlight-fp" style="border-left:1px solid var(--border);">${f.lidarFp.toLocaleString()}</td>
+              <td class="daily-num-cell" style="border-right:1px solid var(--border); color:var(--text-soft);">${f.lidarFpLabelers.size.toLocaleString()}</td>
+              <td class="daily-num-cell highlight-qa">${f.lidarQa.toLocaleString()}</td>
+              <td class="daily-num-cell" style="border-right:1px solid var(--border); color:var(--text-soft);">${f.lidarQaLabelers.size.toLocaleString()}</td>
+              <td class="daily-num-cell highlight-fp">${f.laneFp.toLocaleString()}</td>
+              <td class="daily-num-cell" style="border-right:1px solid var(--border); color:var(--text-soft);">${f.laneFpLabelers.size.toLocaleString()}</td>
+              <td class="daily-num-cell highlight-qa">${f.laneQa.toLocaleString()}</td>
+              <td class="daily-num-cell" style="border-right:1px solid var(--border); color:var(--text-soft);">${f.laneQaLabelers.size.toLocaleString()}</td>
+              ${hasRelabeling ? `
+                <td class="daily-num-cell" style="color:#d97706; font-weight:700;">${(f.relabelFp + f.relabelQa).toLocaleString()}</td>
+                <td class="daily-num-cell" style="border-right:1px solid var(--border); color:var(--text-soft);">${(f.relabelFpLabelers.size + f.relabelQaLabelers.size).toLocaleString()}</td>
+              ` : ''}
+              <td class="daily-num-cell" style="font-weight:800; font-size:13px; color:var(--text); background:rgba(0,0,0,0.015); padding:10px 12px;">${f.totalTasks.toLocaleString()}</td>
+              <td class="daily-num-cell" style="font-weight:700; color:var(--primary); background:rgba(0,0,0,0.015); padding:10px 12px;">${f.allLabelers.size.toLocaleString()}</td>
+            </tr>
+          `).join('')}
+          ${!floorList.length ? `<tr><td colspan="${hasRelabeling ? 13 : 11}" class="ux-empty" style="text-align:center; padding:32px;">No floor submissions recorded for ${rep.meta.name}.</td></tr>` : ''}
+        </tbody>
+        <tfoot>
+          <tr class="daily-total-row" style="background:var(--bg-subtle, rgba(0,0,0,0.04));">
+            <td style="padding:14px 18px; font-weight:800; font-size:12.5px;">
+              TOTAL ${rep.meta.name} (${floorList.length} Floors):
+            </td>
+            <td class="daily-num-cell highlight-fp" style="border-left:1px solid var(--border);"><b>${sumLidarFp.toLocaleString()}</b></td>
+            <td class="daily-num-cell" style="border-right:1px solid var(--border);"><b>${allLidarFpLabs.size.toLocaleString()}</b></td>
+            <td class="daily-num-cell highlight-qa"><b>${sumLidarQa.toLocaleString()}</b></td>
+            <td class="daily-num-cell" style="border-right:1px solid var(--border);"><b>${allLidarQaLabs.size.toLocaleString()}</b></td>
+            <td class="daily-num-cell highlight-fp"><b>${sumLaneFp.toLocaleString()}</b></td>
+            <td class="daily-num-cell" style="border-right:1px solid var(--border);"><b>${allLaneFpLabs.size.toLocaleString()}</b></td>
+            <td class="daily-num-cell highlight-qa"><b>${sumLaneQa.toLocaleString()}</b></td>
+            <td class="daily-num-cell" style="border-right:1px solid var(--border);"><b>${allLaneQaLabs.size.toLocaleString()}</b></td>
+            ${hasRelabeling ? `
+              <td class="daily-num-cell" style="color:#d97706;"><b>${(sumRelabelFp + sumRelabelQa).toLocaleString()}</b></td>
+              <td class="daily-num-cell" style="border-right:1px solid var(--border);"><b>${allRelabelLabs.size.toLocaleString()}</b></td>
+            ` : ''}
+            <td class="daily-num-cell" style="font-size:14px; font-weight:900; color:var(--text);"><b>${sumGrandTasks.toLocaleString()}</b></td>
+            <td class="daily-num-cell" style="font-size:13px; font-weight:800; color:var(--primary);"><b>${grandAllLabs.size.toLocaleString()}</b></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  `;
+}
+
+function build24HourFloorSummaryTableHTML(shiftReports, baseRows) {
+  const idx = name => hdrs ? hdrs.findIndex(h => h.trim().toLowerCase() === name.toLowerCase()) : -1;
+  const qi = idx('Queue Name');
+  const mi = idx('Modality');
+  const pi = idx('Pass');
+  const ni = idx('National Id');
+  const li = idx('Labeler Name');
+  const sti = idx('Stage');
+  const fi = hdrs ? hdrs.findIndex(h => ['floor', 'unit', 'location'].includes(h.toLowerCase())) : -1;
+
+  const getModality = r => {
+    const raw = mi >= 0 ? String(r[mi] || '').trim() : '';
+    const key = raw.toLowerCase().replace(/[\s_-]+/g, '');
+    if (key === 'lidar') return 'Lidar';
+    if (key === 'laneline' || key === 'lane') return 'Lane Line';
+    return raw || 'Unspecified';
+  };
+
+  const checkRelabel = (qName, r) => {
+    const qLower = String(qName || '').toLowerCase();
+    const stLower = sti >= 0 ? String(r[sti] || '').toLowerCase() : '';
+    const modLower = mi >= 0 ? String(r[mi] || '').toLowerCase() : '';
+    return qLower.includes('relabel') || stLower.includes('relabel') || modLower.includes('relabel');
+  };
+
+  const floorMap = new Map();
+
+  shiftReports.forEach(rep => {
+    const sCat = rep.meta.key; // 'on' | 'morning' | 'night'
+    (rep.sRows || []).forEach(r => {
+      const fl = (typeof deriveFloor === 'function' && fi >= 0) ? deriveFloor(r[fi]) : (fi >= 0 && r[fi] ? String(r[fi]).trim() : 'Floor Room');
+      const mod = getModality(r);
+      const mLower = mod.toLowerCase().replace(/[\s_-]+/g, '');
+      const pass = pi >= 0 ? String(r[pi]||'').trim().toUpperCase() : '';
+      const labId = ni >= 0 && r[ni] ? String(r[ni]).trim() : (li >= 0 ? String(r[li]||'').trim() : '');
+      const q = qi >= 0 ? String(r[qi]||'').trim() : '';
+      const isRelabel = checkRelabel(q, r);
+
+      if (!floorMap.has(fl)) {
+        floorMap.set(fl, {
+          floor: fl,
+          onTasks: 0, onLabs: new Set(),
+          mornTasks: 0, mornLabs: new Set(),
+          nightTasks: 0, nightLabs: new Set(),
+          lidarFp: 0, lidarFpLabs: new Set(),
+          lidarQa: 0, lidarQaLabs: new Set(),
+          laneFp: 0, laneFpLabs: new Set(),
+          laneQa: 0, laneQaLabs: new Set(),
+          relabelTasks: 0, relabelLabs: new Set(),
+          totalTasks: 0, allLabs: new Set()
+        });
+      }
+
+      const f = floorMap.get(fl);
+      f.totalTasks++;
+      if (labId) f.allLabs.add(labId);
+
+      if (sCat === 'on') {
+        f.onTasks++;
+        if (labId) f.onLabs.add(labId);
+      } else if (sCat === 'morning') {
+        f.mornTasks++;
+        if (labId) f.mornLabs.add(labId);
+      } else if (sCat === 'night') {
+        f.nightTasks++;
+        if (labId) f.nightLabs.add(labId);
+      }
+
+      if (isRelabel) {
+        f.relabelTasks++;
+        if (labId) f.relabelLabs.add(labId);
+      }
+
+      if (mLower === 'lidar') {
+        if (pass === 'FP') { f.lidarFp++; if (labId) f.lidarFpLabs.add(labId); }
+        else if (pass === 'QA') { f.lidarQa++; if (labId) f.lidarQaLabs.add(labId); }
+      } else if (mLower === 'laneline' || mLower === 'lane') {
+        if (pass === 'FP') { f.laneFp++; if (labId) f.laneFpLabs.add(labId); }
+        else if (pass === 'QA') { f.laneQa++; if (labId) f.laneQaLabs.add(labId); }
+      }
+    });
+  });
+
+  const floorList = [...floorMap.values()].sort((a,b) => b.totalTasks - a.totalTasks || a.floor.localeCompare(b.floor));
+  
+  let totOn = 0, totMorn = 0, totNight = 0, grandTot = 0;
+  let totLidarFp = 0, totLidarQa = 0, totLaneFp = 0, totLaneQa = 0, totRelabel = 0;
+  const allOnLabs = new Set(), allMornLabs = new Set(), allNightLabs = new Set(), allTotalLabs = new Set();
+  const allLidarFpLabs = new Set(), allLidarQaLabs = new Set(), allLaneFpLabs = new Set(), allLaneQaLabs = new Set(), allRelabelLabs = new Set();
+
+  floorList.forEach(f => {
+    totOn += f.onTasks; totMorn += f.mornTasks; totNight += f.nightTasks; grandTot += f.totalTasks;
+    totLidarFp += f.lidarFp; totLidarQa += f.lidarQa; totLaneFp += f.laneFp; totLaneQa += f.laneQa; totRelabel += f.relabelTasks;
+
+    f.onLabs.forEach(l => allOnLabs.add(l));
+    f.mornLabs.forEach(l => allMornLabs.add(l));
+    f.nightLabs.forEach(l => allNightLabs.add(l));
+    f.allLabs.forEach(l => allTotalLabs.add(l));
+    f.lidarFpLabs.forEach(l => allLidarFpLabs.add(l));
+    f.lidarQaLabs.forEach(l => allLidarQaLabs.add(l));
+    f.laneFpLabs.forEach(l => allLaneFpLabs.add(l));
+    f.laneQaLabs.forEach(l => allLaneQaLabs.add(l));
+    f.relabelLabs.forEach(l => allRelabelLabs.add(l));
+  });
+
+  return `
+    <div class="daily-table-wrap">
+      <table class="daily-queue-table" style="font-size:12px; border:1px solid var(--border); border-radius:8px; overflow:hidden;">
+        <thead>
+          <tr style="background:var(--bg-subtle, rgba(0,0,0,0.03)); border-bottom:1px solid var(--border);">
+            <th rowspan="2" style="vertical-align:middle; width:160px; font-weight:800; font-size:12px; background:var(--card-bg, #fff);">🏢 FLOOR / ROOM</th>
+            <th colspan="2" style="text-align:center; background:rgba(139, 92, 246, 0.1); border-left:1px solid var(--border); border-right:1px solid var(--border); color:#8b5cf6; font-weight:800; padding:8px 4px;">
+              🌙 ON SHIFT (00–08)
+            </th>
+            <th colspan="2" style="text-align:center; background:rgba(13, 148, 136, 0.1); border-right:1px solid var(--border); color:#0d9488; font-weight:800; padding:8px 4px;">
+              ☀️ MORNING SHIFT (08–16)
+            </th>
+            <th colspan="2" style="text-align:center; background:rgba(237, 154, 53, 0.1); border-right:1px solid var(--border); color:#ed9a35; font-weight:800; padding:8px 4px;">
+              🌆 NIGHT SHIFT (16–00)
+            </th>
+            <th colspan="2" style="text-align:center; background:rgba(56, 189, 248, 0.08); border-right:1px solid var(--border); color:#0284c7; font-weight:800; padding:8px 4px;">
+              📡 LIDAR (FP / QA)
+            </th>
+            <th colspan="2" style="text-align:center; background:rgba(99, 102, 241, 0.08); border-right:1px solid var(--border); color:#4f46e5; font-weight:800; padding:8px 4px;">
+              🛣️ LANE LINE (FP / QA)
+            </th>
+            <th colspan="2" style="text-align:center; background:rgba(100, 116, 139, 0.1); border-right:1px solid var(--border); color:var(--text); font-weight:800; padding:8px 4px;">
+              ⭐ 24H GRAND TOTAL
+            </th>
+          </tr>
+          <tr style="font-size:10.5px; text-transform:uppercase; background:var(--bg-subtle, rgba(0,0,0,0.02)); border-bottom:1.5px solid var(--border);">
+            <th style="border-left:1px solid var(--border); text-align:right; padding:6px 10px; color:#8b5cf6;">Tasks</th>
+            <th style="border-right:1px solid var(--border); text-align:right; padding:6px 10px; color:var(--text-soft);">Uniq Lab</th>
+            <th style="text-align:right; padding:6px 10px; color:#0d9488;">Tasks</th>
+            <th style="border-right:1px solid var(--border); text-align:right; padding:6px 10px; color:var(--text-soft);">Uniq Lab</th>
+            <th style="text-align:right; padding:6px 10px; color:#ed9a35;">Tasks</th>
+            <th style="border-right:1px solid var(--border); text-align:right; padding:6px 10px; color:var(--text-soft);">Uniq Lab</th>
+            <th style="text-align:right; padding:6px 10px; color:#0284c7;">FP</th>
+            <th style="border-right:1px solid var(--border); text-align:right; padding:6px 10px; color:#059669;">QA</th>
+            <th style="text-align:right; padding:6px 10px; color:#4f46e5;">FP</th>
+            <th style="border-right:1px solid var(--border); text-align:right; padding:6px 10px; color:#db2777;">QA</th>
+            <th style="text-align:right; font-weight:800; padding:6px 12px; color:var(--text);">Tasks</th>
+            <th style="text-align:right; font-weight:800; padding:6px 12px; color:var(--primary);">Total Lab</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${floorList.map(f => `
+            <tr class="daily-queue-row">
+              <td style="font-weight:700; color:var(--primary); font-size:12.5px; white-space:nowrap; padding:10px 14px;">
+                🏢 ${esc(f.floor)}
+              </td>
+              <td class="daily-num-cell" style="border-left:1px solid var(--border); font-weight:700; color:#8b5cf6;">${f.onTasks.toLocaleString()}</td>
+              <td class="daily-num-cell" style="border-right:1px solid var(--border); color:var(--text-soft);">${f.onLabs.size.toLocaleString()}</td>
+              <td class="daily-num-cell" style="font-weight:700; color:#0d9488;">${f.mornTasks.toLocaleString()}</td>
+              <td class="daily-num-cell" style="border-right:1px solid var(--border); color:var(--text-soft);">${f.mornLabs.size.toLocaleString()}</td>
+              <td class="daily-num-cell" style="font-weight:700; color:#ed9a35;">${f.nightTasks.toLocaleString()}</td>
+              <td class="daily-num-cell" style="border-right:1px solid var(--border); color:var(--text-soft);">${f.nightLabs.size.toLocaleString()}</td>
+              <td class="daily-num-cell highlight-fp">${f.lidarFp.toLocaleString()}</td>
+              <td class="daily-num-cell highlight-qa" style="border-right:1px solid var(--border);">${f.lidarQa.toLocaleString()}</td>
+              <td class="daily-num-cell highlight-fp">${f.laneFp.toLocaleString()}</td>
+              <td class="daily-num-cell highlight-qa" style="border-right:1px solid var(--border);">${f.laneQa.toLocaleString()}</td>
+              <td class="daily-num-cell" style="font-weight:900; font-size:13px; color:var(--text); background:rgba(0,0,0,0.015); padding:10px 12px;">${f.totalTasks.toLocaleString()}</td>
+              <td class="daily-num-cell" style="font-weight:800; color:var(--primary); background:rgba(0,0,0,0.015); padding:10px 12px;">${f.allLabs.size.toLocaleString()}</td>
+            </tr>
+          `).join('')}
+          ${!floorList.length ? '<tr><td colspan="12" class="ux-empty" style="text-align:center; padding:32px;">No 24-hour floor records found.</td></tr>' : ''}
+        </tbody>
+        <tfoot>
+          <tr class="daily-total-row" style="background:var(--bg-subtle, rgba(0,0,0,0.04));">
+            <td style="padding:14px 18px; font-weight:800; font-size:12.5px;">
+              24-HOUR TOTAL (${floorList.length} Floors):
+            </td>
+            <td class="daily-num-cell" style="border-left:1px solid var(--border); color:#8b5cf6;"><b>${totOn.toLocaleString()}</b></td>
+            <td class="daily-num-cell" style="border-right:1px solid var(--border);"><b>${allOnLabs.size.toLocaleString()}</b></td>
+            <td class="daily-num-cell" style="color:#0d9488;"><b>${totMorn.toLocaleString()}</b></td>
+            <td class="daily-num-cell" style="border-right:1px solid var(--border);"><b>${allMornLabs.size.toLocaleString()}</b></td>
+            <td class="daily-num-cell" style="color:#ed9a35;"><b>${totNight.toLocaleString()}</b></td>
+            <td class="daily-num-cell" style="border-right:1px solid var(--border);"><b>${allNightLabs.size.toLocaleString()}</b></td>
+            <td class="daily-num-cell highlight-fp"><b>${totLidarFp.toLocaleString()}</b></td>
+            <td class="daily-num-cell highlight-qa" style="border-right:1px solid var(--border);"><b>${totLidarQa.toLocaleString()}</b></td>
+            <td class="daily-num-cell highlight-fp"><b>${totLaneFp.toLocaleString()}</b></td>
+            <td class="daily-num-cell highlight-qa" style="border-right:1px solid var(--border);"><b>${totLaneQa.toLocaleString()}</b></td>
+            <td class="daily-num-cell" style="font-size:14px; font-weight:900; color:var(--text);"><b>${grandTot.toLocaleString()}</b></td>
+            <td class="daily-num-cell" style="font-size:13px; font-weight:800; color:var(--primary);"><b>${allTotalLabs.size.toLocaleString()}</b></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  `;
+}
+
 function buildShiftTableHTML(rep, sRows, viewMode, sortCol, sortAsc) {
   const idx = name => hdrs ? hdrs.findIndex(h => h.trim().toLowerCase() === name.toLowerCase()) : -1;
   const qi = idx('Queue Name');
@@ -4198,6 +4606,8 @@ function buildShiftTableHTML(rep, sRows, viewMode, sortCol, sortAsc) {
 
   // 2. FLOOR PRODUCTIVITY VIEW
   if (viewMode === 'floors') {
+    const summaryHTML = buildFloorSummaryTableHTML(rep, sRows);
+
     const floorMap = new Map();
     sRows.forEach(r => {
       const fl = (typeof deriveFloor === 'function' && fi >= 0) ? deriveFloor(r[fi]) : (fi >= 0 && r[fi] ? String(r[fi]).trim() : 'Floor Room');
@@ -4228,7 +4638,15 @@ function buildShiftTableHTML(rep, sRows, viewMode, sortCol, sortAsc) {
     });
 
     return `
+      <div style="margin-bottom:24px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <h4 style="margin:0; font-size:13px; font-weight:800; color:var(--text);">🏢 Summary of Floor / Room Breakdown (${rep.meta.name})</h4>
+          <span style="font-size:11px; color:var(--muted);">Aggregated by Modality & Unique Labelers</span>
+        </div>
+        ${summaryHTML}
+      </div>
       <div class="daily-table-wrap">
+        <div style="font-size:12px; font-weight:800; color:var(--text); margin-bottom:8px;">📋 Detailed Floor & Queue Breakdown (${rep.meta.name}):</div>
         <table class="daily-queue-table">
           <thead>
             <tr>
@@ -4272,6 +4690,11 @@ function buildShiftTableHTML(rep, sRows, viewMode, sortCol, sortAsc) {
         </table>
       </div>
     `;
+  }
+
+    // 2.5 FLOOR SUMMARY VIEW (Detailed Modality & Unique Labelers Breakdown)
+  if (viewMode === 'floor_summary') {
+    return buildFloorSummaryTableHTML(rep, sRows);
   }
 
   // 3. QC / QTC SUPERVISORS VIEW
@@ -4689,6 +5112,9 @@ function renderGmReport(){
           <button type="button" class="btn ${_shiftReportViewMode==='floors'?'btn-c':''}" data-shift-view="floors" style="font-weight:700; font-size:12px;">
             🏢 2. Floor / Room Breakdown
           </button>
+          <button type="button" class="btn ${_shiftReportViewMode==='floor_summary'?'btn-c':''}" data-shift-view="floor_summary" style="font-weight:700; font-size:12px;">
+            🏢 Summary of Floor / Room Breakdown
+          </button>
           <button type="button" class="btn ${_shiftReportViewMode==='qcs'?'btn-c':''}" data-shift-view="qcs" style="font-weight:700; font-size:12px;">
             👥 3. QC / QTC Supervisors Breakdown
           </button>
@@ -4723,6 +5149,24 @@ function renderGmReport(){
           </div>
         </div>
       </div>
+
+      ${_shiftReportViewMode === 'floor_summary' ? `
+        <section class="daily-queue-card" style="margin-bottom:28px; border-left:4px solid var(--primary);">
+          <div class="daily-queue-card-head">
+            <div>
+              <h3>
+                <span>🌐</span>
+                <span style="color:var(--primary);">24-Hour Grand Summary — Floor & Shifts Breakdown</span>
+                <span class="daily-mod" style="background:rgba(59, 130, 246, 0.1); color:var(--primary);">Full 24 Hours</span>
+              </h3>
+              <p>
+                Consolidated 24-hour floor productivity comparing Over Night (ON), Morning, and Night shifts side-by-side with exact modality and unique labeler breakdown.
+              </p>
+            </div>
+          </div>
+          ${build24HourFloorSummaryTableHTML(shiftReports, baseRows)}
+        </section>
+      ` : ''}
 
       <!-- ============================================================ -->
       <!-- 3 INDEPENDENT SHIFT REPORTS (STACKED VERTICALLY) -->
@@ -4828,8 +5272,35 @@ function renderGmReport(){
         return;
       }
       const cell = v => '"' + String(v ?? '').replace(/^[=+@\-\t\r]/, "'$&").replace(/"/g, '""') + '"';
-      const csvHeaders = ['Queue Name', 'Modality', 'Is Relabeling', 'Shift Window', 'Unique Labelers (FP)', 'Total Submit (FP)', 'Unique Labelers (QA)', 'Total Submit (QA)', 'Total Submissions'];
-      const csvRows = rep.groups.map(g => [
+      let csvHeaders, csvRows;
+      if (_shiftReportViewMode === 'floor_summary') {
+        csvHeaders = ['Shift Name', 'Shift Window', 'Floor / Room', 'Lidar FP Tasks', 'Lidar FP Unique Labelers', 'Lidar QA Tasks', 'Lidar QA Unique Labelers', 'Lane Line FP Tasks', 'Lane Line FP Unique Labelers', 'Lane Line QA Tasks', 'Lane Line QA Unique Labelers', 'Total Tasks', 'Total Unique Labelers'];
+        const fMap = new Map();
+        (rep.sRows || []).forEach(r => {
+          const fl = (typeof deriveFloor === 'function' && fi >= 0) ? deriveFloor(r[fi]) : (fi >= 0 && r[fi] ? String(r[fi]).trim() : 'Floor Room');
+          const mod = getModality(r).toLowerCase().replace(/[\s_-]+/g, '');
+          const pass = pi >= 0 ? String(r[pi]||'').trim().toUpperCase() : '';
+          const labId = ni >= 0 && r[ni] ? String(r[ni]).trim() : (li >= 0 ? String(r[li]||'').trim() : '');
+          if (!fMap.has(fl)) {
+            fMap.set(fl, { floor: fl, lidarFp: 0, lidarFpLabs: new Set(), lidarQa: 0, lidarQaLabs: new Set(), laneFp: 0, laneFpLabs: new Set(), laneQa: 0, laneQaLabs: new Set(), total: 0, allLabs: new Set() });
+          }
+          const f = fMap.get(fl);
+          f.total++;
+          if (labId) f.allLabs.add(labId);
+          if (mod === 'lidar') {
+            if (pass === 'FP') { f.lidarFp++; if (labId) f.lidarFpLabs.add(labId); }
+            else if (pass === 'QA') { f.lidarQa++; if (labId) f.lidarQaLabs.add(labId); }
+          } else if (mod === 'laneline' || mod === 'lane') {
+            if (pass === 'FP') { f.laneFp++; if (labId) f.laneFpLabs.add(labId); }
+            else if (pass === 'QA') { f.laneQa++; if (labId) f.laneQaLabs.add(labId); }
+          }
+        });
+        csvRows = [...fMap.values()].map(f => [
+          rep.meta.name, rep.meta.timeWindow, f.floor, f.lidarFp, f.lidarFpLabs.size, f.lidarQa, f.lidarQaLabs.size, f.laneFp, f.laneFpLabs.size, f.laneQa, f.laneQaLabs.size, f.total, f.allLabs.size
+        ]);
+      } else {
+        csvHeaders = ['Queue Name', 'Modality', 'Is Relabeling', 'Shift Window', 'Unique Labelers (FP)', 'Total Submit (FP)', 'Unique Labelers (QA)', 'Total Submit (QA)', 'Total Submissions'];
+        csvRows = rep.groups.map(g => [
         g.name,
         g.mod,
         g.isRelabel ? 'Yes' : 'No',
@@ -4840,6 +5311,7 @@ function renderGmReport(){
         g.qa,
         g.fp + g.qa
       ]);
+      }
       const csvContent = [csvHeaders, ...csvRows].map(r => r.map(cell).join(',')).join('\r\n');
       downloadBlob(new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8' }), 'MEEG_GM_' + rep.meta.name.replace(/\s+/g, '_') + '_' + cairoToday() + '.csv');
       showToast('✓ ' + rep.meta.name + ' exported to CSV');
