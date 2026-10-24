@@ -1453,17 +1453,27 @@ html[data-theme="dark"] #meegGlobalTooltip .tip-chip {
    UNIVERSAL UNIFIED OPERATIONAL FILTERS (All 8 Analytics Pages)
    ============================================================ */
 .universal-filter-panel {
-  background: var(--bg-2);
+  background: var(--card);
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg, 14px);
-  padding: 16px 20px;
-  margin-bottom: 22px;
-  box-shadow: var(--shadow-sm, 0 1px 3px rgba(15, 23, 42, 0.05));
-  transition: all 0.2s ease;
+  border-top: 3px solid #0d9488;
+  border-radius: var(--radius-lg, 16px);
+  padding: 18px 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05), 0 2px 6px -1px rgba(13, 148, 136, 0.04);
+  position: relative;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
 .universal-filter-panel:hover {
-  border-color: var(--border-hover, #cbd5e1);
+  border-color: rgba(13, 148, 136, 0.45);
+  box-shadow: 0 8px 30px -4px rgba(15, 23, 42, 0.08), 0 4px 16px -2px rgba(13, 148, 136, 0.08);
+}
+
+html[data-theme=dark] .universal-filter-panel {
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.9) 0%, rgba(15, 23, 42, 0.98) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-top: 3px solid #14b8a6;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
 }
 
 .uf-header-row {
@@ -1472,67 +1482,110 @@ html[data-theme="dark"] #meegGlobalTooltip .tip-chip {
   align-items: center;
   flex-wrap: wrap;
   gap: 12px;
-  margin-bottom: 14px;
-  padding-bottom: 10px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
   border-bottom: 1px solid var(--border);
 }
 
 .uf-header-left {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   flex-wrap: wrap;
 }
 
 .uf-header-badge {
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 800;
+  letter-spacing: -0.2px;
   color: var(--primary);
+  background: rgba(13, 148, 136, 0.09);
+  border: 1px solid rgba(13, 148, 136, 0.28);
+  padding: 5px 12px;
+  border-radius: 999px;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
+  box-shadow: 0 0 14px rgba(13, 148, 136, 0.12);
+}
+
+html[data-theme=dark] .uf-header-badge {
+  color: #2dd4bf;
+  background: rgba(45, 212, 191, 0.12);
+  border-color: rgba(45, 212, 191, 0.35);
+  box-shadow: 0 0 18px rgba(45, 212, 191, 0.25);
 }
 
 .uf-stats-badge {
   font-size: 12px;
-  color: var(--text-secondary, #475569);
-  background: var(--bg-3, #ffffff);
+  color: var(--text-soft);
+  background: var(--bg-2);
   border: 1px solid var(--border);
-  padding: 4px 10px;
+  padding: 5px 12px;
   border-radius: 999px;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
+  font-variant-numeric: tabular-nums;
+  transition: all 0.2s ease;
+}
+
+.uf-stats-badge::before {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 8px #10b981;
 }
 
 .uf-stats-badge.active-filter-badge {
   border-color: var(--primary);
   color: var(--primary);
-  font-weight: 600;
-  background: rgba(13, 148, 136, 0.08);
+  font-weight: 700;
+  background: rgba(13, 148, 136, 0.1);
+  box-shadow: 0 0 12px rgba(13, 148, 136, 0.15);
+}
+
+.uf-stats-badge.active-filter-badge::before {
+  background: #0d9488;
+  box-shadow: 0 0 10px #0d9488;
+  animation: ufPulse 1.6s infinite;
+}
+
+@keyframes ufPulse {
+  0% { transform: scale(0.9); opacity: 0.7; }
+  50% { transform: scale(1.3); opacity: 1; }
+  100% { transform: scale(0.9); opacity: 0.7; }
 }
 
 .btn-uf-reset {
-  background: transparent;
-  color: var(--danger, #ef4444);
-  border: 1px solid var(--border);
-  padding: 5px 12px;
+  background: rgba(239, 68, 68, 0.08);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  padding: 6px 14px;
   border-radius: 8px;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
 }
 
 .btn-uf-reset:hover {
-  background: rgba(239, 68, 68, 0.1);
-  border-color: var(--danger);
-  color: var(--danger);
+  background: #ef4444;
+  border-color: #ef4444;
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(239, 68, 68, 0.35);
+  transform: translateY(-1px);
 }
 
 .uf-grid-controls {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(185px, 1fr));
   gap: 14px;
 }
 
@@ -1540,6 +1593,7 @@ html[data-theme="dark"] #meegGlobalTooltip .tip-chip {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  min-width: 0;
 }
 
 .uf-ctrl-date {
@@ -1552,7 +1606,8 @@ html[data-theme="dark"] #meegGlobalTooltip .tip-chip {
   color: var(--text);
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
+  letter-spacing: -0.1px;
 }
 
 .uf-date-actions-wrap {
@@ -1564,34 +1619,45 @@ html[data-theme="dark"] #meegGlobalTooltip .tip-chip {
 .uf-input-date,
 .uf-input-select {
   width: 100%;
-  padding: 8px 12px;
-  border-radius: 8px;
+  padding: 9px 12px;
+  border-radius: 9px;
   border: 1px solid var(--border);
   background: var(--bg-3, #ffffff);
   color: var(--text);
   font-size: 12.5px;
-  font-family: inherit;
+  font-weight: 500;
   outline: none;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition: all 0.2s ease;
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.03);
+}
+
+.uf-input-date:hover,
+.uf-input-select:hover {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 1px var(--primary);
+}
+
+.uf-input-date:focus,
+.uf-input-select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-glow, rgba(20, 184, 166, 0.25));
 }
 
 .uf-input-date-sm {
   width: 115px;
   padding: 5px 8px;
-  border-radius: 6px;
+  border-radius: 7px;
   border: 1px solid var(--border);
   background: var(--bg-3, #ffffff);
   color: var(--text);
   font-size: 11.5px;
-  font-family: inherit;
   outline: none;
+  transition: all 0.2s ease;
 }
 
-.uf-input-date:focus,
-.uf-input-select:focus,
 .uf-input-date-sm:focus {
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px var(--primary-glow, rgba(20, 184, 166, 0.25));
+  box-shadow: 0 0 0 2px var(--primary-glow, rgba(20, 184, 166, 0.25));
 }
 
 .uf-presets-group {
@@ -1601,15 +1667,15 @@ html[data-theme="dark"] #meegGlobalTooltip .tip-chip {
 
 .uf-preset-btn {
   flex: 1;
-  padding: 4px 6px;
+  padding: 5px 8px;
   font-size: 11px;
-  font-weight: 600;
-  border-radius: 6px;
+  font-weight: 700;
+  border-radius: 7px;
   border: 1px solid var(--border);
-  background: var(--bg-3);
-  color: var(--text-secondary);
+  background: var(--bg-2);
+  color: var(--text-soft);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   white-space: nowrap;
   text-align: center;
 }
@@ -1617,12 +1683,14 @@ html[data-theme="dark"] #meegGlobalTooltip .tip-chip {
 .uf-preset-btn:hover {
   border-color: var(--primary);
   color: var(--primary);
+  background: rgba(13, 148, 136, 0.08);
 }
 
 .uf-preset-btn.active {
-  background: var(--primary);
+  background: linear-gradient(135deg, #0d9488 0%, #0284c7 100%);
   color: #ffffff;
-  border-color: var(--primary);
+  border-color: transparent;
+  box-shadow: 0 3px 10px rgba(13, 148, 136, 0.35);
 }
 
 .uf-tags-strip {
@@ -1630,53 +1698,78 @@ html[data-theme="dark"] #meegGlobalTooltip .tip-chip {
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
-  margin-top: 14px;
-  padding-top: 10px;
+  margin-top: 16px;
+  padding-top: 12px;
   border-top: 1px dashed var(--border);
 }
 
 .uf-tags-lbl {
-  font-size: 11px;
-  font-weight: 600;
+  font-size: 11.5px;
+  font-weight: 700;
   color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .uf-tag {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 11px;
-  background: var(--bg-3);
-  border: 1px solid var(--primary);
+  font-size: 11.5px;
+  font-weight: 600;
+  background: rgba(13, 148, 136, 0.09);
+  border: 1px solid rgba(13, 148, 136, 0.35);
   color: var(--text);
-  padding: 3px 8px;
-  border-radius: 6px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(13, 148, 136, 0.06);
+  transition: all 0.15s ease;
+}
+
+.uf-tag:hover {
+  border-color: var(--primary);
+  transform: translateY(-1px);
 }
 
 .uf-tag-del {
-  background: none;
+  background: rgba(239, 68, 68, 0.12);
   border: none;
-  color: var(--danger);
+  color: #ef4444;
   font-weight: bold;
   cursor: pointer;
-  padding: 0 2px;
-  font-size: 11px;
+  border-radius: 50%;
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  margin-left: 2px;
+  transition: all 0.15s ease;
 }
 
 .uf-tag-del:hover {
-  opacity: 0.8;
+  background: #ef4444;
+  color: #ffffff;
+  transform: scale(1.15);
 }
 
 .uf-clear-all-link {
   background: none;
   border: none;
   color: var(--primary);
-  font-size: 11px;
+  font-size: 11.5px;
+  font-weight: 600;
   text-decoration: underline;
   cursor: pointer;
-  padding: 0 4px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: all 0.15s ease;
 }
 
+.uf-clear-all-link:hover {
+  background: rgba(13, 148, 136, 0.1);
+}
 
 /* ============================================================
    GM REPORT — QUEUE DAILY SUMMARY (Matching Reference Screenshot)
@@ -2133,4 +2226,81 @@ html[data-theme="dark"] #meegGlobalTooltip .tip-chip {
     flex-wrap: wrap;
     gap: 8px;
   }
+}
+
+/* ============================================================
+   CATCHY CYBER / SAAS DASHBOARD UI/UX ENHANCEMENTS
+   ============================================================ */
+.kpi-mini-card {
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s ease, border-color 0.25s ease !important;
+}
+.kpi-mini-card:hover {
+  transform: translateY(-4px) !important;
+  border-color: rgba(13, 148, 136, 0.45) !important;
+  box-shadow: 0 12px 28px -4px rgba(15, 23, 42, 0.12), 0 4px 12px -2px rgba(13, 148, 136, 0.12) !important;
+}
+
+.kpi-mini-card::before {
+  background: linear-gradient(90deg, var(--tone, var(--primary)) 0%, #38bdf8 100%) !important;
+}
+
+/* Modality and Pass Badges */
+.mod-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+}
+.mod-pill-lidar {
+  background: rgba(2, 132, 199, 0.12);
+  color: #0284c7;
+  border: 1px solid rgba(2, 132, 199, 0.3);
+}
+.mod-pill-lane {
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+.pass-pill-fp {
+  background: rgba(139, 92, 246, 0.12);
+  color: #8b5cf6;
+  border: 1px solid rgba(139, 92, 246, 0.3);
+}
+.pass-pill-qa {
+  background: rgba(245, 158, 11, 0.12);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+/* Polished Table Rows & Headers */
+.modern-table thead th {
+  backdrop-filter: blur(8px);
+  letter-spacing: 0.3px;
+  font-weight: 700;
+}
+.modern-table tbody tr {
+  transition: background-color 0.15s ease;
+}
+.modern-table tbody tr:hover {
+  background-color: rgba(13, 148, 136, 0.04) !important;
+}
+
+/* Sleek Scrollbars */
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar, rgba(15, 23, 42, 0.18));
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--primary);
 }

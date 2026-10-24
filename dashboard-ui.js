@@ -787,13 +787,19 @@ function getGlobalFilterOptions() {
   const si = idx('shift');
   const fi = hdrs ? hdrs.findIndex(h => ['floor', 'unit'].includes(h.trim().toLowerCase())) : -1;
   const qi = hdrs ? hdrs.findIndex(h => ['qtc name', 'qtc', 'supervisor'].includes(h.trim().toLowerCase())) : -1;
+  const mi = hdrs ? hdrs.findIndex(h => ['modality', 'mod'].includes(h.trim().toLowerCase())) : -1;
+  const pi = hdrs ? hdrs.findIndex(h => ['pass', 'stage'].includes(h.trim().toLowerCase())) : -1;
 
   const shifts = [...new Set(source.map(r => si >= 0 ? String(r[si] || '').trim() : '').filter(Boolean))].sort();
   const floors = [...new Set(source.map(r => fi >= 0 ? deriveFloor(r[fi]) : '').filter(Boolean))].sort();
   const qtcs = [...new Set(source.map(r => qi >= 0 ? String(r[qi] || '').trim() : '').filter(Boolean))].sort();
   const dates = [...new Set(source.map(r => typeof rDate === 'function' ? rDate(r) : '').filter(Boolean))].sort();
+  const modalities = [...new Set(source.map(r => mi >= 0 ? String(r[mi] || '').trim() : '').filter(Boolean))].sort();
+  const rawPasses = [...new Set(source.map(r => pi >= 0 ? String(r[pi] || '').trim().toUpperCase() : '').filter(Boolean))].sort();
+  const validPasses = rawPasses.filter(p => ['FP', 'QA'].includes(p));
+  const passes = validPasses.length ? validPasses : rawPasses;
 
-  return { shifts, floors, qtcs, dates, totalTasks: source.length };
+  return { shifts, floors, qtcs, dates, modalities, passes, totalTasks: source.length };
 }
 
 function renderUniversalFilterBar(pageKey) {
@@ -893,6 +899,23 @@ function renderUniversalFilterBar(pageKey) {
           + opts.shifts.map(s => '<option value="' + esc(s) + '" ' + (globalUnifiedFilters.shift === s ? 'selected' : '') + '>' + esc(s) + '</option>').join('')
         + '</select>'
       + '</div>'
+      // 5. Modality Dropdown
+      + '<div class="uf-ctrl-box">'
+        + '<label class="uf-ctrl-lbl" for="ufModality_' + pageKey + '">📦 Modality:</label>'
+        + '<select class="uf-input-select" id="ufModality_' + pageKey + '">'
+          + '<option value="">📦 All Modalities</option>'
+          + (opts.modalities || []).map(m => '<option value="' + esc(m) + '" ' + (globalUnifiedFilters.modality && globalUnifiedFilters.modality.toLowerCase() === m.toLowerCase() ? 'selected' : '') + '>' + esc(m) + '</option>').join('')
+        + '</select>'
+      + '</div>'
+
+      // 6. Pass Type Dropdown
+      + '<div class="uf-ctrl-box">'
+        + '<label class="uf-ctrl-lbl" for="ufPass_' + pageKey + '">🎯 Pass Type:</label>'
+        + '<select class="uf-input-select" id="ufPass_' + pageKey + '">'
+          + '<option value="">🎯 All Passes (FP & QA)</option>'
+          + ((opts.passes && opts.passes.length) ? opts.passes : ['FP', 'QA']).map(p => '<option value="' + esc(p) + '" ' + (globalUnifiedFilters.pass && globalUnifiedFilters.pass.toUpperCase() === p.toUpperCase() ? 'selected' : '') + '>' + (p === 'FP' ? 'FP (First Pass)' : (p === 'QA' ? 'QA (Quality)' : esc(p))) + '</option>').join('')
+        + '</select>'
+      + '</div>'
     + '</div>'
 
     + activeTagsHtml
@@ -968,6 +991,22 @@ function bindUniversalFilterBar(container, pageKey) {
   if (shiftSelect) {
     shiftSelect.onchange = (e) => {
       globalUnifiedFilters.shift = e.target.value.trim();
+      applyGlobalFilters();
+    };
+  }
+
+  const modSelect = panel.querySelector('#ufModality_' + pageKey);
+  if (modSelect) {
+    modSelect.onchange = (e) => {
+      globalUnifiedFilters.modality = e.target.value.trim();
+      applyGlobalFilters();
+    };
+  }
+
+  const passSelect = panel.querySelector('#ufPass_' + pageKey);
+  if (passSelect) {
+    passSelect.onchange = (e) => {
+      globalUnifiedFilters.pass = e.target.value.trim();
       applyGlobalFilters();
     };
   }
