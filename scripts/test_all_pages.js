@@ -207,6 +207,15 @@ try {
   console.log('Page 8 rendered HTML size:', p8.innerHTML.length, 'bytes');
   if (p8.innerHTML.length < 500) throw new Error('Daily Report HTML is unexpectedly short!');
 
+  // Verify Page 9: Advanced Insights
+  console.log('\n--- Testing Page 9: Advanced Insights ---');
+  location.hash = '#advanced-insights';
+  route();
+  const p9 = document.getElementById('uxAdvancedInsights');
+  console.log('Page 9 rendered HTML size:', p9.innerHTML.length, 'bytes');
+  if (p9.innerHTML.length < 500) throw new Error('Advanced Insights HTML is unexpectedly short!');
+  if (!p9.innerHTML.includes('Advanced Operational Insights')) throw new Error('Advanced Insights header missing!');
+
   // Verify Employee Drilldown Modal & Record Builder
   console.log('\n--- Testing Employee Drilldown Modal & Record Builder ---');
   const samplePersonKey = 'Ahmed Ali';

@@ -612,9 +612,16 @@ shiftComparisonPage.hidden=true;
 shiftComparisonPage.style.display='none';
 targetContainer.appendChild(shiftComparisonPage);
 
+const advancedInsightsPage=document.createElement('section');
+advancedInsightsPage.id='uxAdvancedInsights';
+advancedInsightsPage.className='ux-workspace-page';
+advancedInsightsPage.hidden=true;
+advancedInsightsPage.style.display='none';
+targetContainer.appendChild(advancedInsightsPage);
+
 const root=overview;
 
-const aside=document.createElement('aside');aside.className='ux-sidebar';aside.setAttribute('aria-label','Main navigation');aside.innerHTML='<div class="ux-brand"><div class="brand-logo-card"><img src="logo.jpg" alt="MEEG - Micro Engineering Egypt" class="brand-img"></div><span class="brand-workspace-tag">PRODUCTIVITY WORKSPACE</span></div><small>WORKSPACE</small><button class="ux-nav active" data-page="dashboard">▦ &nbsp; Overview</button><button class="ux-nav" data-page="analysis">◈ &nbsp; Analysis</button><button class="ux-nav" data-page="queues">☷ &nbsp; Queues Analysis</button><button class="ux-nav" data-page="gm_report">📊 &nbsp; GM Report</button><button class="ux-nav" data-page="shift_comparison">⚖️ &nbsp; Shift Comparison</button><button class="ux-nav" data-page="performance">▤ &nbsp; Performance per Labelers</button><button class="ux-nav" data-page="qtcfloor">🏢 &nbsp; Performance per QTC & Floor</button><button class="ux-nav" data-page="daily">▦ &nbsp; Daily Report</button><footer>Connected to your existing data<br><span style="display:block;margin-top:8px">MEEG · Internal Dashboard</span></footer>';
+const aside=document.createElement('aside');aside.className='ux-sidebar';aside.setAttribute('aria-label','Main navigation');aside.innerHTML='<div class="ux-brand"><div class="brand-logo-card"><img src="logo.jpg" alt="MEEG - Micro Engineering Egypt" class="brand-img"></div><span class="brand-workspace-tag">PRODUCTIVITY WORKSPACE</span></div><small>WORKSPACE</small><button class="ux-nav active" data-page="dashboard">▦ &nbsp; Overview</button><button class="ux-nav" data-page="analysis">◈ &nbsp; Analysis</button><button class="ux-nav" data-page="queues">☷ &nbsp; Queues Analysis</button><button class="ux-nav" data-page="gm_report">📊 &nbsp; GM Report</button><button class="ux-nav" data-page="shift_comparison">⚖️ &nbsp; Shift Comparison</button><button class="ux-nav" data-page="performance">▤ &nbsp; Performance per Labelers</button><button class="ux-nav" data-page="qtcfloor">🏢 &nbsp; Performance per QTC & Floor</button><button class="ux-nav" data-page="daily">▦ &nbsp; Daily Report</button><button class="ux-nav" data-page="advanced_insights">🔮 &nbsp; Advanced Insights</button><footer>Connected to your existing data<br><span style="display:block;margin-top:8px">MEEG · Internal Dashboard</span></footer>';
 if (isUnified) {
   aside.style.display = 'none';
 }
@@ -649,6 +656,7 @@ function resolveAnalyticsPageKey(target) {
   if (['performance-labelers', 'performance_labelers', 'performance'].includes(clean)) return 'performance';
   if (['performance-qtc-floor', 'performance_qtc_floor', 'qtcfloor', 'qtc_floor'].includes(clean)) return 'qtcfloor';
   if (['daily-report', 'daily_report', 'daily'].includes(clean)) return 'daily';
+  if (['advanced-insights', 'advanced_insights', 'insights', 'analytics-insights'].includes(clean)) return 'advanced_insights';
   return 'dashboard';
 }
 
@@ -662,7 +670,8 @@ function route(forcedTarget){
     'shift_comparison': '#shift-comparison',
     'performance': '#performance-labelers',
     'qtcfloor': '#performance-qtc-floor',
-    'daily': '#daily-report'
+    'daily': '#daily-report',
+    'advanced_insights': '#advanced-insights'
   };
 
   const expectedHash = targetHashMap[current] || '#dashboard';
@@ -702,6 +711,11 @@ function route(forcedTarget){
   dailyPage.hidden = (current !== 'daily');
   dailyPage.style.display = (current === 'daily') ? 'block' : 'none';
 
+  if (typeof advancedInsightsPage !== 'undefined' && advancedInsightsPage) {
+    advancedInsightsPage.hidden = (current !== 'advanced_insights');
+    advancedInsightsPage.style.display = (current === 'advanced_insights') ? 'block' : 'none';
+  }
+
   document.querySelectorAll('#shiftBanner, #fstrip, .pills-row, #locTabs, #mainContent, #cmpBar').forEach(el => {
     el.style.setProperty('display', 'none', 'important');
   });
@@ -721,6 +735,7 @@ function route(forcedTarget){
   else if(current==='performance'&&typeof renderPerformance==='function')renderPerformance();
   else if(current==='qtcfloor'&&typeof renderQtcFloorPerformance==='function')renderQtcFloorPerformance();
   else if(current==='daily'&&typeof renderDailyReport==='function')renderDailyReport();
+  else if(current==='advanced_insights'&&typeof renderAdvancedInsights==='function')renderAdvancedInsights();
   else if(typeof renderOverview==='function')renderOverview();
 
   if(!window.rawRows || !window.rawRows.length){
@@ -734,7 +749,7 @@ window.switchAnalyticsWorkspace = function(hashOrKey) {
   route(hashOrKey);
 };
 
-aside.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>{location.hash=b.dataset.page==='analysis'?'analysis-overview':b.dataset.page==='queues'?'queues-analysis':b.dataset.page==='gm_report'?'gm-report':b.dataset.page==='shift_comparison'?'shift-comparison':b.dataset.page==='performance'?'performance-labelers':b.dataset.page==='qtcfloor'?'performance-qtc-floor':b.dataset.page==='daily'?'daily-report':'dashboard';});
+aside.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>{location.hash=b.dataset.page==='analysis'?'analysis-overview':b.dataset.page==='queues'?'queues-analysis':b.dataset.page==='gm_report'?'gm-report':b.dataset.page==='shift_comparison'?'shift-comparison':b.dataset.page==='performance'?'performance-labelers':b.dataset.page==='qtcfloor'?'performance-qtc-floor':b.dataset.page==='daily'?'daily-report':b.dataset.page==='advanced_insights'?'advanced-insights':'dashboard';});
 const uxBackEl = $('uxBack'); if (uxBackEl) uxBackEl.onclick = () => { if (typeof switchTab === 'function') switchTab('overview'); else location.hash = 'dashboard'; };
 $('uxSideRefresh')?.addEventListener('click',()=>loadData());$('uxSideTheme')?.addEventListener('click',()=>toggleDark());window.addEventListener('hashchange',route);
 
@@ -6777,6 +6792,12 @@ function exportFloorPerformanceCSV(groups){
  showToast('✓ Floor performance CSV exported successfully!');
 }
 
+let _qfActiveView = 'all';
+window._setQfActiveView = function(view) {
+  _qfActiveView = view;
+  renderQtcFloorPerformance();
+};
+
 function renderQtcFloorPerformance(){
   const page = $('uxQtcFloor');
   if(!page || page.hidden) return;
@@ -6870,6 +6891,10 @@ function renderQtcFloorPerformance(){
     });
   });
 
+  // Helper sort icon indicator
+  const qfIcon = col => qtcFloorFilters.sortCol === col ? (qtcFloorFilters.sortAsc ? ' <span class="table-sort-icon active">▲</span>' : ' <span class="table-sort-icon active">▼</span>') : ' <span class="table-sort-icon">↕</span>';
+  const flIcon = col => floorPerformanceFilters.sortCol === col ? (floorPerformanceFilters.sortAsc ? ' <span class="table-sort-icon active">▲</span>' : ' <span class="table-sort-icon active">▼</span>') : ' <span class="table-sort-icon">↕</span>';
+
   // 8 Main KPI Cards (Including Total Objects)
   const kpiDefs = [
     { title: 'Total Submissions', val: totalSubmissions.toLocaleString(), sub: 'In current view', tone: '#0d9488' },
@@ -6896,15 +6921,23 @@ function renderQtcFloorPerformance(){
 
     // 8 Main KPI Cards Grid
     + '<div class="ux-grid-8">'
-      + kpiDefs.map(k => '<div class="kpi-mini-card" style="--tone:' + k.tone + '">'
+      + kpiDefs.map((k, idx) => '<div class="kpi-mini-card qf-kpi-card" data-kpi-idx="' + idx + '" style="--tone:' + k.tone + '; cursor:help;">'
         + '<div class="kpi-title"><span>' + esc(k.title) + '</span><span style="color:' + k.tone + '">●</span></div>'
         + '<div class="kpi-val">' + k.val + '</div>'
         + '<div class="kpi-sub">' + esc(k.sub) + '</div>'
       + '</div>').join('')
     + '</div>'
 
+    // Segmented View Toggle Buttons
+    + '<div class="dash-tabs-bar" style="margin-top:18px; margin-bottom:12px; border-bottom:1px solid var(--border); padding-bottom:8px;">'
+      + '<button class="dash-tab-btn ' + (_qfActiveView==='all'?'active':'') + '" onclick="window._setQfActiveView(\'all\')">📑 All Views</button>'
+      + '<button class="dash-tab-btn ' + (_qfActiveView==='teams'?'active':'') + '" onclick="window._setQfActiveView(\'teams\')">👥 Table 1: QTC × Floor Teams (' + allQTCFloorGroups.length + ')</button>'
+      + '<button class="dash-tab-btn ' + (_qfActiveView==='floors'?'active':'') + '" onclick="window._setQfActiveView(\'floors\')">🏢 Table 2: Facility Units (' + allFloorGroups.length + ')</button>'
+      + '<button class="dash-tab-btn ' + (_qfActiveView==='heatmap'?'active':'') + '" onclick="window._setQfActiveView(\'heatmap\')">🔥 Facility Heatmap Matrix</button>'
+    + '</div>'
+
     // Controls & Filter Bar
-    + '<div class="queues-controls" style="margin-top:16px;">'
+    + '<div class="queues-controls" style="margin-top:8px;">'
       + '<label>Search QTC / Unit / Shift<input id="qfSearch" placeholder="Type QTC name, unit, shift…" value="' + esc(qtcFloorFilters.query || '') + '"></label>'
       + '<label>Select QTC<select id="qfSelectQtc"><option value="">All QTC Supervisors (' + distinctQtcs.length + ')</option>' + distinctQtcs.map(q => '<option value="' + esc(q) + '" ' + (qtcFloorFilters.qtc===q?'selected':'') + '>' + esc(q) + '</option>').join('') + '</select></label>'
       + '<label>Select Floor / Unit<select id="qfSelectFloor"><option value="">All Floors (' + distinctFloors.length + ')</option>' + distinctFloors.map(f => '<option value="' + esc(f) + '" ' + (qtcFloorFilters.floor===f?'selected':'') + '>Unit ' + esc(f) + '</option>').join('') + '</select></label>'
@@ -6916,25 +6949,25 @@ function renderQtcFloorPerformance(){
     + '</div>'
 
     // HEATMAP: Floor (Unit) x Shift Matrix
-    + '<div class="ux-panel" style="margin-top:20px;">'
+    + '<div class="ux-panel qf-sec-heatmap" style="margin-top:20px; display:' + (_qfActiveView==='all'||_qfActiveView==='heatmap'?'block':'none') + ';">'
       + '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">'
         + '<h3 style="margin:0;">🔥 Facility Heatmap: Floor / Unit × Shift</h3>'
-        + '<span class="ux-note">Color intensity represents submission throughput volume</span>'
+        + '<span class="ux-note">Click any cell or unit to instantly filter the tables</span>'
       + '</div>'
       + '<div style="overflow-x:auto;">'
         + '<table style="width:100%; border-collapse:collapse; font-size:12px; text-align:center;">'
-          + '<thead><tr style="background:var(--bg-2); border-bottom:1px solid var(--border);"><th style="padding:10px 14px; text-align:left;">Floor / Unit</th>' + distinctShifts.map(sh => '<th style="padding:10px 14px;">' + esc(sh) + '</th>').join('') + '<th style="padding:10px 14px; font-weight:700;">Unit Total</th></tr></thead>'
+          + '<thead><tr style="background:var(--bg-2); border-bottom:1px solid var(--border);"><th style="padding:10px 14px; text-align:left;">Floor / Unit</th>' + distinctShifts.map(sh => '<th class="qf-heat-shift-hdr" data-shift="' + esc(sh) + '" style="padding:10px 14px; cursor:pointer;" title="Click to filter by ' + esc(sh) + ' shift">' + esc(sh) + ' ↕</th>').join('') + '<th style="padding:10px 14px; font-weight:700;">Unit Total</th></tr></thead>'
           + '<tbody>'
             + distinctFloors.map(fl => {
               let rowTot = 0;
               return '<tr style="border-bottom:1px solid var(--border);">'
-                + '<td style="padding:10px 14px; text-align:left; font-weight:700; color:var(--accent);">🏢 Unit ' + esc(fl) + '</td>'
+                + '<td class="qf-heat-unit-hdr" data-floor="' + esc(fl) + '" style="padding:10px 14px; text-align:left; font-weight:700; color:var(--accent); cursor:pointer;" title="Click to filter by Unit ' + esc(fl) + '">🏢 Unit ' + esc(fl) + '</td>'
                 + distinctShifts.map(sh => {
                   const val = heatmapData[fl][sh] || 0;
                   rowTot += val;
                   const ratio = maxHeat > 0 ? (val / maxHeat) : 0;
                   const bg = val > 0 ? 'rgba(13,148,136,' + Math.max(0.12, ratio * 0.75).toFixed(2) + ')' : 'transparent';
-                  return '<td style="padding:10px 14px; background:' + bg + '; font-weight:' + (val > 0 ? '700' : '400') + '; color:var(--text);">' + val.toLocaleString() + '</td>';
+                  return '<td class="qf-heat-cell" data-floor="' + esc(fl) + '" data-shift="' + esc(sh) + '" style="padding:10px 14px; background:' + bg + '; font-weight:' + (val > 0 ? '700' : '400') + '; color:var(--text); cursor:pointer;" title="Click to filter by Unit ' + esc(fl) + ' - ' + esc(sh) + ' shift">' + val.toLocaleString() + '</td>';
                 }).join('')
                 + '<td style="padding:10px 14px; font-weight:800; color:var(--primary); font-size:13px;">' + rowTot.toLocaleString() + '</td>'
               + '</tr>';
@@ -6945,30 +6978,30 @@ function renderQtcFloorPerformance(){
     + '</div>'
 
     // TABLE 1: QTC × Unit Performance Table (Section 7.2)
-    + '<section class="ux-panel" style="margin-top:20px;">'
+    + '<section class="ux-panel qf-sec-teams" style="margin-top:20px; display:' + (_qfActiveView==='all'||_qfActiveView==='teams'?'block':'none') + ';">'
       + '<div class="ux-heading" style="margin-bottom:12px;">'
-        + '<div><h3>Table 1: QTC × Floor Performance Table (' + allQTCFloorGroups.length + ' combinations)</h3><p>Composite groups: each row represents an actual QTC + Unit assignment. Never combines different Units.</p></div>'
+        + '<div><h3>Table 1: QTC × Floor Performance Table (' + allQTCFloorGroups.length + ' combinations)</h3><p>Composite groups: each row represents an actual QTC + Unit assignment. Click any column header to sort.</p></div>'
         + '<span class="ux-note">Showing ' + (qfVisible.length ? (qtcFloorFilters.page*qfPageSize+1) : 0) + ' – ' + Math.min((qtcFloorFilters.page+1)*qfPageSize, allQTCFloorGroups.length) + ' of ' + allQTCFloorGroups.length + ' records</span>'
       + '</div>'
       + '<div class="perf-table">'
         + '<table>'
           + '<thead><tr>'
-            + '<th data-sort="qtc">QTC Supervisor ↕</th>'
-            + '<th data-sort="floor">Floor / Unit ↕</th>'
+            + '<th data-sort="qtc">QTC Supervisor' + qfIcon('qtc') + '</th>'
+            + '<th data-sort="floor">Floor / Unit' + qfIcon('floor') + '</th>'
             + '<th>Active Shifts</th>'
-            + '<th data-sort="lidarFP" style="color:#0d9488;">Lidar FP ↕</th>'
-            + '<th data-sort="lidarQA" style="color:#14b8a6;">Lidar QA ↕</th>'
-            + '<th data-sort="laneFP" style="color:#ed9a35;">Lane FP ↕</th>'
-            + '<th data-sort="laneQA" style="color:#ec4899;">Lane QA ↕</th>'
-            + '<th data-sort="totalSubmit" style="color:var(--primary);">Total Submit ↕</th>'
-            + '<th data-sort="totalObjects" style="color:#0284c7;">Total Objects ↕</th>'
-            + '<th data-sort="uniqueLabelers">Team (Labelers) ↕</th>'
-            + '<th data-sort="avgSubmit">Avg / Labeler ↕</th>'
+            + '<th data-sort="lidarFP" style="color:#0d9488;">Lidar FP' + qfIcon('lidarFP') + '</th>'
+            + '<th data-sort="lidarQA" style="color:#14b8a6;">Lidar QA' + qfIcon('lidarQA') + '</th>'
+            + '<th data-sort="laneFP" style="color:#ed9a35;">Lane FP' + qfIcon('laneFP') + '</th>'
+            + '<th data-sort="laneQA" style="color:#ec4899;">Lane QA' + qfIcon('laneQA') + '</th>'
+            + '<th data-sort="totalSubmit" style="color:var(--primary); font-weight:800;">Total Submit' + qfIcon('totalSubmit') + '</th>'
+            + '<th data-sort="totalObjects" style="color:#0284c7;">Total Objects' + qfIcon('totalObjects') + '</th>'
+            + '<th data-sort="uniqueLabelers">Team (Labelers)' + qfIcon('uniqueLabelers') + '</th>'
+            + '<th data-sort="avgSubmit">Avg / Labeler' + qfIcon('avgSubmit') + '</th>'
             + '<th>Queues Covered</th>'
           + '</tr></thead>'
           + '<tbody>'
-            + qfVisible.map(item => `
-              <tr style="border-bottom:1px solid var(--border);" onmouseover="this.style.background='var(--accent-light)'" onmouseout="this.style.background='transparent'">
+            + qfVisible.map((item, rowIdx) => `
+              <tr class="qf-row-item" data-qtc="${esc(item.qtc)}" data-floor="${esc(item.floor)}" style="border-bottom:1px solid var(--border); cursor:pointer;" onmouseover="this.style.background='var(--accent-light)'" onmouseout="this.style.background='transparent'">
                 <td style="padding:9px 12px; font-weight:700; color:var(--primary);">👤 ${esc(item.qtc)}</td>
                 <td style="padding:9px 12px; font-weight:600; color:var(--accent);">🏢 Unit ${esc(item.floor)}</td>
                 <td style="padding:9px 12px;"><span class="ux-note">${esc(item.shifts.join(', ') || '—')}</span></td>
@@ -6995,27 +7028,27 @@ function renderQtcFloorPerformance(){
     + '</section>'
 
     // TABLE 2: Floor Performance Table (Section 7.3)
-    + '<section class="ux-panel" style="margin-top:20px;">'
+    + '<section class="ux-panel qf-sec-floors" style="margin-top:20px; display:' + (_qfActiveView==='all'||_qfActiveView==='floors'?'block':'none') + ';">'
       + '<div class="ux-heading" style="margin-bottom:12px;">'
-        + '<div><h3>Table 2: Floor (= Unit) Performance Table (' + allFloorGroups.length + ' Units)</h3><p>Overall operational throughput per facility unit (Floor = Unit).</p></div>'
+        + '<div><h3>Table 2: Floor (= Unit) Performance Table (' + allFloorGroups.length + ' Units)</h3><p>Overall operational throughput per facility unit (Floor = Unit). Click any column header to sort.</p></div>'
         + '<button class="btn btn-c" id="floorExportCSV" style="font-size:11px; padding:5px 12px;">↓ Export Floor CSV</button>'
       + '</div>'
       + '<div class="perf-table">'
         + '<table>'
           + '<thead><tr>'
-            + '<th data-sort="floor">Floor / Unit ↕</th>'
+            + '<th data-sort="floor">Floor / Unit' + flIcon('floor') + '</th>'
             + '<th>Active Shifts</th>'
-            + '<th data-sort="uniqueQtcs">Unique QTCs ↕</th>'
-            + '<th data-sort="uniqueLabelers">Unique Labelers ↕</th>'
-            + '<th data-sort="lidarFP" style="color:#0d9488;">Lidar FP</th>'
-            + '<th data-sort="lidarQA" style="color:#14b8a6;">Lidar QA</th>'
-            + '<th data-sort="laneFP" style="color:#ed9a35;">Lane FP</th>'
-            + '<th data-sort="laneQA" style="color:#ec4899;">Lane QA</th>'
-            + '<th data-sort="totalFP">Total FP</th>'
-            + '<th data-sort="totalQA">Total QA</th>'
-            + '<th data-sort="totalSubmit" style="color:var(--primary); font-weight:800;">Total Submits ↕</th>'
-            + '<th data-sort="totalObjects" style="color:#0284c7;">Total Objects</th>'
-            + '<th data-sort="avgSubmit">Avg / Labeler</th>'
+            + '<th data-sort="uniqueQtcs">Unique QTCs' + flIcon('uniqueQtcs') + '</th>'
+            + '<th data-sort="uniqueLabelers">Unique Labelers' + flIcon('uniqueLabelers') + '</th>'
+            + '<th data-sort="lidarFP" style="color:#0d9488;">Lidar FP' + flIcon('lidarFP') + '</th>'
+            + '<th data-sort="lidarQA" style="color:#14b8a6;">Lidar QA' + flIcon('lidarQA') + '</th>'
+            + '<th data-sort="laneFP" style="color:#ed9a35;">Lane FP' + flIcon('laneFP') + '</th>'
+            + '<th data-sort="laneQA" style="color:#ec4899;">Lane QA' + flIcon('laneQA') + '</th>'
+            + '<th data-sort="totalFP">Total FP' + flIcon('totalFP') + '</th>'
+            + '<th data-sort="totalQA">Total QA' + flIcon('totalQA') + '</th>'
+            + '<th data-sort="totalSubmit" style="color:var(--primary); font-weight:800;">Total Submits' + flIcon('totalSubmit') + '</th>'
+            + '<th data-sort="totalObjects" style="color:#0284c7;">Total Objects' + flIcon('totalObjects') + '</th>'
+            + '<th data-sort="avgSubmit">Avg / Labeler' + flIcon('avgSubmit') + '</th>'
             + '<th>Unit Share %</th>'
           + '</tr></thead>'
           + '<tbody>'
@@ -7053,6 +7086,91 @@ function renderQtcFloorPerformance(){
   bindHeaderControls(page, 'qf');
   bindUniversalFilterBar(page, 'qtcfloor');
 
+  // Sorting Table 1 click listeners
+  const perfTables = page.querySelectorAll('.perf-table');
+  const tbl1 = perfTables[0];
+  if (tbl1) {
+    tbl1.querySelectorAll('th[data-sort]').forEach(th => {
+      th.style.cursor = 'pointer';
+      th.onclick = () => {
+        const s = th.dataset.sort;
+        if (qtcFloorFilters.sortCol === s) { qtcFloorFilters.sortAsc = !qtcFloorFilters.sortAsc; }
+        else { qtcFloorFilters.sortCol = s; qtcFloorFilters.sortAsc = false; }
+        qtcFloorFilters.page = 0;
+        renderQtcFloorPerformance();
+      };
+    });
+  }
+
+  // Sorting Table 2 click listeners
+  const tbl2 = perfTables[1];
+  if (tbl2) {
+    tbl2.querySelectorAll('th[data-sort]').forEach(th => {
+      th.style.cursor = 'pointer';
+      th.onclick = () => {
+        const s = th.dataset.sort;
+        if (floorPerformanceFilters.sortCol === s) { floorPerformanceFilters.sortAsc = !floorPerformanceFilters.sortAsc; }
+        else { floorPerformanceFilters.sortCol = s; floorPerformanceFilters.sortAsc = false; }
+        renderQtcFloorPerformance();
+      };
+    });
+  }
+
+  // Heatmap interactive clicks & tooltips
+  page.querySelectorAll('.qf-heat-cell').forEach(cell => {
+    cell.onclick = () => {
+      const fl = cell.dataset.floor;
+      const sh = cell.dataset.shift;
+      if (fl) qtcFloorFilters.floor = fl;
+      if (sh) qtcFloorFilters.shift = sh;
+      qtcFloorFilters.page = 0;
+      renderQtcFloorPerformance();
+    };
+    MeegTooltip.attach(cell, () => ({
+      title: 'Unit ' + cell.dataset.floor + ' · ' + cell.dataset.shift,
+      badge: 'Heatmap Cell',
+      desc: 'Facility Shift Throughput',
+      rows: [
+        { label: 'Unit', value: 'Unit ' + cell.dataset.floor, color: 'var(--accent)' },
+        { label: 'Shift', value: cell.dataset.shift, color: 'var(--primary)' },
+        { label: 'Submissions', value: cell.textContent.trim(), color: '#10b981' }
+      ]
+    }));
+  });
+
+  page.querySelectorAll('.qf-heat-unit-hdr').forEach(el => {
+    el.onclick = () => {
+      const fl = el.dataset.floor;
+      if (fl) qtcFloorFilters.floor = (qtcFloorFilters.floor === fl ? '' : fl);
+      qtcFloorFilters.page = 0;
+      renderQtcFloorPerformance();
+    };
+  });
+
+  page.querySelectorAll('.qf-heat-shift-hdr').forEach(el => {
+    el.onclick = () => {
+      const sh = el.dataset.shift;
+      if (sh) qtcFloorFilters.shift = (qtcFloorFilters.shift === sh ? '' : sh);
+      qtcFloorFilters.page = 0;
+      renderQtcFloorPerformance();
+    };
+  });
+
+  // KPI card tooltips
+  page.querySelectorAll('.qf-kpi-card').forEach((card, idx) => {
+    const k = kpiDefs[idx];
+    if (k) {
+      MeegTooltip.attach(card, () => ({
+        title: k.title,
+        badge: 'Diagnostic KPI',
+        desc: k.sub,
+        rows: [
+          { label: 'Current Value', value: k.val, color: k.tone }
+        ]
+      }));
+    }
+  });
+
   // Event handlers
   const qfSearch = $('qfSearch');
   if(qfSearch) qfSearch.oninput = e => { qtcFloorFilters.query = e.target.value; qtcFloorFilters.page = 0; renderQtcFloorPerformance(); };
@@ -7084,6 +7202,410 @@ function renderQtcFloorPerformance(){
   if(flExp) flExp.onclick = () => exportFloorPerformanceCSV(allFloorGroups);
 }
 
+// ============================================================
+// PAGE: ADVANCED INSIGHTS (Additive Analytical Workspace)
+// ============================================================
+const advancedInsightsFilters = { query: '', sortCol: 'total', sortAsc: false, page: 0, pageSize: 20 };
+
+function renderAdvancedInsights() {
+  const page = $('uxAdvancedInsights');
+  if (!page || page.hidden) return;
+
+  const baseRows = rowsInView();
+  const idx = name => hdrs.findIndex(h => h.trim().toLowerCase() === name.toLowerCase());
+  const qi = idx('queue name');
+  const li = idx('labeler name');
+  const qtc_i = idx('qtc name');
+  const fi = hdrs.findIndex(h => ['floor', 'unit'].includes(h.trim().toLowerCase()));
+  const si = idx('shift');
+  const mi = idx('modality');
+  const pi = idx('pass');
+  const oi = idx('object count');
+
+  // 1. Time Series & Period-over-Period Partitioning
+  const dateMap = new Map();
+  baseRows.forEach(r => {
+    const d = rDate(r);
+    if (d) {
+      if (!dateMap.has(d)) dateMap.set(d, []);
+      dateMap.get(d).push(r);
+    }
+  });
+
+  const sortedDates = [...dateMap.keys()].sort();
+  let p1Rows = [], p2Rows = [];
+  let p1Label = 'Prior Period', p2Label = 'Recent Period';
+
+  if (sortedDates.length >= 2) {
+    const mid = Math.ceil(sortedDates.length / 2);
+    const p1Dates = new Set(sortedDates.slice(0, mid));
+    const p2Dates = new Set(sortedDates.slice(mid));
+    p1Rows = baseRows.filter(r => p1Dates.has(rDate(r)));
+    p2Rows = baseRows.filter(r => p2Dates.has(rDate(r)));
+    p1Label = sortedDates[0] + ' → ' + sortedDates[mid - 1];
+    p2Label = sortedDates[mid] + ' → ' + sortedDates[sortedDates.length - 1];
+  } else {
+    // If single date or no date, partition records chronologically into two halves
+    const half = Math.ceil(baseRows.length / 2);
+    p1Rows = baseRows.slice(0, half);
+    p2Rows = baseRows.slice(half);
+  }
+
+  const p1Count = p1Rows.length;
+  const p2Count = p2Rows.length;
+  const countDelta = p1Count > 0 ? (((p2Count - p1Count) / p1Count) * 100) : 0;
+  const countDeltaStr = (countDelta >= 0 ? '+' : '') + countDelta.toFixed(1) + '%';
+
+  const p1Obj = p1Rows.reduce((acc, r) => acc + (parseFloat(oi >= 0 ? r[oi] : 0) || 0), 0);
+  const p2Obj = p2Rows.reduce((acc, r) => acc + (parseFloat(oi >= 0 ? r[oi] : 0) || 0), 0);
+  const objDelta = p1Obj > 0 ? (((p2Obj - p1Obj) / p1Obj) * 100) : 0;
+  const objDeltaStr = (objDelta >= 0 ? '+' : '') + objDelta.toFixed(1) + '%';
+
+  const p1Qa = p1Rows.filter(r => pi >= 0 && String(r[pi]||'').toUpperCase().includes('QA')).length;
+  const p2Qa = p2Rows.filter(r => pi >= 0 && String(r[pi]||'').toUpperCase().includes('QA')).length;
+  const p1QaRate = p1Count > 0 ? (p1Qa / p1Count * 100) : 0;
+  const p2QaRate = p2Count > 0 ? (p2Qa / p2Count * 100) : 0;
+  const qaRateDelta = (p2QaRate - p1QaRate).toFixed(1);
+
+  // 2. QTC Supervisory Workload Gini & Balance Index
+  const qtcMap = new Map();
+  baseRows.forEach(r => {
+    const qtc = qtc_i >= 0 ? String(r[qtc_i] || '').normalize('NFC').trim().replace(/\s+/gu, ' ') : 'Unknown';
+    if (!qtc) return;
+    if (!qtcMap.has(qtc)) qtcMap.set(qtc, { qtc, count: 0, objects: 0, labelers: new Set() });
+    const item = qtcMap.get(qtc);
+    item.count++;
+    item.objects += (parseFloat(oi >= 0 ? r[oi] : 0) || 0);
+    const lab = li >= 0 ? String(r[li] || '').trim() : '';
+    if (lab) item.labelers.add(lab);
+  });
+
+  const qtcList = [...qtcMap.values()].map(item => ({
+    qtc: item.qtc,
+    count: item.count,
+    objects: item.objects,
+    labelerCount: item.labelers.size,
+    avgPerLabeler: item.labelers.size > 0 ? (item.count / item.labelers.size).toFixed(1) : '0'
+  })).sort((a,b) => b.count - a.count);
+
+  // Compute Workload Balance Index
+  let balanceScore = 100;
+  let balanceStatus = 'Optimal Balance across Teams';
+  let balanceTone = '#10b981';
+  if (qtcList.length >= 2) {
+    const counts = qtcList.map(q => q.count);
+    const mean = counts.reduce((a, b) => a + b, 0) / counts.length;
+    const variance = counts.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / counts.length;
+    const stdDev = Math.sqrt(variance);
+    const cv = mean > 0 ? (stdDev / mean) : 0;
+    balanceScore = Math.max(10, Math.min(100, Math.round((1 - Math.min(cv, 1)) * 100)));
+    if (cv < 0.30) {
+      balanceStatus = 'Balanced supervisory workload distribution';
+      balanceTone = '#10b981';
+    } else if (cv <= 0.60) {
+      balanceStatus = 'Moderate supervisory load disparity';
+      balanceTone = '#f59e0b';
+    } else {
+      balanceStatus = 'High workload disparity detected across QTC supervisors';
+      balanceTone = '#ef4444';
+    }
+  }
+
+  // 3. Labeler Productivity Stability & Consistency Profiling
+  const labelerDailyMap = new Map();
+  baseRows.forEach(r => {
+    const lab = li >= 0 ? String(r[li] || '').trim() : '';
+    const d = rDate(r) || 'all';
+    if (!lab) return;
+    if (!labelerDailyMap.has(lab)) labelerDailyMap.set(lab, { name: lab, total: 0, totalObjects: 0, days: new Map() });
+    const rec = labelerDailyMap.get(lab);
+    rec.total++;
+    rec.totalObjects += (parseFloat(oi >= 0 ? r[oi] : 0) || 0);
+    rec.days.set(d, (rec.days.get(d) || 0) + 1);
+  });
+
+  const labelerProfiles = [...labelerDailyMap.values()].map(rec => {
+    const dailyCounts = [...rec.days.values()];
+    const activeDays = dailyCounts.length;
+    const mean = activeDays > 0 ? (rec.total / activeDays) : 0;
+    const variance = activeDays > 1 ? (dailyCounts.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / activeDays) : 0;
+    const std = Math.sqrt(variance);
+    const consistencyScore = Math.max(10, Math.min(100, Math.round(100 - (std / Math.max(1, mean) * 45))));
+
+    let tier = '🎯 Steady Performer';
+    let tierColor = '#0284c7';
+    if (rec.total >= 15 && consistencyScore >= 70) {
+      tier = '🌟 Core Consistent Driver';
+      tierColor = '#10b981';
+    } else if (rec.total >= 15 && consistencyScore < 70) {
+      tier = '⚡ High-Velocity Sprinter';
+      tierColor = '#f59e0b';
+    } else if (rec.total < 5) {
+      tier = '🌱 Emerging / Support';
+      tierColor = '#64748b';
+    }
+
+    return {
+      name: rec.name,
+      total: rec.total,
+      totalObjects: rec.totalObjects,
+      activeDays,
+      avgPerDay: mean.toFixed(1),
+      stabilityScore: consistencyScore,
+      tier,
+      tierColor
+    };
+  });
+
+  const highConsistencyCount = labelerProfiles.filter(p => p.stabilityScore >= 70).length;
+  const highConsistencyPct = labelerProfiles.length > 0 ? ((highConsistencyCount / labelerProfiles.length) * 100).toFixed(1) : '0';
+
+  // 4. Facility Unit × Modality Density Matrix
+  const distinctUnits = [...new Set(baseRows.map(r => fi >= 0 ? deriveFloor(r[fi]) : '').filter(Boolean))].sort();
+  const modalityCategories = [
+    { key: 'lidarFP', label: 'Lidar FP', match: r => isModPass(r, 'lidar', 'FP') },
+    { key: 'lidarQA', label: 'Lidar QA', match: r => isModPass(r, 'lidar', 'QA') },
+    { key: 'laneFP', label: 'Lane Line FP', match: r => isModPass(r, 'laneline', 'FP') },
+    { key: 'laneQA', label: 'Lane Line QA', match: r => isModPass(r, 'laneline', 'QA') },
+    { key: 'relabelFP', label: 'Relabeling FP', match: r => isModPass(r, 'relabeling', 'FP') }
+  ];
+
+  const unitModalityMatrix = {};
+  let maxCellCount = 1;
+  distinctUnits.forEach(u => {
+    unitModalityMatrix[u] = {};
+    modalityCategories.forEach(mc => {
+      const c = baseRows.filter(r => (fi >= 0 && deriveFloor(r[fi]) === u) && mc.match(r)).length;
+      unitModalityMatrix[u][mc.key] = c;
+      if (c > maxCellCount) maxCellCount = c;
+    });
+  });
+
+  // Top 4 Momentum KPIs
+  const insightKPIs = [
+    { title: 'Period Output Momentum', val: countDeltaStr, sub: p2Label + ' vs ' + p1Label, tone: countDelta >= 0 ? '#10b981' : '#ef4444' },
+    { title: 'Object Velocity Delta', val: objDeltaStr, sub: 'Total annotated objects comparison', tone: objDelta >= 0 ? '#0284c7' : '#ef4444' },
+    { title: 'Workload Balance Score', val: balanceScore + '%', sub: balanceStatus, tone: balanceTone },
+    { title: 'Workforce Stability Rate', val: highConsistencyPct + '%', sub: highConsistencyCount + ' / ' + labelerProfiles.length + ' labelers at high consistency', tone: '#8b5cf6' }
+  ];
+
+  page.innerHTML = '<div class="ux-overview">'
+    + '<div class="ux-heading">'
+      + '<div>'
+        + '<div class="ux-eyebrow">Enterprise Intelligence &amp; Predictive Diagnostics</div>'
+        + '<h2>🔮 Advanced Operational Insights</h2>'
+        + '<p>Period-over-period momentum, supervisory workload distribution, labeler productivity stability, and facility modality concentration.</p>'
+      + '</div>'
+      + renderHeaderControlsHTML('adv')
+    + '</div>'
+
+    + renderUniversalFilterBar('advanced_insights')
+
+    // Top 4 Diagnostic Cards
+    + '<div class="ux-grid-4">'
+      + insightKPIs.map((k, idx) => '<div class="kpi-mini-card adv-kpi-card" data-idx="' + idx + '" style="--tone:' + k.tone + '; cursor:help;">'
+        + '<div class="kpi-title"><span>' + esc(k.title) + '</span><span style="color:' + k.tone + '">●</span></div>'
+        + '<div class="kpi-val" style="color:' + k.tone + ';">' + k.val + '</div>'
+        + '<div class="kpi-sub">' + esc(k.sub) + '</div>'
+      + '</div>').join('')
+    + '</div>'
+
+    // MODULE 1: Period-over-Period Performance Comparison (WoW / MoM)
+    + '<div class="ux-panel" style="margin-top:20px;">'
+      + '<div class="ux-heading" style="margin-bottom:14px;">'
+        + '<div>'
+          + '<h3 style="margin:0;">📅 Module 1: Period-over-Period Performance Comparison</h3>'
+          + '<p style="margin:4px 0 0;">Comparing performance between chronological partitions (' + esc(p1Label) + ' vs ' + esc(p2Label) + ').</p>'
+        + '</div>'
+      + '</div>'
+      + '<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:16px;">'
+        + '<div style="background:var(--bg-2); border:1px solid var(--border); border-radius:12px; padding:18px;">'
+          + '<div style="font-size:12px; font-weight:700; color:var(--text-secondary); text-transform:uppercase;">Submissions Volume Momentum</div>'
+          + '<div style="display:flex; justify-content:space-between; align-items:baseline; margin:10px 0;">'
+            + '<div><span style="font-size:24px; font-weight:800; color:var(--text);">' + p2Count.toLocaleString() + '</span><span style="font-size:11px; color:var(--text-secondary); margin-left:6px;">recent</span></div>'
+            + '<div style="font-size:13px; font-weight:700; color:' + (countDelta >= 0 ? '#10b981' : '#ef4444') + '; background:' + (countDelta >= 0 ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)') + '; padding:3px 8px; border-radius:12px;">' + countDeltaStr + '</div>'
+          + '</div>'
+          + '<div style="font-size:11px; color:var(--text-secondary);">Prior period: ' + p1Count.toLocaleString() + ' tasks</div>'
+        + '</div>'
+
+        + '<div style="background:var(--bg-2); border:1px solid var(--border); border-radius:12px; padding:18px;">'
+          + '<div style="font-size:12px; font-weight:700; color:var(--text-secondary); text-transform:uppercase;">Object Annotations Momentum</div>'
+          + '<div style="display:flex; justify-content:space-between; align-items:baseline; margin:10px 0;">'
+            + '<div><span style="font-size:24px; font-weight:800; color:#0284c7;">' + p2Obj.toLocaleString() + '</span><span style="font-size:11px; color:var(--text-secondary); margin-left:6px;">objects</span></div>'
+            + '<div style="font-size:13px; font-weight:700; color:' + (objDelta >= 0 ? '#0284c7' : '#ef4444') + '; background:' + (objDelta >= 0 ? 'rgba(2,132,199,0.12)' : 'rgba(239,68,68,0.12)') + '; padding:3px 8px; border-radius:12px;">' + objDeltaStr + '</div>'
+          + '</div>'
+          + '<div style="font-size:11px; color:var(--text-secondary);">Prior period: ' + p1Obj.toLocaleString() + ' objects</div>'
+        + '</div>'
+
+        + '<div style="background:var(--bg-2); border:1px solid var(--border); border-radius:12px; padding:18px;">'
+          + '<div style="font-size:12px; font-weight:700; color:var(--text-secondary); text-transform:uppercase;">QA Verification Share</div>'
+          + '<div style="display:flex; justify-content:space-between; align-items:baseline; margin:10px 0;">'
+            + '<div><span style="font-size:24px; font-weight:800; color:#8b5cf6;">' + p2QaRate.toFixed(1) + '%</span><span style="font-size:11px; color:var(--text-secondary); margin-left:6px;">QA rate</span></div>'
+            + '<div style="font-size:13px; font-weight:700; color:#8b5cf6; background:rgba(139,92,246,0.12); padding:3px 8px; border-radius:12px;">' + (qaRateDelta >= 0 ? '+' : '') + qaRateDelta + '% pts</div>'
+          + '</div>'
+          + '<div style="font-size:11px; color:var(--text-secondary);">Prior period QA rate: ' + p1QaRate.toFixed(1) + '%</div>'
+        + '</div>'
+      + '</div>'
+    + '</div>'
+
+    // MODULE 2: QTC Supervisory Workload Distribution
+    + '<div class="ux-panel" style="margin-top:20px;">'
+      + '<div class="ux-heading" style="margin-bottom:14px;">'
+        + '<div>'
+          + '<h3 style="margin:0;">👥 Module 2: QTC Supervisory Workload Distribution (' + qtcList.length + ' Supervisors)</h3>'
+          + '<p style="margin:4px 0 0;">Output and team size distribution across QTC supervisors. Click any supervisor to filter the view.</p>'
+        + '</div>'
+        + '<div style="display:inline-flex; align-items:center; gap:8px; background:' + balanceTone + '18; color:' + balanceTone + '; padding:4px 12px; border-radius:20px; font-size:11px; font-weight:700;">● ' + esc(balanceStatus) + '</div>'
+      + '</div>'
+      + '<div style="display:grid; gap:10px;">'
+        + qtcList.slice(0, 10).map(q => {
+          const maxQ = qtcList[0] ? qtcList[0].count : 1;
+          const pct = Math.max(2, Math.round((q.count / maxQ) * 100));
+          return '<div class="adv-qtc-bar-row" data-qtc="' + esc(q.qtc) + '" style="display:flex; align-items:center; gap:14px; padding:8px 12px; border-radius:8px; background:var(--bg-2); cursor:pointer;" title="Click to filter by ' + esc(q.qtc) + '">'
+            + '<div style="width:160px; font-weight:700; color:var(--primary); font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">👤 ' + esc(q.qtc) + '</div>'
+            + '<div style="flex:1; height:8px; border-radius:4px; background:var(--border); overflow:hidden;">'
+              + '<div style="width:' + pct + '%; height:100%; background:linear-gradient(90deg, var(--primary) 0%, var(--accent) 100%);"></div>'
+            + '</div>'
+            + '<div style="width:70px; text-align:right; font-weight:800; font-size:12px; color:var(--text);">' + q.count.toLocaleString() + ' <span style="font-size:10px; font-weight:500; color:var(--text-secondary);">tasks</span></div>'
+            + '<div style="width:90px; text-align:right; font-size:11px; color:var(--text-secondary);">' + q.labelerCount + ' labelers</div>'
+            + '<div style="width:90px; text-align:right; font-size:11px; color:var(--primary); font-weight:600;">' + q.avgPerLabeler + ' avg/lab</div>'
+          + '</div>';
+        }).join('')
+      + '</div>'
+    + '</div>'
+
+    // MODULE 3: Labeler Productivity Consistency Matrix
+    + '<div class="ux-panel" style="margin-top:20px;">'
+      + '<div class="ux-heading" style="margin-bottom:14px;">'
+        + '<div>'
+          + '<h3 style="margin:0;">🎯 Module 3: Labeler Productivity Stability &amp; Consistency Profiling</h3>'
+          + '<p style="margin:4px 0 0;">Statistical stability scores evaluating daily output predictability and reliable contributors.</p>'
+        + '</div>'
+      + '</div>'
+      + '<div class="perf-table">'
+        + '<table>'
+          + '<thead><tr>'
+            + '<th>Labeler Name</th>'
+            + '<th>Performance Classification</th>'
+            + '<th style="text-align:center;">Stability Score</th>'
+            + '<th style="text-align:center;">Total Submits</th>'
+            + '<th style="text-align:center;">Total Objects</th>'
+            + '<th style="text-align:center;">Active Days</th>'
+            + '<th style="text-align:center;">Daily Velocity</th>'
+            + '<th>Action</th>'
+          + '</tr></thead>'
+          + '<tbody>'
+            + labelerProfiles.slice(0, 15).map(lp => `
+              <tr style="border-bottom:1px solid var(--border);" onmouseover="this.style.background='var(--accent-light)'" onmouseout="this.style.background='transparent'">
+                <td style="padding:10px 14px; font-weight:700; color:var(--text);">👤 ${esc(lp.name)}</td>
+                <td style="padding:10px 14px;"><span style="display:inline-block; font-size:11px; font-weight:700; padding:3px 10px; border-radius:12px; background:${lp.tierColor}18; color:${lp.tierColor};">● ${lp.tier}</span></td>
+                <td style="padding:10px 14px; text-align:center;">
+                  <div style="display:inline-flex; align-items:center; gap:6px;">
+                    <div style="width:40px; height:5px; border-radius:3px; background:var(--border); overflow:hidden;">
+                      <div style="width:${lp.stabilityScore}%; height:100%; background:${lp.stabilityScore >= 70 ? '#10b981' : '#f59e0b'};"></div>
+                    </div>
+                    <b>${lp.stabilityScore}%</b>
+                  </div>
+                </td>
+                <td style="padding:10px 14px; text-align:center; font-weight:800; color:var(--primary);">${lp.total.toLocaleString()}</td>
+                <td style="padding:10px 14px; text-align:center; font-weight:700; color:#0284c7;">${lp.totalObjects.toLocaleString()}</td>
+                <td style="padding:10px 14px; text-align:center; color:var(--text-secondary);">${lp.activeDays} days</td>
+                <td style="padding:10px 14px; text-align:center; font-weight:700; color:var(--text);">${lp.avgPerDay} / day</td>
+                <td style="padding:10px 14px;"><button class="btn btn-c adv-drilldown-btn" data-labeler="${esc(lp.name)}" style="font-size:10px; padding:3px 8px;">🔍 Profile</button></td>
+              </tr>
+            `).join('')
+          + '</tbody>'
+        + '</table>'
+      + '</div>'
+    + '</div>'
+
+    // MODULE 4: Facility Unit × Modality Density Matrix
+    + '<div class="ux-panel" style="margin-top:20px;">'
+      + '<div class="ux-heading" style="margin-bottom:14px;">'
+        + '<div>'
+          + '<h3 style="margin:0;">🏢 Module 4: Facility Unit (Floor) × Modality Density Matrix</h3>'
+          + '<p style="margin:4px 0 0;">Volume distribution across Facility Units and Modality Pass types. Click any cell to filter.</p>'
+        + '</div>'
+      + '</div>'
+      + '<div style="overflow-x:auto;">'
+        + '<table style="width:100%; border-collapse:collapse; font-size:12px; text-align:center;">'
+          + '<thead><tr style="background:var(--bg-2); border-bottom:1px solid var(--border);"><th style="padding:10px 14px; text-align:left;">Facility Unit</th>'
+            + modalityCategories.map(mc => '<th style="padding:10px 14px;">' + mc.label + '</th>').join('')
+            + '<th style="padding:10px 14px; font-weight:700;">Total Unit Volume</th>'
+          + '</tr></thead>'
+          + '<tbody>'
+            + distinctUnits.map(u => {
+              let rowSum = 0;
+              return '<tr style="border-bottom:1px solid var(--border);">'
+                + '<td style="padding:10px 14px; text-align:left; font-weight:700; color:var(--accent);">🏢 Unit ' + esc(u) + '</td>'
+                + modalityCategories.map(mc => {
+                  const c = unitModalityMatrix[u][mc.key] || 0;
+                  rowSum += c;
+                  const ratio = maxCellCount > 0 ? (c / maxCellCount) : 0;
+                  const bg = c > 0 ? 'rgba(13,148,136,' + Math.max(0.10, ratio * 0.70).toFixed(2) + ')' : 'transparent';
+                  return '<td class="adv-mod-cell" data-unit="' + esc(u) + '" data-mod="' + mc.key + '" style="padding:10px 14px; background:' + bg + '; font-weight:' + (c > 0 ? '700' : '400') + '; color:var(--text); cursor:pointer;" title="Click to filter Unit ' + esc(u) + ' ' + mc.label + '">' + c.toLocaleString() + '</td>';
+                }).join('')
+                + '<td style="padding:10px 14px; font-weight:800; color:var(--primary); font-size:13px;">' + rowSum.toLocaleString() + '</td>'
+              + '</tr>';
+            }).join('')
+          + '</tbody>'
+        + '</table>'
+      + '</div>'
+    + '</div>'
+  + '</div>';
+
+  bindHeaderControls(page, 'adv');
+  bindUniversalFilterBar(page, 'advanced_insights');
+
+  // Interactive bindings
+  page.querySelectorAll('.adv-qtc-bar-row').forEach(row => {
+    row.onclick = () => {
+      const qtc = row.dataset.qtc;
+      if (qtc && typeof qtcFloorFilters !== 'undefined') {
+        qtcFloorFilters.qtc = qtc;
+        location.hash = 'performance-qtc-floor';
+      }
+    };
+  });
+
+  page.querySelectorAll('.adv-drilldown-btn').forEach(btn => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      const lab = btn.dataset.labeler;
+      if (lab && typeof openLabelerDetailModal === 'function') openLabelerDetailModal(lab);
+    };
+  });
+
+  page.querySelectorAll('.adv-mod-cell').forEach(cell => {
+    cell.onclick = () => {
+      const u = cell.dataset.unit;
+      const mod = cell.dataset.mod;
+      if (typeof qtcFloorFilters !== 'undefined') {
+        qtcFloorFilters.floor = u;
+        qtcFloorFilters.category = mod;
+        location.hash = 'performance-qtc-floor';
+      }
+    };
+  });
+
+  // KPI card tooltips
+  page.querySelectorAll('.adv-kpi-card').forEach((card, idx) => {
+    const k = insightKPIs[idx];
+    if (k) {
+      MeegTooltip.attach(card, () => ({
+        title: k.title,
+        badge: 'Diagnostic Metric',
+        desc: k.sub,
+        rows: [
+          { label: 'Current Score', value: k.val, color: k.tone }
+        ]
+      }));
+    }
+  });
+}
+
+window.renderAdvancedInsights = renderAdvancedInsights;
+
 renderAllSections=function(){
   document.querySelectorAll('#shiftBanner, #fstrip, .pills-row, #locTabs, #mainContent, #cmpBar').forEach(el => {
     el.style.setProperty('display', 'none', 'important');
@@ -7097,6 +7619,7 @@ renderAllSections=function(){
   renderPerformance();
   renderQtcFloorPerformance();
   renderDailyReport();
+  renderAdvancedInsights();
 };
 
 
