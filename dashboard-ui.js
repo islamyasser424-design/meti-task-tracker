@@ -4115,7 +4115,7 @@ function gmQueueReport(rows, universe = rows) {
 
 
 
-function buildFloorSummaryTableHTML(rep, sRows) {
+function buildFloorSummaryTableHTML(rep, sRows, sortCol, sortAsc) {
   const idx = name => hdrs ? hdrs.findIndex(h => h.trim().toLowerCase() === name.toLowerCase()) : -1;
   const qi = idx('Queue Name');
   const mi = idx('Modality');
@@ -4204,7 +4204,38 @@ function buildFloorSummaryTableHTML(rep, sRows) {
     }
   });
 
-  const floorList = [...floorMap.values()].sort((a,b) => b.totalTasks - a.totalTasks || a.floor.localeCompare(b.floor));
+  let floorList = [...floorMap.values()];
+  if (sortCol === 'floor') {
+    floorList.sort((a,b) => sortAsc ? a.floor.localeCompare(b.floor) : b.floor.localeCompare(a.floor));
+  } else if (sortCol === 'lidarFp') {
+    floorList.sort((a,b) => sortAsc ? a.lidarFp - b.lidarFp : b.lidarFp - a.lidarFp);
+  } else if (sortCol === 'lidarFpLabs') {
+    floorList.sort((a,b) => sortAsc ? a.lidarFpLabelers.size - b.lidarFpLabelers.size : b.lidarFpLabelers.size - a.lidarFpLabelers.size);
+  } else if (sortCol === 'lidarQa') {
+    floorList.sort((a,b) => sortAsc ? a.lidarQa - b.lidarQa : b.lidarQa - a.lidarQa);
+  } else if (sortCol === 'lidarQaLabs') {
+    floorList.sort((a,b) => sortAsc ? a.lidarQaLabelers.size - b.lidarQaLabelers.size : b.lidarQaLabelers.size - a.lidarQaLabelers.size);
+  } else if (sortCol === 'laneFp') {
+    floorList.sort((a,b) => sortAsc ? a.laneFp - b.laneFp : b.laneFp - a.laneFp);
+  } else if (sortCol === 'laneFpLabs') {
+    floorList.sort((a,b) => sortAsc ? a.laneFpLabelers.size - b.laneFpLabelers.size : b.laneFpLabelers.size - a.laneFpLabelers.size);
+  } else if (sortCol === 'laneQa') {
+    floorList.sort((a,b) => sortAsc ? a.laneQa - b.laneQa : b.laneQa - a.laneQa);
+  } else if (sortCol === 'laneQaLabs') {
+    floorList.sort((a,b) => sortAsc ? a.laneQaLabelers.size - b.laneQaLabelers.size : b.laneQaLabelers.size - a.laneQaLabelers.size);
+  } else if (sortCol === 'relabelFp') {
+    floorList.sort((a,b) => sortAsc ? a.relabelFp - b.relabelFp : b.relabelFp - a.relabelFp);
+  } else if (sortCol === 'relabelLabs') {
+    floorList.sort((a,b) => sortAsc ? (a.relabelFpLabelers.size + a.relabelQaLabelers.size) - (b.relabelFpLabelers.size + b.relabelQaLabelers.size) : (b.relabelFpLabelers.size + b.relabelQaLabelers.size) - (a.relabelFpLabelers.size + a.relabelQaLabelers.size));
+  } else if (sortCol === 'total') {
+    floorList.sort((a,b) => sortAsc ? a.totalTasks - b.totalTasks : b.totalTasks - a.totalTasks);
+  } else if (sortCol === 'labelers') {
+    floorList.sort((a,b) => sortAsc ? a.allLabelers.size - b.allLabelers.size : b.allLabelers.size - a.allLabelers.size);
+  } else {
+    floorList.sort((a,b) => b.totalTasks - a.totalTasks || a.floor.localeCompare(b.floor));
+  }
+  
+  const getFSIcon = c => (sortCol === c ? `<span class="table-sort-icon active">${sortAsc ? '▲' : '▼'}</span>` : `<span class="table-sort-icon">↕</span>`);
   
   let sumLidarFp = 0, sumLidarQa = 0;
   let sumLaneFp = 0, sumLaneQa = 0;
@@ -4240,7 +4271,9 @@ function buildFloorSummaryTableHTML(rep, sRows) {
       <table class="daily-queue-table" style="font-size:12px; border:1px solid var(--border); border-radius:8px; overflow:hidden;">
         <thead>
           <tr style="background:var(--bg-subtle, rgba(0,0,0,0.03)); border-bottom:1px solid var(--border);">
-            <th rowspan="2" style="vertical-align:middle; width:160px; font-weight:800; font-size:12px; background:var(--card-bg, #fff);">🏢 FLOOR / ROOM</th>
+            <th rowspan="2" class="sortable" data-sort="floor" style="vertical-align:middle; width:160px; font-weight:800; font-size:12px; background:var(--card-bg, #fff); cursor:pointer;" title="Sort by Floor / Room">
+              🏢 FLOOR / ROOM ${getFSIcon('floor')}
+            </th>
             <th colspan="2" style="text-align:center; background:rgba(56, 189, 248, 0.1); border-left:1px solid var(--border); border-right:1px solid var(--border); color:#0284c7; font-weight:800; padding:8px 4px;">
               📡 LIDAR FP
             </th>
@@ -4263,20 +4296,20 @@ function buildFloorSummaryTableHTML(rep, sRows) {
             </th>
           </tr>
           <tr style="font-size:10.5px; text-transform:uppercase; background:var(--bg-subtle, rgba(0,0,0,0.02)); border-bottom:1.5px solid var(--border);">
-            <th style="border-left:1px solid var(--border); text-align:right; padding:6px 10px; color:#0284c7;">Tasks</th>
-            <th style="border-right:1px solid var(--border); text-align:right; padding:6px 10px; color:var(--text-soft);">Uniq Lab</th>
-            <th style="text-align:right; padding:6px 10px; color:#059669;">Tasks</th>
-            <th style="border-right:1px solid var(--border); text-align:right; padding:6px 10px; color:var(--text-soft);">Uniq Lab</th>
-            <th style="text-align:right; padding:6px 10px; color:#4f46e5;">Tasks</th>
-            <th style="border-right:1px solid var(--border); text-align:right; padding:6px 10px; color:var(--text-soft);">Uniq Lab</th>
-            <th style="text-align:right; padding:6px 10px; color:#db2777;">Tasks</th>
-            <th style="border-right:1px solid var(--border); text-align:right; padding:6px 10px; color:var(--text-soft);">Uniq Lab</th>
+            <th class="sortable" data-sort="lidarFp" style="border-left:1px solid var(--border); text-align:right; padding:6px 10px; color:#0284c7; cursor:pointer;" title="Sort by Lidar FP Tasks">Tasks ${getFSIcon('lidarFp')}</th>
+            <th class="sortable" data-sort="lidarFpLabs" style="border-right:1px solid var(--border); text-align:right; padding:6px 10px; color:var(--text-soft); cursor:pointer;" title="Sort by Lidar FP Labelers">Uniq Lab ${getFSIcon('lidarFpLabs')}</th>
+            <th class="sortable" data-sort="lidarQa" style="text-align:right; padding:6px 10px; color:#059669; cursor:pointer;" title="Sort by Lidar QA Tasks">Tasks ${getFSIcon('lidarQa')}</th>
+            <th class="sortable" data-sort="lidarQaLabs" style="border-right:1px solid var(--border); text-align:right; padding:6px 10px; color:var(--text-soft); cursor:pointer;" title="Sort by Lidar QA Labelers">Uniq Lab ${getFSIcon('lidarQaLabs')}</th>
+            <th class="sortable" data-sort="laneFp" style="text-align:right; padding:6px 10px; color:#4f46e5; cursor:pointer;" title="Sort by Lane Line FP Tasks">Tasks ${getFSIcon('laneFp')}</th>
+            <th class="sortable" data-sort="laneFpLabs" style="border-right:1px solid var(--border); text-align:right; padding:6px 10px; color:var(--text-soft); cursor:pointer;" title="Sort by Lane Line FP Labelers">Uniq Lab ${getFSIcon('laneFpLabs')}</th>
+            <th class="sortable" data-sort="laneQa" style="text-align:right; padding:6px 10px; color:#db2777; cursor:pointer;" title="Sort by Lane Line QA Tasks">Tasks ${getFSIcon('laneQa')}</th>
+            <th class="sortable" data-sort="laneQaLabs" style="border-right:1px solid var(--border); text-align:right; padding:6px 10px; color:var(--text-soft); cursor:pointer;" title="Sort by Lane Line QA Labelers">Uniq Lab ${getFSIcon('laneQaLabs')}</th>
             ${hasRelabeling ? `
-              <th style="text-align:right; padding:6px 10px; color:#d97706;">Tasks</th>
-              <th style="border-right:1px solid var(--border); text-align:right; padding:6px 10px; color:var(--text-soft);">Uniq Lab</th>
+              <th class="sortable" data-sort="relabelFp" style="text-align:right; padding:6px 10px; color:#d97706; cursor:pointer;" title="Sort by Relabel Tasks">Tasks ${getFSIcon('relabelFp')}</th>
+              <th class="sortable" data-sort="relabelLabs" style="border-right:1px solid var(--border); text-align:right; padding:6px 10px; color:var(--text-soft); cursor:pointer;" title="Sort by Relabel Labelers">Uniq Lab ${getFSIcon('relabelLabs')}</th>
             ` : ''}
-            <th style="text-align:right; font-weight:800; padding:6px 12px; color:var(--text);">Tasks</th>
-            <th style="text-align:right; font-weight:800; padding:6px 12px; color:var(--primary);">Uniq Lab</th>
+            <th class="sortable" data-sort="total" style="text-align:right; font-weight:800; padding:6px 12px; color:var(--text); cursor:pointer;" title="Sort by Total Tasks">Tasks ${getFSIcon('total')}</th>
+            <th class="sortable" data-sort="labelers" style="text-align:right; font-weight:800; padding:6px 12px; color:var(--primary); cursor:pointer;" title="Sort by Total Unique Labelers">Uniq Lab ${getFSIcon('labelers')}</th>
           </tr>
         </thead>
         <tbody>
@@ -4329,7 +4362,7 @@ function buildFloorSummaryTableHTML(rep, sRows) {
   `;
 }
 
-function build24HourFloorSummaryTableHTML(shiftReports, baseRows) {
+function build24HourFloorSummaryTableHTML(shiftReports, baseRows, sortCol, sortAsc) {
   const idx = name => hdrs ? hdrs.findIndex(h => h.trim().toLowerCase() === name.toLowerCase()) : -1;
   const qi = idx('Queue Name');
   const mi = idx('Modality');
@@ -4412,7 +4445,38 @@ function build24HourFloorSummaryTableHTML(shiftReports, baseRows) {
     });
   });
 
-  const floorList = [...floorMap.values()].sort((a,b) => b.totalTasks - a.totalTasks || a.floor.localeCompare(b.floor));
+  let floorList = [...floorMap.values()];
+  if (sortCol === 'floor') {
+    floorList.sort((a,b) => sortAsc ? a.floor.localeCompare(b.floor) : b.floor.localeCompare(a.floor));
+  } else if (sortCol === 'onTasks') {
+    floorList.sort((a,b) => sortAsc ? a.onTasks - b.onTasks : b.onTasks - a.onTasks);
+  } else if (sortCol === 'onLabs') {
+    floorList.sort((a,b) => sortAsc ? a.onLabs.size - b.onLabs.size : b.onLabs.size - a.onLabs.size);
+  } else if (sortCol === 'mornTasks') {
+    floorList.sort((a,b) => sortAsc ? a.mornTasks - b.mornTasks : b.mornTasks - a.mornTasks);
+  } else if (sortCol === 'mornLabs') {
+    floorList.sort((a,b) => sortAsc ? a.mornLabs.size - b.mornLabs.size : b.mornLabs.size - a.mornLabs.size);
+  } else if (sortCol === 'nightTasks') {
+    floorList.sort((a,b) => sortAsc ? a.nightTasks - b.nightTasks : b.nightTasks - a.nightTasks);
+  } else if (sortCol === 'nightLabs') {
+    floorList.sort((a,b) => sortAsc ? a.nightLabs.size - b.nightLabs.size : b.nightLabs.size - a.nightLabs.size);
+  } else if (sortCol === 'lidarFp') {
+    floorList.sort((a,b) => sortAsc ? a.lidarFp - b.lidarFp : b.lidarFp - a.lidarFp);
+  } else if (sortCol === 'lidarQa') {
+    floorList.sort((a,b) => sortAsc ? a.lidarQa - b.lidarQa : b.lidarQa - a.lidarQa);
+  } else if (sortCol === 'laneFp') {
+    floorList.sort((a,b) => sortAsc ? a.laneFp - b.laneFp : b.laneFp - a.laneFp);
+  } else if (sortCol === 'laneQa') {
+    floorList.sort((a,b) => sortAsc ? a.laneQa - b.laneQa : b.laneQa - a.laneQa);
+  } else if (sortCol === 'total') {
+    floorList.sort((a,b) => sortAsc ? a.totalTasks - b.totalTasks : b.totalTasks - a.totalTasks);
+  } else if (sortCol === 'labelers') {
+    floorList.sort((a,b) => sortAsc ? a.allLabs.size - b.allLabs.size : b.allLabs.size - a.allLabs.size);
+  } else {
+    floorList.sort((a,b) => b.totalTasks - a.totalTasks || a.floor.localeCompare(b.floor));
+  }
+
+  const get24Icon = c => (sortCol === c ? `<span class="table-sort-icon active">${sortAsc ? '▲' : '▼'}</span>` : `<span class="table-sort-icon">↕</span>`);
   
   let totOn = 0, totMorn = 0, totNight = 0, grandTot = 0;
   let totLidarFp = 0, totLidarQa = 0, totLaneFp = 0, totLaneQa = 0, totRelabel = 0;
@@ -4439,7 +4503,9 @@ function build24HourFloorSummaryTableHTML(shiftReports, baseRows) {
       <table class="daily-queue-table" style="font-size:12px; border:1px solid var(--border); border-radius:8px; overflow:hidden;">
         <thead>
           <tr style="background:var(--bg-subtle, rgba(0,0,0,0.03)); border-bottom:1px solid var(--border);">
-            <th rowspan="2" style="vertical-align:middle; width:160px; font-weight:800; font-size:12px; background:var(--card-bg, #fff);">🏢 FLOOR / ROOM</th>
+            <th rowspan="2" class="sortable" data-sort="floor" style="vertical-align:middle; width:160px; font-weight:800; font-size:12px; background:var(--card-bg, #fff); cursor:pointer;" title="Sort by Floor / Room">
+              🏢 FLOOR / ROOM ${get24Icon('floor')}
+            </th>
             <th colspan="2" style="text-align:center; background:rgba(139, 92, 246, 0.1); border-left:1px solid var(--border); border-right:1px solid var(--border); color:#8b5cf6; font-weight:800; padding:8px 4px;">
               🌙 ON SHIFT (00–08)
             </th>
@@ -4460,16 +4526,20 @@ function build24HourFloorSummaryTableHTML(shiftReports, baseRows) {
             </th>
           </tr>
           <tr style="font-size:10.5px; text-transform:uppercase; background:var(--bg-subtle, rgba(0,0,0,0.02)); border-bottom:1.5px solid var(--border);">
-            <th style="border-left:1px solid var(--border); text-align:right; padding:6px 10px; color:#8b5cf6;">Tasks</th>
-            <th style="border-right:1px solid var(--border); text-align:right; padding:6px 10px; color:var(--text-soft);">Uniq Lab</th>
-            <th style="text-align:right; padding:6px 10px; color:#0d9488;">Tasks</th>
-            <th style="border-right:1px solid var(--border); text-align:right; padding:6px 10px; color:var(--text-soft);">Uniq Lab</th>
-            <th style="text-align:right; padding:6px 10px; color:#ed9a35;">Tasks</th>
-            <th style="border-right:1px solid var(--border); text-align:right; padding:6px 10px; color:var(--text-soft);">Uniq Lab</th>
-            <th style="text-align:right; padding:6px 10px; color:#0284c7;">FP</th>
-            <th style="border-right:1px solid var(--border); text-align:right; padding:6px 10px; color:#059669;">QA</th>
-            <th style="text-align:right; padding:6px 10px; color:#4f46e5;">FP</th>
-            <th style="border-right:1px solid var(--border); text-align:right; padding:6px 10px; color:#db2777;">QA</th>
+            <th class="sortable" data-sort="onTasks" style="border-left:1px solid var(--border); text-align:right; padding:6px 10px; color:#8b5cf6; cursor:pointer;" title="Sort by ON Tasks">Tasks ${get24Icon('onTasks')}</th>
+            <th class="sortable" data-sort="onLabs" style="border-right:1px solid var(--border); text-align:right; padding:6px 10px; color:var(--text-soft); cursor:pointer;" title="Sort by ON Labelers">Uniq Lab ${get24Icon('onLabs')}</th>
+            <th class="sortable" data-sort="mornTasks" style="text-align:right; padding:6px 10px; color:#0d9488; cursor:pointer;" title="Sort by Morning Tasks">Tasks ${get24Icon('mornTasks')}</th>
+            <th class="sortable" data-sort="mornLabs" style="border-right:1px solid var(--border); text-align:right; padding:6px 10px; color:var(--text-soft); cursor:pointer;" title="Sort by Morning Labelers">Uniq Lab ${get24Icon('mornLabs')}</th>
+            <th class="sortable" data-sort="nightTasks" style="text-align:right; padding:6px 10px; color:#ed9a35; cursor:pointer;" title="Sort by Night Tasks">Tasks ${get24Icon('nightTasks')}</th>
+            <th class="sortable" data-sort="nightLabs" style="border-right:1px solid var(--border); text-align:right; padding:6px 10px; color:var(--text-soft); cursor:pointer;" title="Sort by Night Labelers">Uniq Lab ${get24Icon('nightLabs')}</th>
+            <th class="sortable" data-sort="lidarFp" style="text-align:right; padding:6px 10px; color:#0284c7; cursor:pointer;" title="Sort by Lidar FP">FP ${get24Icon('lidarFp')}</th>
+            <th class="sortable" data-sort="lidarQa" style="border-right:1px solid var(--border); text-align:right; padding:6px 10px; color:#059669; cursor:pointer;" title="Sort by Lidar QA">QA ${get24Icon('lidarQa')}</th>
+            <th class="sortable" data-sort="laneFp" style="text-align:right; padding:6px 10px; color:#4f46e5; cursor:pointer;" title="Sort by Lane Line FP">FP ${get24Icon('laneFp')}</th>
+            <th class="sortable" data-sort="laneQa" style="border-right:1px solid var(--border); text-align:right; padding:6px 10px; color:#db2777; cursor:pointer;" title="Sort by Lane Line QA">QA ${get24Icon('laneQa')}</th>
+            <th class="sortable" data-sort="total" style="text-align:right; font-weight:800; padding:6px 12px; color:var(--text); cursor:pointer;" title="Sort by Total Tasks">Tasks ${get24Icon('total')}</th>
+            <th class="sortable" data-sort="labelers" style="text-align:right; font-weight:800; padding:6px 12px; color:var(--primary); cursor:pointer;" title="Sort by Total Unique Labelers">Total Lab ${get24Icon('labelers')}</th>
+          </tr>
+        </thead>
             <th style="text-align:right; font-weight:800; padding:6px 12px; color:var(--text);">Tasks</th>
             <th style="text-align:right; font-weight:800; padding:6px 12px; color:var(--primary);">Total Lab</th>
           </tr>
@@ -4544,6 +4614,11 @@ function buildShiftTableHTML(rep, sRows, viewMode, sortCol, sortAsc) {
     return '<span class="daily-mod daily-lidar">(' + esc(mod) + ')</span>';
   };
 
+  const getSortIcon = (col) => {
+    if (sortCol === col) return `<span class="table-sort-icon active" style="margin-left:5px; font-size:10px; color:var(--primary, #0284c7); font-weight:800;">${sortAsc ? '▲' : '▼'}</span>`;
+    return `<span class="table-sort-icon" style="margin-left:5px; font-size:10px; opacity:0.35;">↕</span>`;
+  };
+
   // 1. QUEUES VIEW (Screenshot layout)
   if (viewMode === 'queues') {
     return `
@@ -4551,11 +4626,11 @@ function buildShiftTableHTML(rep, sRows, viewMode, sortCol, sortAsc) {
         <table class="daily-queue-table">
           <thead>
             <tr>
-              <th class="sortable" data-sort="name">QUEUE ${sortCol==='name'?(sortAsc?'▲':'▼'):''}</th>
-              <th class="sortable" data-sort="fpLabelers">UNIQUE LABELERS (FP) ${sortCol==='fpLabelers'?(sortAsc?'▲':'▼'):''}</th>
-              <th class="sortable" data-sort="fp">TOTAL SUBMIT (FP) ${sortCol==='fp'?(sortAsc?'▲':'▼'):''}</th>
-              <th class="sortable" data-sort="qaLabelers">UNIQUE LABELERS (QA) ${sortCol==='qaLabelers'?(sortAsc?'▲':'▼'):''}</th>
-              <th class="sortable" data-sort="qa">TOTAL SUBMIT (QA) ${sortCol==='qa'?(sortAsc?'▲':'▼'):''}</th>
+              <th class="sortable" data-sort="name" style="cursor:pointer; user-select:none;" title="Click to sort by Queue Name">QUEUE ${getSortIcon('name')}</th>
+              <th class="sortable" data-sort="fpLabelers" style="cursor:pointer; user-select:none;" title="Click to sort by Unique Labelers (FP)">UNIQUE LABELERS (FP) ${getSortIcon('fpLabelers')}</th>
+              <th class="sortable" data-sort="fp" style="cursor:pointer; user-select:none;" title="Click to sort by Total Submit (FP)">TOTAL SUBMIT (FP) ${getSortIcon('fp')}</th>
+              <th class="sortable" data-sort="qaLabelers" style="cursor:pointer; user-select:none;" title="Click to sort by Unique Labelers (QA)">UNIQUE LABELERS (QA) ${getSortIcon('qaLabelers')}</th>
+              <th class="sortable" data-sort="qa" style="cursor:pointer; user-select:none;" title="Click to sort by Total Submit (QA)">TOTAL SUBMIT (QA) ${getSortIcon('qa')}</th>
             </tr>
           </thead>
           <tbody>
@@ -4606,7 +4681,7 @@ function buildShiftTableHTML(rep, sRows, viewMode, sortCol, sortAsc) {
 
   // 2. FLOOR PRODUCTIVITY VIEW
   if (viewMode === 'floors') {
-    const summaryHTML = buildFloorSummaryTableHTML(rep, sRows);
+    const summaryHTML = buildFloorSummaryTableHTML(rep, sRows, sortCol, sortAsc);
 
     const floorMap = new Map();
     sRows.forEach(r => {
@@ -4627,7 +4702,25 @@ function buildShiftTableHTML(rep, sRows, viewMode, sortCol, sortAsc) {
       if (labId) e.labelers.add(labId);
     });
 
-    const floorList = [...floorMap.values()].sort((a,b) => a.floor.localeCompare(b.floor) || b.total - a.total);
+    let floorList = [...floorMap.values()];
+    if (sortCol === 'floor') {
+      floorList.sort((a,b) => sortAsc ? a.floor.localeCompare(b.floor) : b.floor.localeCompare(a.floor));
+    } else if (sortCol === 'queue') {
+      floorList.sort((a,b) => sortAsc ? a.queue.localeCompare(b.queue) : b.queue.localeCompare(a.queue));
+    } else if (sortCol === 'mod') {
+      floorList.sort((a,b) => sortAsc ? a.mod.localeCompare(b.mod) : b.mod.localeCompare(a.mod));
+    } else if (sortCol === 'fp') {
+      floorList.sort((a,b) => sortAsc ? a.fp - b.fp : b.fp - a.fp);
+    } else if (sortCol === 'qa') {
+      floorList.sort((a,b) => sortAsc ? a.qa - b.qa : b.qa - a.qa);
+    } else if (sortCol === 'total') {
+      floorList.sort((a,b) => sortAsc ? a.total - b.total : b.total - a.total);
+    } else if (sortCol === 'labelers') {
+      floorList.sort((a,b) => sortAsc ? a.labelers.size - b.labelers.size : b.labelers.size - a.labelers.size);
+    } else {
+      floorList.sort((a,b) => a.floor.localeCompare(b.floor) || b.total - a.total);
+    }
+
     let totFp = 0, totQa = 0, grandTot = 0;
     const allLabs = new Set();
     floorList.forEach(f => {
@@ -4650,13 +4743,13 @@ function buildShiftTableHTML(rep, sRows, viewMode, sortCol, sortAsc) {
         <table class="daily-queue-table">
           <thead>
             <tr>
-              <th>FLOOR / UNIT</th>
-              <th>QUEUE NAME</th>
-              <th>MODALITY</th>
-              <th>FP SUBMITS</th>
-              <th>QA SUBMITS</th>
-              <th>TOTAL SUBMITS</th>
-              <th>UNIQUE LABELERS</th>
+              <th class="sortable" data-sort="floor" style="cursor:pointer; user-select:none;" title="Click to sort by Floor / Unit">FLOOR / UNIT ${getSortIcon('floor')}</th>
+              <th class="sortable" data-sort="queue" style="cursor:pointer; user-select:none;" title="Click to sort by Queue Name">QUEUE NAME ${getSortIcon('queue')}</th>
+              <th class="sortable" data-sort="mod" style="cursor:pointer; user-select:none;" title="Click to sort by Modality">MODALITY ${getSortIcon('mod')}</th>
+              <th class="sortable" data-sort="fp" style="cursor:pointer; user-select:none;" title="Click to sort by FP Submits">FP SUBMITS ${getSortIcon('fp')}</th>
+              <th class="sortable" data-sort="qa" style="cursor:pointer; user-select:none;" title="Click to sort by QA Submits">QA SUBMITS ${getSortIcon('qa')}</th>
+              <th class="sortable" data-sort="total" style="cursor:pointer; user-select:none;" title="Click to sort by Total Submits">TOTAL SUBMITS ${getSortIcon('total')}</th>
+              <th class="sortable" data-sort="labelers" style="cursor:pointer; user-select:none;" title="Click to sort by Unique Labelers">UNIQUE LABELERS ${getSortIcon('labelers')}</th>
             </tr>
           </thead>
           <tbody>
@@ -4692,9 +4785,9 @@ function buildShiftTableHTML(rep, sRows, viewMode, sortCol, sortAsc) {
     `;
   }
 
-    // 2.5 FLOOR SUMMARY VIEW (Detailed Modality & Unique Labelers Breakdown)
+  // 2.5 FLOOR SUMMARY VIEW (Detailed Modality & Unique Labelers Breakdown)
   if (viewMode === 'floor_summary') {
-    return buildFloorSummaryTableHTML(rep, sRows);
+    return buildFloorSummaryTableHTML(rep, sRows, sortCol, sortAsc);
   }
 
   // 3. QC / QTC SUPERVISORS VIEW
@@ -4718,7 +4811,25 @@ function buildShiftTableHTML(rep, sRows, viewMode, sortCol, sortAsc) {
       if (labId) e.labelers.add(labId);
     });
 
-    const qcList = [...qcMap.values()].sort((a,b) => a.qc.localeCompare(b.qc) || b.total - a.total);
+    let qcList = [...qcMap.values()];
+    if (sortCol === 'qc') {
+      qcList.sort((a,b) => sortAsc ? a.qc.localeCompare(b.qc) : b.qc.localeCompare(a.qc));
+    } else if (sortCol === 'queue') {
+      qcList.sort((a,b) => sortAsc ? a.queue.localeCompare(b.queue) : b.queue.localeCompare(a.queue));
+    } else if (sortCol === 'mod') {
+      qcList.sort((a,b) => sortAsc ? a.mod.localeCompare(b.mod) : b.mod.localeCompare(a.mod));
+    } else if (sortCol === 'fp') {
+      qcList.sort((a,b) => sortAsc ? a.fp - b.fp : b.fp - a.fp);
+    } else if (sortCol === 'qa') {
+      qcList.sort((a,b) => sortAsc ? a.qa - b.qa : b.qa - a.qa);
+    } else if (sortCol === 'total') {
+      qcList.sort((a,b) => sortAsc ? a.total - b.total : b.total - a.total);
+    } else if (sortCol === 'labelers') {
+      qcList.sort((a,b) => sortAsc ? a.labelers.size - b.labelers.size : b.labelers.size - a.labelers.size);
+    } else {
+      qcList.sort((a,b) => a.qc.localeCompare(b.qc) || b.total - a.total);
+    }
+
     let totFp = 0, totQa = 0, grandTot = 0;
     qcList.forEach(qc => {
       totFp += qc.fp;
@@ -4731,13 +4842,13 @@ function buildShiftTableHTML(rep, sRows, viewMode, sortCol, sortAsc) {
         <table class="daily-queue-table">
           <thead>
             <tr>
-              <th>QC / QTC SUPERVISOR</th>
-              <th>QUEUE NAME</th>
-              <th>MODALITY</th>
-              <th>FP REVIEWED</th>
-              <th>QA REVIEWED</th>
-              <th>TOTAL SUBMISSIONS</th>
-              <th>LABELERS SERVED</th>
+              <th class="sortable" data-sort="qc" style="cursor:pointer; user-select:none;" title="Click to sort by QC / QTC Supervisor">QC / QTC SUPERVISOR ${getSortIcon('qc')}</th>
+              <th class="sortable" data-sort="queue" style="cursor:pointer; user-select:none;" title="Click to sort by Queue Name">QUEUE NAME ${getSortIcon('queue')}</th>
+              <th class="sortable" data-sort="mod" style="cursor:pointer; user-select:none;" title="Click to sort by Modality">MODALITY ${getSortIcon('mod')}</th>
+              <th class="sortable" data-sort="fp" style="cursor:pointer; user-select:none;" title="Click to sort by FP Reviewed">FP REVIEWED ${getSortIcon('fp')}</th>
+              <th class="sortable" data-sort="qa" style="cursor:pointer; user-select:none;" title="Click to sort by QA Reviewed">QA REVIEWED ${getSortIcon('qa')}</th>
+              <th class="sortable" data-sort="total" style="cursor:pointer; user-select:none;" title="Click to sort by Total Submissions">TOTAL SUBMISSIONS ${getSortIcon('total')}</th>
+              <th class="sortable" data-sort="labelers" style="cursor:pointer; user-select:none;" title="Click to sort by Labelers Served">LABELERS SERVED ${getSortIcon('labelers')}</th>
             </tr>
           </thead>
           <tbody>
@@ -4792,7 +4903,23 @@ function buildShiftTableHTML(rep, sRows, viewMode, sortCol, sortAsc) {
       e.total++;
     });
 
-    const labList = [...labMap.values()].sort((a,b) => a.labeler.localeCompare(b.labeler) || b.total - a.total);
+    let labList = [...labMap.values()];
+    if (sortCol === 'labeler') {
+      labList.sort((a,b) => sortAsc ? a.labeler.localeCompare(b.labeler) : b.labeler.localeCompare(a.labeler));
+    } else if (sortCol === 'queue') {
+      labList.sort((a,b) => sortAsc ? a.queue.localeCompare(b.queue) : b.queue.localeCompare(a.queue));
+    } else if (sortCol === 'mod') {
+      labList.sort((a,b) => sortAsc ? a.mod.localeCompare(b.mod) : b.mod.localeCompare(a.mod));
+    } else if (sortCol === 'fp') {
+      labList.sort((a,b) => sortAsc ? a.fp - b.fp : b.fp - a.fp);
+    } else if (sortCol === 'qa') {
+      labList.sort((a,b) => sortAsc ? a.qa - b.qa : b.qa - a.qa);
+    } else if (sortCol === 'total') {
+      labList.sort((a,b) => sortAsc ? a.total - b.total : b.total - a.total);
+    } else {
+      labList.sort((a,b) => a.labeler.localeCompare(b.labeler) || b.total - a.total);
+    }
+
     let totFp = 0, totQa = 0, grandTot = 0;
     labList.forEach(l => {
       totFp += l.fp;
@@ -4805,12 +4932,12 @@ function buildShiftTableHTML(rep, sRows, viewMode, sortCol, sortAsc) {
         <table class="daily-queue-table">
           <thead>
             <tr>
-              <th>LABELER NAME</th>
-              <th>QUEUE NAME</th>
-              <th>MODALITY</th>
-              <th>FP SUBMITS</th>
-              <th>QA SUBMITS</th>
-              <th>TOTAL SUBMISSIONS</th>
+              <th class="sortable" data-sort="labeler" style="cursor:pointer; user-select:none;" title="Click to sort by Labeler Name">LABELER NAME ${getSortIcon('labeler')}</th>
+              <th class="sortable" data-sort="queue" style="cursor:pointer; user-select:none;" title="Click to sort by Queue Name">QUEUE NAME ${getSortIcon('queue')}</th>
+              <th class="sortable" data-sort="mod" style="cursor:pointer; user-select:none;" title="Click to sort by Modality">MODALITY ${getSortIcon('mod')}</th>
+              <th class="sortable" data-sort="fp" style="cursor:pointer; user-select:none;" title="Click to sort by FP Submits">FP SUBMITS ${getSortIcon('fp')}</th>
+              <th class="sortable" data-sort="qa" style="cursor:pointer; user-select:none;" title="Click to sort by QA Submits">QA SUBMITS ${getSortIcon('qa')}</th>
+              <th class="sortable" data-sort="total" style="cursor:pointer; user-select:none;" title="Click to sort by Total Submissions">TOTAL SUBMISSIONS ${getSortIcon('total')}</th>
             </tr>
           </thead>
           <tbody>
@@ -5164,7 +5291,7 @@ function renderGmReport(){
               </p>
             </div>
           </div>
-          ${build24HourFloorSummaryTableHTML(shiftReports, baseRows)}
+          ${build24HourFloorSummaryTableHTML(shiftReports, baseRows, gmReportFilters.sortCol, gmReportFilters.sortAsc)}
         </section>
       ` : ''}
 
@@ -5248,15 +5375,17 @@ function renderGmReport(){
     };
   }
 
-  // Table header sorting binding
+  // Table header sorting binding across all GM Report tables
   page.querySelectorAll('th.sortable[data-sort]').forEach(th => {
-    th.onclick = () => {
+    th.onclick = (e) => {
+      e.stopPropagation();
       const col = th.dataset.sort;
       if (gmReportFilters.sortCol === col) {
         gmReportFilters.sortAsc = !gmReportFilters.sortAsc;
       } else {
         gmReportFilters.sortCol = col;
-        gmReportFilters.sortAsc = (col === 'name');
+        const isText = ['name', 'qc', 'floor', 'labeler', 'queue', 'mod'].includes(col);
+        gmReportFilters.sortAsc = isText;
       }
       renderGmReport();
     };
@@ -7107,4 +7236,187 @@ if (typeof document !== 'undefined') {
   } else {
     initGlobalTooltipEngine();
   }
+}
+
+
+// ============================================================
+// UNIVERSAL INTERACTIVE TABLE SORTER (ALL PAGES & ALL TABLES)
+// ============================================================
+
+function sortDOMTable(table, th) {
+  if (!table || !th) return;
+  const tr = th.closest('tr');
+  if (!tr) return;
+
+  const headerCells = Array.from(tr.children);
+  const colIndex = headerCells.indexOf(th);
+  if (colIndex === -1) return;
+
+  const tbody = table.querySelector('tbody') || table;
+  const allRows = Array.from(tbody.querySelectorAll('tr'));
+  const dataRows = allRows.filter(r => {
+    if (r.querySelector('th')) return false;
+    if (r.closest('tfoot')) return false;
+    if (r.classList.contains('daily-total-row') || r.classList.contains('total-row') || r.classList.contains('ux-empty')) return false;
+    return true;
+  });
+
+  if (dataRows.length <= 1) return;
+
+  const currentOrder = th.getAttribute('data-dom-sort');
+  let newOrder = 'asc';
+  if (currentOrder === 'asc') {
+    newOrder = 'desc';
+  } else if (currentOrder === 'desc') {
+    newOrder = 'asc';
+  } else {
+    // Detect if column is mostly numeric to default to descending (highest first)
+    let numericCount = 0;
+    for (let i = 0; i < Math.min(dataRows.length, 5); i++) {
+      const cell = dataRows[i].children[colIndex];
+      if (cell) {
+        const raw = cell.textContent.trim().replace(/[$,%]/g, '').replace(/,/g, '');
+        if (raw !== '' && !isNaN(parseFloat(raw)) && isFinite(raw)) numericCount++;
+      }
+    }
+    newOrder = numericCount >= 2 ? 'desc' : 'asc';
+  }
+
+  // Update indicators on all headers in the same row
+  headerCells.forEach(cell => {
+    cell.removeAttribute('data-dom-sort');
+    const icon = cell.querySelector('.table-sort-icon');
+    if (icon) {
+      icon.textContent = '↕';
+      icon.classList.remove('active');
+      icon.style.opacity = '0.35';
+    }
+  });
+
+  th.setAttribute('data-dom-sort', newOrder);
+  let icon = th.querySelector('.table-sort-icon');
+  if (!icon) {
+    icon = document.createElement('span');
+    icon.className = 'table-sort-icon';
+    icon.style.marginLeft = '5px';
+    icon.style.fontSize = '10px';
+    icon.style.display = 'inline-block';
+    th.appendChild(icon);
+  }
+  icon.textContent = newOrder === 'asc' ? '▲' : '▼';
+  icon.classList.add('active');
+  icon.style.opacity = '1';
+  icon.style.color = 'var(--primary, #0284c7)';
+
+  const getVal = (row) => {
+    const cell = row.children[colIndex];
+    if (!cell) return { isNum: false, val: '' };
+    const attrVal = cell.getAttribute('data-sort-val') || cell.getAttribute('data-val');
+    const text = (attrVal !== null ? attrVal : cell.textContent).trim();
+    
+    // Number check
+    const cleanNum = text.replace(/,/g, '').replace(/[%$]/g, '').trim();
+    if (cleanNum !== '' && !isNaN(cleanNum) && isFinite(cleanNum)) {
+      return { isNum: true, val: parseFloat(cleanNum) };
+    }
+    // Date check
+    const d = Date.parse(text);
+    if (!isNaN(d) && text.length >= 8 && (text.includes('/') || text.includes('-'))) {
+      return { isNum: true, val: d };
+    }
+    return { isNum: false, val: text.toLowerCase() };
+  };
+
+  dataRows.sort((a, b) => {
+    const valA = getVal(a);
+    const valB = getVal(b);
+
+    if (valA.isNum && valB.isNum) {
+      return newOrder === 'asc' ? valA.val - valB.val : valB.val - valA.val;
+    }
+    return newOrder === 'asc'
+      ? String(valA.val).localeCompare(String(valB.val), undefined, { numeric: true, sensitivity: 'base' })
+      : String(valB.val).localeCompare(String(valA.val), undefined, { numeric: true, sensitivity: 'base' });
+  });
+
+  const totalRow = tbody.querySelector('.daily-total-row, .total-row, .ux-empty');
+  dataRows.forEach(row => {
+    if (totalRow) {
+      tbody.insertBefore(row, totalRow);
+    } else {
+      tbody.appendChild(row);
+    }
+  });
+}
+
+function enableUniversalTableSorting() {
+  if (typeof document === 'undefined') return;
+
+  // 1. Inject Styles
+  if (!document.getElementById('universal-table-sort-css')) {
+    const style = document.createElement('style');
+    style.id = 'universal-table-sort-css';
+    style.textContent = `
+      table thead th:not(.no-sort), 
+      table tr:first-child th:not(.no-sort),
+      th.sortable {
+        cursor: pointer !important;
+        user-select: none !important;
+        transition: background-color 0.15s ease, color 0.15s ease;
+      }
+      table thead th:not(.no-sort):hover, 
+      table tr:first-child th:not(.no-sort):hover,
+      th.sortable:hover {
+        background-color: var(--accent-light, rgba(2, 132, 199, 0.08)) !important;
+        color: var(--primary, #0284c7) !important;
+      }
+      .table-sort-icon {
+        display: inline-block;
+        margin-left: 5px;
+        font-size: 10px;
+        opacity: 0.35;
+        vertical-align: middle;
+        transition: opacity 0.15s, transform 0.15s, color 0.15s;
+      }
+      .table-sort-icon.active {
+        opacity: 1 !important;
+        color: var(--primary, #0284c7) !important;
+        font-weight: 800;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  // 2. Event delegation on document
+  document.addEventListener('click', function(e) {
+    const th = e.target.closest('th');
+    if (!th) return;
+
+    if (th.classList.contains('no-sort') || th.getAttribute('data-no-sort') === 'true') return;
+    const table = th.closest('table');
+    if (!table) return;
+
+    // Managed pages that already have dataset re-rendering for th[data-sort]
+    const managedPage = th.closest('#uxGmReport, #uxPerfLabelers, #uxQueuesAnalysis, #uxQtcFloor');
+    if (managedPage && (th.classList.contains('sortable') || th.hasAttribute('data-sort'))) {
+      return; // Handled by component state
+    }
+
+    // All other tables (Submissions, Overview, Daily Report, Shift Comp, Admin Tables, Modals)
+    sortDOMTable(table, th);
+  });
+}
+
+// Auto-initialize Universal Table Sorter
+if (typeof document !== 'undefined') {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', enableUniversalTableSorting);
+  } else {
+    enableUniversalTableSorting();
+  }
+}
+
+if (typeof window !== 'undefined') {
+  window.enableUniversalTableSorting = enableUniversalTableSorting;
+  window.sortDOMTable = sortDOMTable;
 }
