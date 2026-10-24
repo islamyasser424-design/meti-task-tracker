@@ -1394,6 +1394,20 @@ function loadData(){
   setSyncActive(true);setTrafficLight('yellow');
   const b=document.getElementById('refreshBtn');if(b)b.disabled=true;
   const mc=document.getElementById('mainContent');
+
+  // FAST PATH: Instant boot from IndexedDB cache (< 50ms)
+  if(!_cacheTried && rawRows.length===0){
+    _cacheTried=true;
+    try {
+      idbGet('meeg_analytics_table').then(cachedTable=>{
+        if(cachedTable && Array.isArray(cachedTable) && cachedTable.length>1 && rawRows.length===0){
+          onCsvTable(cachedTable);
+          setSyncActive(true);
+        }
+      }).catch(()=>{});
+    }catch(e){}
+  }
+
   if(mc && rawRows.length===0){
     mc.innerHTML=`<div class="loader"><div class="spin"></div><span class="ltxt">Connecting to Turso Database…</span></div>`;
   }
@@ -1433,6 +1447,7 @@ function loadData(){
     }
     setSyncActive(false);
     if(b)b.disabled=false;
+    try { idbSet('meeg_analytics_table', table); } catch(e){}
     onCsvTable(table);
   })
     .catch(e => {

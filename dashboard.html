@@ -1707,7 +1707,7 @@
               <option value="all">All QTCs</option>
             </select>
 
-            <select class="filter-select" id="filterSource" onchange="applyFilters()" style="max-width:180px; font-weight:700;">
+            <select class="filter-select" id="filterSource" onchange="onSourceFilterChange()" style="max-width:180px; font-weight:700;">
               <option value="all">🌐 All Sources</option>
               <option value="live">⚡ Live Only</option>
               <option value="arch1">📦 ارشيف 1</option>
@@ -4835,6 +4835,74 @@ async function syncGoogleSheetsClient(isAuto) {
   }
 }
 
+
+    var _sourceCache = {};
+
+    function onSourceFilterChange() {
+      var filterSource = document.getElementById("filterSource") ? document.getElementById("filterSource").value : "live";
+      var filterDate = document.getElementById("filterDate");
+
+      // When switching to an archive, auto-switch date filter to "all" because archives contain historical records from past dates
+      if ((filterSource === "arch1" || filterSource === "arch2") && filterDate && (filterDate.value === "today" || filterDate.value === "yesterday")) {
+        filterDate.value = "all";
+        if (typeof showToast === "function") {
+          showToast("📅 Switched date to 'All Dates' for Archive view");
+        }
+      }
+
+      // Check in-memory source cache for instant switching (0ms!)
+      if (_sourceCache[filterSource] && _sourceCache[filterSource].length > 0) {
+        _allSubmissions = _sourceCache[filterSource];
+        _totalDbCount = _sourceCache[filterSource + "_total"] || _allSubmissions.length;
+        calculateKPIs();
+        _currentPage = 1;
+        applyFilters();
+        return;
+      }
+
+      // Otherwise, load from backend for this specific source
+      var sync = document.getElementById("syncStatus");
+      var sourceLabel = filterSource === "arch1" ? "ارشيف 1" : (filterSource === "arch2" ? "ارشيف 2" : (filterSource === "live" ? "Live Only" : "All Sources"));
+      if (sync) sync.textContent = "📦 Loading " + sourceLabel + " from database...";
+
+      var url = "/api/tasks?limit=2500";
+      if (filterSource !== "all") {
+        url += "&source=" + encodeURIComponent(filterSource);
+      }
+
+      apiFetch(url)
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (!data.ok) throw new Error(data.message || "Failed to load tasks");
+          if (sync) sync.textContent = "● " + sourceLabel + " Synced (" + new Date().toLocaleTimeString("en-US", {timeZone:"Africa/Cairo"}) + ")";
+          _totalDbCount = data.total || 0;
+          _allSubmissions = (data.tasks || []).map(mapSubmissionRow);
+
+          // Save into cache for instant switching
+          _sourceCache[filterSource] = _allSubmissions;
+          _sourceCache[filterSource + "_total"] = _totalDbCount;
+
+          _allSubmissions.forEach(function(s) {
+            if (s.queue_name && !_allQueuesList.includes(s.queue_name)) {
+              _allQueuesList.push(s.queue_name);
+            }
+            if (s.qtc_name && !_allQTCList.includes(s.qtc_name)) {
+              _allQTCList.push(s.qtc_name);
+            }
+          });
+          populateQueueDropdowns();
+          populateQTCDropdowns();
+
+          calculateKPIs();
+          _currentPage = 1;
+          applyFilters();
+        })
+        .catch(function(err) {
+          if (sync) sync.textContent = "API error: " + err.message;
+          alert("Error loading " + sourceLabel + ": " + err.message);
+        });
+    }
+
 function fetchLiveDataOnly() {
   var sync = document.getElementById("syncStatus");
   if (sync) sync.textContent = "⚡ Loading from database...";
@@ -4990,7 +5058,12 @@ function searchFullDatabase() {
   var sync = document.getElementById("syncStatus");
   if (sync) sync.textContent = "🔍 Searching full database...";
 
-  apiFetch("/api/tasks?search=" + encodeURIComponent(q) + "&limit=1000")
+  var filterSource = document.getElementById("filterSource") ? document.getElementById("filterSource").value : "all";
+  var searchUrl = "/api/tasks?search=" + encodeURIComponent(q) + "&limit=1000";
+  if (filterSource !== "all") {
+    searchUrl += "&source=" + encodeURIComponent(filterSource);
+  }
+  apiFetch(searchUrl)
     .then(function(r) { return r.json(); })
     .then(function(data) {
       if (sync) sync.textContent = "● Live Edge Synced (" + new Date().toLocaleTimeString("en-US", {timeZone:"Africa/Cairo"}) + ")";

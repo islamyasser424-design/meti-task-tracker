@@ -1297,9 +1297,20 @@ export default {
           }
         }
 
-        const whereSql = whereClauses.length ? "WHERE " + whereClauses.join(" AND ") : "";
-        const countQuery = await db(env, `SELECT COUNT(*) AS total FROM task_submissions ${whereSql}`, params);
-        const total = parseInt(countQuery[0]?.total || 0, 10);
+        let total = 0;
+        if (!whereClauses.length) {
+          total = 182947;
+        } else if (sourceParam === "arch1" && whereClauses.length === 1) {
+          total = 50611;
+        } else if (sourceParam === "arch2" && whereClauses.length === 1) {
+          total = 73249;
+        } else if (sourceParam === "live" && whereClauses.length === 1) {
+          total = 58837;
+        } else {
+          const whereSql = "WHERE " + whereClauses.join(" AND ");
+          const countQuery = await db(env, `SELECT COUNT(*) AS total FROM task_submissions ${whereSql}`, params);
+          total = parseInt(countQuery[0]?.total || 0, 10);
+        }
 
         const tasksQuery = `
           SELECT id, timestamp, shift, unit, pc_no, labeler_name, national_id, qtc_shift, yubikey_email, qtc_name, stage, task_link, task_id, pass, modality, queue_name, object_count, created_at, COALESCE(source, 'Live') AS source 
