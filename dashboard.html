@@ -2750,7 +2750,7 @@
 
       if (cfg.isAnalytics) {
         if (typeof window.switchAnalyticsWorkspace === "function") {
-          window.switchAnalyticsWorkspace(cfg.hash || "#dashboard");
+          window.switchAnalyticsWorkspace(cfg.hash || cfg.key || "#dashboard");
         } else {
           location.hash = cfg.hash || "#dashboard";
         }
@@ -2760,7 +2760,17 @@
       }
     }
 
-    function refreshCurrentWorkspace() {
+        function syncTabOnHashChange() {
+      var h = window.location.hash;
+      if (!h) return;
+      var matching = PAGE_KEYS.find(function(p) { return p.hash && p.hash.toLowerCase() === h.toLowerCase(); });
+      if (matching && _activeTab !== matching.key) {
+        switchMainTab(matching.key);
+      }
+    }
+    window.addEventListener("hashchange", syncTabOnHashChange);
+
+function refreshCurrentWorkspace() {
       if (_activeTab === "tasks") fetchLiveData();
       else if (_activeTab === "queues") loadLiveQueuesAdmin();
       else if (_activeTab === "qtc") loadLiveQTCAdmin();

@@ -617,16 +617,45 @@ function closeNav(){document.body.classList.remove('ux-sidebar-open');menu.setAt
 menu.onclick=()=>{const open=document.body.classList.toggle('ux-sidebar-open');menu.setAttribute('aria-expanded',String(open));if(open)aside.querySelector('button').focus();};backdrop.onclick=closeNav;
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeNav();menu.focus();}});
 
-function route(){
-  const hash = location.hash || '#dashboard';
-  const current = hash === '#analysis-overview' ? 'analysis'
-                : hash === '#queues-analysis' ? 'queues'
-                : hash === '#gm-report' ? 'gm_report'
-                : hash === '#shift-comparison' ? 'shift_comparison'
-                : hash === '#performance-labelers' ? 'performance'
-                : hash === '#performance-qtc-floor' ? 'qtcfloor'
-                : hash === '#daily-report' ? 'daily'
-                : 'dashboard';
+function resolveAnalyticsPageKey(target) {
+  let raw = target || location.hash || (typeof _activeTab !== 'undefined' ? _activeTab : '#dashboard');
+  let clean = String(raw).toLowerCase().trim().replace(/^[#\/]+/, '').split('?')[0].split('&')[0];
+
+  if (['gm-report', 'gm_report', 'gmreport'].includes(clean)) return 'gm_report';
+  if (['shift-comparison', 'shift_comparison', 'shiftcomparison'].includes(clean)) return 'shift_comparison';
+  if (['analysis-overview', 'analysis_overview', 'analysis'].includes(clean)) return 'analysis';
+  if (['queues-analysis', 'queues_analysis', 'queues'].includes(clean)) return 'queues';
+  if (['performance-labelers', 'performance_labelers', 'performance'].includes(clean)) return 'performance';
+  if (['performance-qtc-floor', 'performance_qtc_floor', 'qtcfloor', 'qtc_floor'].includes(clean)) return 'qtcfloor';
+  if (['daily-report', 'daily_report', 'daily'].includes(clean)) return 'daily';
+  return 'dashboard';
+}
+
+function route(forcedTarget){
+  const current = resolveAnalyticsPageKey(forcedTarget);
+  const targetHashMap = {
+    'dashboard': '#dashboard',
+    'analysis': '#analysis-overview',
+    'queues': '#queues-analysis',
+    'gm_report': '#gm-report',
+    'shift_comparison': '#shift-comparison',
+    'performance': '#performance-labelers',
+    'qtcfloor': '#performance-qtc-floor',
+    'daily': '#daily-report'
+  };
+
+  const expectedHash = targetHashMap[current] || '#dashboard';
+  if (location.hash !== expectedHash) {
+    try {
+      if (window.history && window.history.replaceState) {
+        window.history.replaceState(null, '', expectedHash);
+      } else {
+        location.hash = expectedHash;
+      }
+    } catch(e) {
+      location.hash = expectedHash;
+    }
+  }
 
   overview.hidden = (current !== 'dashboard');
   overview.style.display = (current === 'dashboard') ? 'block' : 'none';
@@ -678,10 +707,10 @@ function route(){
   }
 }
 
+window.resolveAnalyticsPageKey = resolveAnalyticsPageKey;
 window.route = route;
-window.switchAnalyticsWorkspace = function(hash) {
-  if (hash) location.hash = hash;
-  route();
+window.switchAnalyticsWorkspace = function(hashOrKey) {
+  route(hashOrKey);
 };
 
 aside.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>{location.hash=b.dataset.page==='analysis'?'analysis-overview':b.dataset.page==='queues'?'queues-analysis':b.dataset.page==='gm_report'?'gm-report':b.dataset.page==='shift_comparison'?'shift-comparison':b.dataset.page==='performance'?'performance-labelers':b.dataset.page==='qtcfloor'?'performance-qtc-floor':b.dataset.page==='daily'?'daily-report':'dashboard';});
