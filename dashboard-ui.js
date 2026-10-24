@@ -4552,6 +4552,7 @@ function renderGmReport(){
     return {
       meta,
       rowsCount: sRows.length,
+      sRows: sRows,
       groups,
       totalFp,
       totalQa,
@@ -4749,7 +4750,7 @@ function renderGmReport(){
             </div>
 
             <!-- Dynamic Shift Report Table (Queues, Floors, QCs, Labelers) -->
-            ${buildShiftTableHTML(rep, sRows, _shiftReportViewMode, sortCol, sortAsc)}
+            ${buildShiftTableHTML(rep, rep.sRows || [], _shiftReportViewMode, sortCol, sortAsc)}
 
             <p class="an-context" style="margin-top:12px; font-size:11px; color:var(--muted);">
               ${rep.missing > 0 ? (rep.missing + ' FP/QA entries de-duplicated by name. ') : ''}

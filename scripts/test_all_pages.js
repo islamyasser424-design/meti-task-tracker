@@ -173,8 +173,24 @@ try {
   console.log('Page 6 rendered HTML size:', p6.innerHTML.length, 'bytes');
   if (p6.innerHTML.length < 500) throw new Error('Shift Comparison HTML is unexpectedly short!');
 
+  // Verify Page 7: GM Report
+  console.log('\n--- Testing Page 7: GM Report ---');
+  location.hash = '#gm-report';
+  route();
+  const p7 = document.getElementById('uxGmReport');
+  console.log('Page 7 rendered HTML size:', p7.innerHTML.length, 'bytes');
+  if (p7.innerHTML.length < 500) throw new Error('GM Report HTML is unexpectedly short!');
+
+  // Verify Page 8: Daily Report
+  console.log('\n--- Testing Page 8: Daily Report ---');
+  location.hash = '#daily-report';
+  route();
+  const p8 = document.getElementById('uxDaily');
+  console.log('Page 8 rendered HTML size:', p8.innerHTML.length, 'bytes');
+  if (p8.innerHTML.length < 500) throw new Error('Daily Report HTML is unexpectedly short!');
+
   console.log('\n================================================================');
-  console.log('ALL 6 APPROVED ANALYTICS PAGES FULLY FUNCTIONAL AND VERIFIED!');
+  console.log('ALL ANALYTICS PAGES FULLY FUNCTIONAL AND VERIFIED!');
   console.log('================================================================');
   process.exit(0);
 } catch (err) {

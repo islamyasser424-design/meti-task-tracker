@@ -1703,6 +1703,13 @@
               <option value="all">All QTCs</option>
             </select>
 
+            <select class="filter-select" id="filterSource" onchange="applyFilters()" style="max-width:180px; font-weight:700;">
+              <option value="all">🌐 All Sources</option>
+              <option value="live">⚡ Live Only</option>
+              <option value="arch1">📦 ارشيف 1</option>
+              <option value="arch2">📦 ارشيف 2</option>
+            </select>
+
             <div style="display:flex; align-items:center; gap:6px; flex:1; min-width:240px;">
               <input type="text" class="filter-input" id="searchQuery" placeholder="🔍 Search Task ID, Labeler, National ID, PC..." oninput="applyFilters()" style="flex:1;">
               <button type="button" class="btn-action secondary" id="btnServerSearch" onclick="searchFullDatabase()" title="Search across all 51,000+ records directly in database" style="padding:6px 11px; font-size:0.75rem; white-space:nowrap; font-weight:700;">
@@ -1818,6 +1825,7 @@
             <thead>
               <tr>
                 <th>#ID</th>
+                <th style="width:105px; text-align:center;">Source</th>
                 <th>Timestamp</th>
                 <th>Shift</th>
                 <th>Unit</th>
@@ -2497,6 +2505,8 @@
         return res;
       });
     }
+    window.apiFetch = apiFetch;
+    window.API_BASE = API_BASE;
 
     function apiLogin(username, password, callback) {
       apiFetch("/api/auth/login", {
@@ -2582,7 +2592,8 @@
           object_count: parseInt(r.object_count, 10) || 0,
           stage: r.stage || "",
           created_at: r.created_at || "",
-          task_link: r.task_link || ""
+          task_link: r.task_link || "",
+          source: r.source || "Live"
         };
       }
       return {
@@ -3453,6 +3464,59 @@
       applyFilters();
     }
 
+
+    // Quick Interactive Click-To-Filter System
+    function quickFilterShift(val) {
+      var el = document.getElementById("filterShift");
+      if (!el || !val) return;
+      el.value = (el.value === val) ? "all" : val;
+      applyFilters();
+    }
+    function quickFilterUnit(val) {
+      var el = document.getElementById("colFilterUnit");
+      if (!el || !val || val === "-") return;
+      el.value = (el.value.toLowerCase() === val.toLowerCase()) ? "" : val;
+      applyFilters();
+    }
+    function quickFilterLabeler(val) {
+      var el = document.getElementById("colFilterLabeler");
+      if (!el || !val) return;
+      el.value = (el.value.toLowerCase() === val.toLowerCase()) ? "" : val;
+      applyFilters();
+    }
+    function quickFilterQTC(val) {
+      var el = document.getElementById("filterQTC");
+      if (!el || !val || val === "-") return;
+      el.value = (el.value === val) ? "all" : val;
+      applyFilters();
+    }
+    function quickFilterModality(val) {
+      var el = document.getElementById("filterModality");
+      if (!el || !val) return;
+      var target = val.toLowerCase().includes("lidar") ? "Lidar" : (val.toLowerCase().includes("lane") ? "Lane Line" : val);
+      el.value = (el.value === target) ? "all" : target;
+      applyFilters();
+    }
+    function quickFilterPass(val) {
+      var el = document.getElementById("filterPass");
+      if (!el || !val) return;
+      var p = val.toUpperCase();
+      el.value = (el.value === p) ? "all" : p;
+      applyFilters();
+    }
+    function quickFilterQueue(val) {
+      var el = document.getElementById("colFilterQueue");
+      if (!el || !val) return;
+      el.value = (el.value === val) ? "all" : val;
+      applyFilters();
+    }
+    function quickFilterSource(val) {
+      var el = document.getElementById("filterSource");
+      if (!el || !val) return;
+      el.value = (el.value === val) ? "all" : val;
+      applyFilters();
+    }
+
     function resetAllFilters() {
       document.getElementById("filterDate").value = "today";
       document.getElementById("optCustomDate").style.display = "none";
@@ -3567,6 +3631,14 @@
         if (cPass !== "all" && r.pass.toUpperCase() !== cPass.toUpperCase()) return false;
         if (cStage !== "all" && r.stage.toLowerCase() !== cStage.toLowerCase()) return false;
 
+        var filterSource = document.getElementById("filterSource") ? document.getElementById("filterSource").value : "all";
+        if (filterSource !== "all") {
+          var s = (r.source || "Live").toLowerCase();
+          if (filterSource === "live" && s !== "live") return false;
+          if (filterSource === "arch1" && s !== "ارشيف 1") return false;
+          if (filterSource === "arch2" && s !== "ارشيف 2") return false;
+        }
+
         if (q) {
           var combined = (r.labeler_name + " " + r.task_id + " " + (r.task_link || "") + " " + r.pc_no + " " + r.national_id + " " + r.queue_name + " " + r.yubikey_email + " " + r.qtc_name).toLowerCase();
           if (combined.indexOf(q) === -1) return false;
@@ -3650,21 +3722,37 @@
           ? '<a href="' + r.task_link + '" target="_blank" rel="noopener noreferrer" style="text-decoration:none; color:inherit;" title="' + r.task_id + '"><code style="cursor:pointer; color:var(--primary); font-weight:700;">' + taskDisplay + ' ↗</code></a>'
           : '<code title="' + r.task_id + '">' + taskDisplay + '</code>';
 
+        var src = r.source || "Live";
+        var srcBadge = src === "ارشيف 1"
+          ? '<span class="badge-source" style="background:rgba(59,130,246,0.12); color:#2563eb; border:1px solid rgba(59,130,246,0.3); padding:2px 7px; border-radius:4px; font-size:0.72rem; font-weight:700; cursor:pointer;" onclick="quickFilterSource(\'arch1\')" title="Click to filter by ارشيف 1">📦 ارشيف 1</span>'
+          : (src === "ارشيف 2"
+            ? '<span class="badge-source" style="background:rgba(168,85,247,0.12); color:#9333ea; border:1px solid rgba(168,85,247,0.3); padding:2px 7px; border-radius:4px; font-size:0.72rem; font-weight:700; cursor:pointer;" onclick="quickFilterSource(\'arch2\')" title="Click to filter by ارشيف 2">📦 ارشيف 2</span>'
+            : '<span class="badge-source" style="background:rgba(16,185,129,0.12); color:#059669; border:1px solid rgba(16,185,129,0.3); padding:2px 7px; border-radius:4px; font-size:0.72rem; font-weight:700; cursor:pointer;" onclick="quickFilterSource(\'live\')" title="Click to filter by Live">⚡ Live</span>');
+
+        var escUnit = (r.unit || "").replace(/'/g, "\\'");
+        var escLab = (r.labeler_name || "").replace(/'/g, "\\'");
+        var escQtc = (r.qtc_name || "").replace(/'/g, "\\'");
+        var escQueue = (r.queue_name || "").replace(/'/g, "\\'");
+        var escShift = (r.shift || "").replace(/'/g, "\\'");
+        var escMod = (r.modality || "").replace(/'/g, "\\'");
+        var escPass = (r.pass || "").replace(/'/g, "\\'");
+
         html += '<tr>'
           + '<td style="font-weight:700; color:var(--primary-dark);">#' + r.id + '</td>'
+          + '<td style="text-align:center;">' + srcBadge + '</td>'
           + '<td style="color:var(--text-secondary);">' + r.timestamp + '</td>'
-          + '<td><span class="badge-shift">' + r.shift + '</span></td>'
-          + '<td>' + (r.unit || "-") + '</td>'
+          + '<td><span class="badge-shift" style="cursor:pointer;" onclick="quickFilterShift(\'' + escShift + '\')" title="Click to filter by Shift: ' + escShift + '">' + r.shift + '</span></td>'
+          + '<td style="cursor:pointer;" onclick="quickFilterUnit(\'' + escUnit + '\')" title="Click to filter by Unit">' + (r.unit || "-") + '</td>'
           + '<td><code>' + (r.pc_no || "-") + '</code></td>'
-          + '<td style="font-weight:600;">' + r.labeler_name + '</td>'
+          + '<td style="font-weight:600; cursor:pointer;" onclick="quickFilterLabeler(\'' + escLab + '\')" title="Click to filter by Labeler">' + r.labeler_name + '</td>'
           + '<td style="font-family:monospace; color:var(--text-secondary);">' + (r.national_id || "-") + '</td>'
           + '<td style="color:var(--text-secondary);">' + (r.yubikey_email || "-") + '</td>'
-          + '<td style="font-weight:600; color:var(--primary);">' + (r.qtc_name || "-") + '</td>'
+          + '<td style="font-weight:600; color:var(--primary); cursor:pointer;" onclick="quickFilterQTC(\'' + escQtc + '\')" title="Click to filter by QTC">' + (r.qtc_name || "-") + '</td>'
           + '<td>' + taskDisplayHtml + '</td>'
           + '<td>' + taskLinkBtn + '</td>'
-          + '<td>' + r.modality + '</td>'
-          + '<td style="max-width:200px; overflow:hidden; text-overflow:ellipsis;" title="' + r.queue_name + '">' + r.queue_name + '</td>'
-          + '<td>' + passBadge + '</td>'
+          + '<td style="cursor:pointer;" onclick="quickFilterModality(\'' + escMod + '\')" title="Click to filter by Modality">' + r.modality + '</td>'
+          + '<td style="max-width:200px; overflow:hidden; text-overflow:ellipsis; cursor:pointer; color:var(--primary);" onclick="quickFilterQueue(\'' + escQueue + '\')" title="Click to filter by Queue: ' + escQueue + '">' + r.queue_name + '</td>'
+          + '<td style="cursor:pointer;" onclick="quickFilterPass(\'' + escPass + '\')" title="Click to filter by Pass">' + passBadge + '</td>'
           + '<td style="font-weight:700; text-align:right;">' + r.object_count + '</td>'
           + '<td>' + (r.stage || "-") + '</td>'
           + actionCell

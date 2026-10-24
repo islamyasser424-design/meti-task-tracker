@@ -351,6 +351,9 @@ async function syncGoogleSheetsToTurso(env) {
   const q2 = "select * order by A desc limit 100";
   const url2 = "https://docs.google.com/spreadsheets/d/1vpsYtvoZSKLsUeKj-FTXVGJmyFygSSck8DUIODJha_A/gviz/tq?tqx=responseHandler:cb2&tq=" + encodeURIComponent(q2);
 
+  const urlArch1 = "https://docs.google.com/spreadsheets/d/1oYBQ0pBqdre60Ds14sTbSijBxOBDsbCZ_kurYrdX_1o/gviz/tq?tqx=responseHandler:cbArch1&tq=" + encodeURIComponent("select * order by A desc limit 150") + "&gid=260304689";
+  const urlArch2 = "https://docs.google.com/spreadsheets/d/1BSeiRLiRTSmH_Et0B8TQAPKsuY98CVSB-gcg6ai51YQ/gviz/tq?tqx=responseHandler:cbArch2&tq=" + encodeURIComponent("select * order by A desc limit 150") + "&gid=231409283";
+
   const stmts = [];
   const newQueues = new Set();
   const newQtcs = new Set();
@@ -489,6 +492,128 @@ async function syncGoogleSheetsToTurso(env) {
     }
   } catch (e) {
     console.warn("Sheet 2 sync error:", e);
+  }
+
+  // 3. Fetch Archive 1 (Live auto-sync of any new additions)
+  try {
+    const resA1 = await fetch(urlArch1, { headers: { "User-Agent": "Mozilla/5.0" } });
+    const txtA1 = await resA1.text();
+    const objA1 = parseGViz(txtA1, "cbArch1");
+    if (objA1 && objA1.table && objA1.table.rows) {
+      for (const row of objA1.table.rows) {
+        if (!row.c) continue;
+        const vals = row.c.map(cell => cell ? (cell.f || cell.v || "") : "");
+        if (vals.length < 15) continue;
+        const ts = String(vals[0] || "").trim();
+        const shift = String(vals[1] || "").trim();
+        const unit = String(vals[2] || "").trim();
+        const qtc_name = String(vals[3] || "").trim();
+        const rawId = String(vals[4] || "").trim();
+        const yk_email = rawId ? (rawId.includes("@") ? rawId.toLowerCase() : ("me" + rawId + "@meti.ai")) : "";
+        const pc_no = String(vals[5] || "").trim();
+        const stage = String(vals[6] || "").trim();
+        const queue = String(vals[12] || "").trim();
+        const mod = String(vals[13] || "").trim();
+        const pas = String(vals[14] || "").trim().toUpperCase();
+        const link = String(vals[15] || "").trim();
+        const obj_cnt = parseInt(vals[16] || 0, 10) || 0;
+        let tid = String(vals[25] || "").trim();
+        if (!tid && link) {
+          const m = link.match(/\/id\/(\d+)/i);
+          if (m) tid = m[1];
+        }
+        if (!tid) continue;
+
+        stmts.push({
+          type: "execute",
+          stmt: {
+            sql: "INSERT OR IGNORE INTO task_submissions (timestamp, shift, unit, pc_no, labeler_name, national_id, qtc_shift, yubikey_email, qtc_name, stage, task_link, task_id, pass, modality, queue_name, object_count, created_at, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ارشيف 1')",
+            args: [
+              { type: "text", value: ts },
+              { type: "text", value: shift },
+              { type: "text", value: unit },
+              { type: "text", value: pc_no },
+              { type: "text", value: rawId || "Labeler" },
+              { type: "text", value: "" },
+              { type: "text", value: shift },
+              { type: "text", value: yk_email },
+              { type: "text", value: qtc_name },
+              { type: "text", value: stage },
+              { type: "text", value: link },
+              { type: "text", value: tid },
+              { type: "text", value: pas },
+              { type: "text", value: mod },
+              { type: "text", value: queue },
+              { type: "integer", value: String(obj_cnt) },
+              { type: "text", value: ts }
+            ]
+          }
+        });
+      }
+    }
+  } catch (e) {
+    console.warn("Archive 1 sync error:", e);
+  }
+
+  // 4. Fetch Archive 2 (Live auto-sync of any new additions)
+  try {
+    const resA2 = await fetch(urlArch2, { headers: { "User-Agent": "Mozilla/5.0" } });
+    const txtA2 = await resA2.text();
+    const objA2 = parseGViz(txtA2, "cbArch2");
+    if (objA2 && objA2.table && objA2.table.rows) {
+      for (const row of objA2.table.rows) {
+        if (!row.c) continue;
+        const vals = row.c.map(cell => cell ? (cell.f || cell.v || "") : "");
+        if (vals.length < 12) continue;
+        const ts = String(vals[0] || "").trim();
+        const shift = String(vals[1] || "").trim();
+        const unit = String(vals[2] || "").trim();
+        const qtc_name = String(vals[3] || "").trim();
+        const yk_email = String(vals[4] || "").trim().toLowerCase();
+        const lab_name = String(vals[5] || "").trim();
+        const pc_no = String(vals[6] || "").trim();
+        const stage = String(vals[7] || "").trim();
+        const mod = String(vals[8] || "").trim();
+        const queue = String(vals[9] || "").trim();
+        const link = String(vals[10] || "").trim();
+        const obj_cnt = parseInt(vals[11] || 0, 10) || 0;
+        const pas = String(vals[18] || "").trim().toUpperCase() || (link.toLowerCase().includes("sellivandar2d") ? "FP" : "QA");
+        let tid = "";
+        if (link) {
+          const m = link.match(/\/id\/(\d+)/i);
+          if (m) tid = m[1];
+        }
+        if (!tid) continue;
+
+        stmts.push({
+          type: "execute",
+          stmt: {
+            sql: "INSERT OR IGNORE INTO task_submissions (timestamp, shift, unit, pc_no, labeler_name, national_id, qtc_shift, yubikey_email, qtc_name, stage, task_link, task_id, pass, modality, queue_name, object_count, created_at, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ارشيف 2')",
+            args: [
+              { type: "text", value: ts },
+              { type: "text", value: shift },
+              { type: "text", value: unit },
+              { type: "text", value: pc_no },
+              { type: "text", value: lab_name || "Labeler" },
+              { type: "text", value: "" },
+              { type: "text", value: shift },
+              { type: "text", value: yk_email },
+              { type: "text", value: qtc_name },
+              { type: "text", value: stage },
+              { type: "text", value: link },
+              { type: "text", value: tid },
+              { type: "text", value: pas },
+              { type: "text", value: mod },
+              { type: "text", value: queue },
+              { type: "integer", value: String(obj_cnt) },
+              { type: "text", value: ts }
+            ]
+          }
+        });
+      }
+    }
+  } catch (e) {
+    console.warn("Archive 2 sync error:", e);
   }
 
   // Execute statements in batches of 50
@@ -1128,10 +1253,26 @@ export default {
         const countQuery = await db(env, `SELECT COUNT(*) AS total FROM task_submissions ${whereSql}`, params);
         const total = parseInt(countQuery[0]?.total || 0, 10);
 
+        const sourceParam = url.searchParams.get("source");
+        if (sourceParam && sourceParam !== "all") {
+          if (sourceParam === "live") {
+            whereClauses.push("(source = 'Live' OR source IS NULL)");
+          } else if (sourceParam === "arch1") {
+            whereClauses.push("source = 'ارشيف 1'");
+          } else if (sourceParam === "arch2") {
+            whereClauses.push("source = 'ارشيف 2'");
+          } else if (sourceParam === "archive") {
+            whereClauses.push("(source = 'ارشيف 1' OR source = 'ارشيف 2')");
+          } else {
+            whereClauses.push("source = ?");
+            params.push(sourceParam);
+          }
+        }
+
         const tasksQuery = `
-          SELECT id, timestamp, shift, unit, pc_no, labeler_name, national_id, qtc_shift, yubikey_email, qtc_name, stage, task_link, task_id, pass, modality, queue_name, object_count, created_at 
+          SELECT id, timestamp, shift, unit, pc_no, labeler_name, national_id, qtc_shift, yubikey_email, qtc_name, stage, task_link, task_id, pass, modality, queue_name, object_count, created_at, COALESCE(source, 'Live') AS source 
           FROM task_submissions 
-          ${whereSql} 
+          ${whereClauses.length ? "WHERE " + whereClauses.join(" AND ") : ""} 
           ORDER BY id DESC 
           LIMIT ? OFFSET ?
         `;
@@ -1271,6 +1412,19 @@ export default {
     } catch (err) {
       console.error("Backend exception:", err);
       return json({ error: "server_error", message: err.message || "Internal server error" }, 500, corsHeaders);
+    }
+  },
+
+  async scheduled(event, env, ctx) {
+    console.log("[CRON] Running automatic Google Sheets & Archives continuous sync:", event.cron);
+    try {
+      if (ctx && ctx.waitUntil) {
+        ctx.waitUntil(syncGoogleSheetsToTurso(env));
+      } else {
+        await syncGoogleSheetsToTurso(env);
+      }
+    } catch (e) {
+      console.error("[CRON] Sync error:", e);
     }
   }
 };

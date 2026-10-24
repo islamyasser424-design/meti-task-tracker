@@ -664,6 +664,48 @@ async function runArchiveSearch(){
   const fail=msg=>{st.textContent=msg;_arcsOnProg=null;prog.style.display='none';};
   if(!idq&&!hasOther){fail('Type an ID (3+ characters) or pick at least one filter, then press Search.');return;}
   if(idq&&idq.length<3&&!hasOther){fail('Type at least 3 characters of the ID.');return;}
+
+  // High-performance direct Turso database & archives lookup
+  var apiEndpoint = window.API_BASE || "https://meeg-secure-api.islamyasser424.workers.dev";
+  if (idq && idq.length >= 3) {
+    try {
+      st.textContent = "Searching database & archives…";
+      var searchFetch = typeof window.apiFetch === "function" 
+        ? window.apiFetch("/api/tasks?search=" + encodeURIComponent(idq) + "&limit=50")
+        : fetch(apiEndpoint + "/api/tasks?search=" + encodeURIComponent(idq) + "&limit=50");
+      var sRes = await searchFetch;
+      if (sRes.ok) {
+        var sData = await sRes.json();
+        if (sData && sData.ok && sData.tasks && sData.tasks.length > 0) {
+          if (my !== _arcsToken) return;
+          prog.style.display = "none";
+          st.textContent = "Found " + sData.tasks.length + " match(es) in database & archives";
+          res.innerHTML = sData.tasks.map(function(t) {
+            var src = t.source || "Live";
+            var icon = src === "Live" ? "⚡" : "📦";
+            return '<div class="arcs-card">'
+              + '<span class="arcs-tab">' + icon + ' ' + esc(src) + ' · Task ID: ' + esc(t.task_id || '') + '</span>'
+              + '<div class="arcs-grid">'
+              + '<div class="arcs-kv"><div class="k">Timestamp</div><div class="v">' + esc(t.timestamp || '') + '</div></div>'
+              + '<div class="arcs-kv"><div class="k">Shift</div><div class="v">' + esc(t.shift || '') + '</div></div>'
+              + '<div class="arcs-kv"><div class="k">Unit</div><div class="v">' + esc(t.unit || '') + '</div></div>'
+              + '<div class="arcs-kv"><div class="k">QTC</div><div class="v">' + esc(t.qtc_name || '') + '</div></div>'
+              + '<div class="arcs-kv"><div class="k">Labeler</div><div class="v">' + esc(t.labeler_name || t.yubikey_email || '') + '</div></div>'
+              + '<div class="arcs-kv"><div class="k">PC No</div><div class="v">' + esc(t.pc_no || '') + '</div></div>'
+              + '<div class="arcs-kv"><div class="k">Modality</div><div class="v">' + esc(t.modality || '') + '</div></div>'
+              + '<div class="arcs-kv"><div class="k">Queue</div><div class="v">' + esc(t.queue_name || '') + '</div></div>'
+              + '<div class="arcs-kv"><div class="k">Pass</div><div class="v">' + esc(t.pass || '') + '</div></div>'
+              + '<div class="arcs-kv"><div class="k">Objects</div><div class="v">' + esc(String(t.object_count || 0)) + '</div></div>'
+              + (t.task_link ? '<div class="arcs-kv" style="grid-column:1/-1"><div class="k">Link</div><div class="v"><a href="' + esc(t.task_link) + '" target="_blank" style="color:#2563eb;text-decoration:underline;">Open Task</a></div></div>' : '')
+              + '</div></div>';
+          }).join('');
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn("Backend fast archive search error:", e);
+    }
+  }
   const MAX=50;let shown=0,total=0,failed=0,done=0;
   st.textContent='Searching…';prog.style.display='flex';fill.style.width='0%';pctEl.textContent='0%';
   let tabs;try{tabs=await resolveArchiveTabs();}catch(e){tabs=archiveTabList;}
