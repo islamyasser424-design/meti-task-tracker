@@ -3168,11 +3168,14 @@ if(lastYK) { document.getElementById("yk").value = lastYK; validateYK(lastYK); }
     </div>
     <div class="admin-modal-body">
       <div id="adminAuthSection" style="text-align:center; padding: 30px 20px;">
-        <h3 style="margin-bottom:10px; color:#132f6b;">Admin Access</h3>
-        <p style="font-size:0.85rem; color:#4a6375; margin-bottom:16px;">Please enter the admin PIN to access database records.</p>
-        <input type="password" id="adminPin" placeholder="Enter PIN (Default: 2026)" style="padding:10px 16px; border:1.5px solid #c5d3ec; border-radius:8px; width:220px; font-size:1rem; text-align:center; margin-bottom:14px;" onkeydown="if(event.key==='Enter')checkAdminPin()">
-        <br>
-        <button class="admin-btn" onclick="checkAdminPin()">Login to Admin</button>
+        <h3 style="margin-bottom:10px; color:#132f6b;">Admin Authentication</h3>
+        <p style="font-size:0.85rem; color:#4a6375; margin-bottom:16px;">Sign in with your admin credentials to access database records.</p>
+        <div style="display:flex; flex-direction:column; gap:10px; align-items:center; max-width:280px; margin:0 auto 12px;">
+          <input type="text" id="adminUsername" placeholder="Admin Username" autocomplete="username" style="padding:10px 14px; border:1.5px solid #c5d3ec; border-radius:8px; width:100%; font-size:0.95rem; text-align:left;" onkeydown="if(event.key==='Enter')adminLogin()">
+          <input type="password" id="adminPassword" placeholder="Admin Password" autocomplete="current-password" style="padding:10px 14px; border:1.5px solid #c5d3ec; border-radius:8px; width:100%; font-size:0.95rem; text-align:left;" onkeydown="if(event.key==='Enter')adminLogin()">
+        </div>
+        <div id="adminLoginError" style="color:#e53e3e; font-size:0.8rem; margin-bottom:12px; min-height:18px;"></div>
+        <button class="admin-btn" onclick="adminLogin()">Sign In to Admin</button>
       </div>
 
       <div id="adminContentSection" style="display:none;">
@@ -3330,11 +3333,26 @@ var _adminBtnEl = document.getElementById("adminBtn");
 if (_adminBtnEl) {
   _adminBtnEl.addEventListener("click", function() {
     document.getElementById("adminModal").classList.add("show");
-    if (_adminUnlocked) {
+    var token = getAuthToken();
+    if (token) {
+      _adminUnlocked = true;
+      var authSec = document.getElementById("adminAuthSection");
+      var contSec = document.getElementById("adminContentSection");
+      if (authSec) authSec.style.display = "none";
+      if (contSec) contSec.style.display = "block";
       loadAdminData();
     } else {
-      document.getElementById("adminPin").value = "";
-      document.getElementById("adminPin").focus();
+      _adminUnlocked = false;
+      var authSec = document.getElementById("adminAuthSection");
+      var contSec = document.getElementById("adminContentSection");
+      if (authSec) authSec.style.display = "block";
+      if (contSec) contSec.style.display = "none";
+      var errEl = document.getElementById("adminLoginError");
+      if (errEl) errEl.textContent = "";
+      var uEl = document.getElementById("adminUsername");
+      if (uEl) { uEl.value = ""; uEl.focus(); }
+      var pEl = document.getElementById("adminPassword");
+      if (pEl) pEl.value = "";
     }
   });
 }
@@ -3381,16 +3399,48 @@ if (_dbDupOverlay) {
 }
 
 
-function checkAdminPin() {
-  var pin = document.getElementById("adminPin").value.trim();
-  if (pin === "2026" || pin === "admin" || pin === "meti2026") {
-    _adminUnlocked = true;
-    document.getElementById("adminAuthSection").style.display = "none";
-    document.getElementById("adminContentSection").style.display = "block";
-    loadAdminData();
-  } else {
-    alert("Incorrect PIN. Please try again.");
+function adminLogin() {
+  var u = (document.getElementById("adminUsername") ? document.getElementById("adminUsername").value.trim() : "");
+  var p = (document.getElementById("adminPassword") ? document.getElementById("adminPassword").value : "");
+  var errEl = document.getElementById("adminLoginError");
+  if (!u || !p) {
+    if (errEl) errEl.textContent = "Please enter both username and password.";
+    return;
   }
+  if (errEl) {
+    errEl.style.color = "#4a6375";
+    errEl.textContent = "Authenticating with server...";
+  }
+
+  apiFetch("/api/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ username: u, password: p })
+  })
+  .then(function(res) {
+    return res.json().then(function(data) {
+      if (!res.ok) {
+        throw new Error(data.message || (data.error === "rate_limited" ? "Too many attempts. Please try again later." : "Invalid username or password"));
+      }
+      return data;
+    });
+  })
+  .then(function(data) {
+    if (data.token) {
+      sessionStorage.setItem("meeg_auth_token", data.token);
+    }
+    _adminUnlocked = true;
+    var authSec = document.getElementById("adminAuthSection");
+    var contSec = document.getElementById("adminContentSection");
+    if (authSec) authSec.style.display = "none";
+    if (contSec) contSec.style.display = "block";
+    loadAdminData();
+  })
+  .catch(function(err) {
+    if (errEl) {
+      errEl.style.color = "#e53e3e";
+      errEl.textContent = err.message || "Login failed";
+    }
+  });
 }
 
 function loadAdminData() {
