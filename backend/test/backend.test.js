@@ -260,4 +260,34 @@ describe("MEEG Secure Backend Comprehensive Test Suite", () => {
     assert.ok(cookie.includes("Max-Age=0"));
   });
 
+  test("PUT /api/tasks/:id is permanently disabled and returns 403", async () => {
+    const req = new Request("https://worker.local/api/tasks/1", {
+      method: "PUT",
+      headers: {
+        "Authorization": `Bearer ${adminToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ labeler_name: "Hacker" })
+    });
+    const res = await worker.fetch(req, TEST_ENV);
+    assert.equal(res.status, 403);
+    const data = await res.json();
+    assert.equal(data.error, "forbidden");
+    assert.equal(data.message, "Task editing is permanently disabled");
+  });
+
+  test("DELETE /api/tasks/:id is permanently disabled and returns 403", async () => {
+    const req = new Request("https://worker.local/api/tasks/1", {
+      method: "DELETE",
+      headers: {
+        "Authorization": `Bearer ${adminToken}`
+      }
+    });
+    const res = await worker.fetch(req, TEST_ENV);
+    assert.equal(res.status, 403);
+    const data = await res.json();
+    assert.equal(data.error, "forbidden");
+    assert.equal(data.message, "Task deletion is permanently disabled");
+  });
+
 });

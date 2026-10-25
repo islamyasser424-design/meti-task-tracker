@@ -1419,42 +1419,15 @@ export default {
         return json({ ok: true, tasks, total, page, limit }, 200, corsHeaders);
       }
 
-      // Update Task (Admin or Supervisor)
+      // Update Task (Permanently Disabled)
       const taskUpdateMatch = pathname.match(/^\/api\/tasks\/(\d+)$/);
       if (taskUpdateMatch && request.method === "PUT") {
-        if (!isSupervisor) return json({ error: "forbidden", message: "Supervisor access required" }, 403, corsHeaders);
-        const taskId = taskUpdateMatch[1];
-        const b = await request.json().catch(() => ({}));
-
-        await db(
-          env,
-          `UPDATE task_submissions SET 
-            shift = COALESCE(?, shift), 
-            unit = COALESCE(?, unit), 
-            pc_no = COALESCE(?, pc_no), 
-            labeler_name = COALESCE(?, labeler_name), 
-            qtc_name = COALESCE(?, qtc_name), 
-            pass = COALESCE(?, pass), 
-            modality = COALESCE(?, modality), 
-            queue_name = COALESCE(?, queue_name), 
-            object_count = COALESCE(?, object_count) 
-           WHERE id = ?`,
-          [
-            b.shift || null, b.unit || null, b.pc_no || null,
-            b.labeler_name || null, b.qtc_name || null, b.pass || null,
-            b.modality || null, b.queue_name || null, b.object_count !== undefined ? b.object_count : null,
-            taskId
-          ]
-        );
-        return json({ ok: true, message: "Task updated" }, 200, corsHeaders);
+        return json({ error: "forbidden", message: "Task editing is permanently disabled" }, 403, corsHeaders);
       }
 
-      // Delete Task (Admin Only)
+      // Delete Task (Permanently Disabled)
       if (taskUpdateMatch && request.method === "DELETE") {
-        if (!isAdmin) return json({ error: "forbidden", message: "Admin access required to delete records" }, 403, corsHeaders);
-        const taskId = taskUpdateMatch[1];
-        await db(env, "DELETE FROM task_submissions WHERE id = ?", [taskId]);
-        return json({ ok: true, message: "Task deleted" }, 200, corsHeaders);
+        return json({ error: "forbidden", message: "Task deletion is permanently disabled" }, 403, corsHeaders);
       }
 
       // ------------------------------------------------------------
