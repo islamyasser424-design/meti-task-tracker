@@ -373,6 +373,8 @@ const ARCHIVE_TABS_URL='https://script.google.com/macros/s/AKfycbxIqJnT2eX1Ll1S9
 const ARCHIVE_API_KEY='';
 const ARCHIVE_TABS_EXCLUDE=[];
 let archiveIdInfo={},archiveLoading=false,archiveLoaded=false,archiveStatus='',archiveLastKey='',archiveDone=0,archiveFetched=0,archiveTotal=0;
+let archiveConflicts=[]; // Task IDs with conflicting metadata across archive tabs
+let archiveBestGuessTabs=[]; // Tabs without ID column scanned with best-guess method
 let archiveRemoteTabs=0,archiveFailedTabs=[],archiveFoundCount=0,archiveRerun=false,archiveOkTabs=new Set(),archiveOkKey='';
 const ARCHIVE_TABS_CACHE_KEY='meeg_archive_tabs_v1';
 let archiveTabList=ARCHIVE_TABS.map(n=>({name:n})),archiveTabsSource='manual list',archiveTabsResolvedAt=0,archiveLastSig='',archiveSearchedIds=new Set(),archiveSearchedSig='';
@@ -441,6 +443,26 @@ function computeUnresolvedQualityIds(){
 // downloads ONE archive tab (by gid when known — survives renames — otherwise by name). Retries up to 3 times (Google
 // throttles parallel gviz requests) and treats an HTML answer (login / error page) as a failure, not as an empty tab
 async function fetchArchiveTab(tab){
+  // Item A.5: Route all reads exclusively through ARCHIVE_TABS_URL proxy (service account), direct gviz fallback
+  if(typeof ARCHIVE_TABS_URL !== 'undefined' && ARCHIVE_TABS_URL){
+    for(let attempt=1;attempt<=2;attempt++){
+      try{
+        const sel=tab.gid!=null&&tab.gid!==''?`gid=${encodeURIComponent(tab.gid)}`:`tab=${encodeURIComponent(tab.name)}`;
+        const scriptUrl=ARCHIVE_TABS_URL+(ARCHIVE_TABS_URL.includes('?')?'&':'?')+sel+'&format=csv';
+        const r=await fetch(scriptUrl);
+        if(r.ok){
+          const t=await r.text();
+          if(t&&!/^\s*<!?doctype|^\s*<html/i.test(t)&&t.length>5){
+            return t;
+          }
+        }
+      }catch(e){
+        console.warn('ARCHIVE_TABS_URL tab read attempt '+attempt+' failed:',e.message);
+      }
+      if(attempt<2)await new Promise(res=>setTimeout(res,600));
+    }
+  }
+
   const sel=tab.gid!=null&&tab.gid!==''?`gid=${encodeURIComponent(tab.gid)}`:`sheet=${encodeURIComponent(tab.name)}`;
   const url=`https://docs.google.com/spreadsheets/d/${ARCHIVE_SHEET_ID}/gviz/tq?tqx=out:csv&headers=1&${sel}`;
   for(let attempt=1;attempt<=3;attempt++){
@@ -478,21 +500,58 @@ function scanArchiveTab(tab,text,remainingMap,map){
   const table=parseCSV(text).filter(row=>row&&row.length&&!(row.length===1&&String(row[0]||'').trim()===''));
   if(!table.length)return 0;
   const h=table[0].map(normHdr);
-  // some tabs call it "Task ID", others "ID" — and a tab can even have two (numeric "ID" + UUID "Id"), so index every one of them
   const idCols=[];h.forEach((x,i)=>{if(x==='id'||x==='task id'||x==='taskid')idCols.push(i);});
-  if(!idCols.length)console.warn('Archive tab "'+tab.name+'": no ID / Task ID column — scanning every cell instead');
+  if(!idCols.length){
+    console.warn('Archive tab "'+tab.name+'": no ID / Task ID column — scanning every cell instead');
+    if(!archiveBestGuessTabs.includes(tab.name)) archiveBestGuessTabs.push(tab.name);
+  }
   const emI=h.findIndex(x=>x.startsWith('yubikey email')),nmI=h.indexOf('labeler name'),qtI=h.indexOf('qtc name');
   let found=0;
   for(let i=1;i<table.length;i++){
     const row=table[i];if(!row)continue;
     const hits=[];
-    if(idCols.length){idCols.forEach(c=>{const o=remainingMap.get(normId(row[c]));if(o)hits.push(o);});}
-    else{row.forEach(cell=>{const n=normId(cell);if(n.length>=6){const o=remainingMap.get(n);if(o)hits.push(o);}});}
+    if(idCols.length){
+      idCols.forEach(c=>{const o=remainingMap.get(normId(row[c]));if(o)hits.push(o);});
+    } else {
+      row.forEach(cell=>{
+        const raw=String(cell==null?'':cell).trim();
+        // Item A.3: Task ID pattern check (digits only, no "/", "-", ":" from dates or phones)
+        if(!/^\d{6,}$/.test(raw)) return;
+        const n=normId(raw);
+        if(n.length>=6){const o=remainingMap.get(n);if(o)hits.push(o);}
+      });
+    }
     if(!hits.length)continue;
     const em=emI>=0?String(row[emI]||'').trim():'';
     const nm=nmI>=0?String(row[nmI]||'').trim():'';
     const qtc=qtI>=0?String(row[qtI]||'').trim():'';
-    hits.forEach(rid=>{map[rid]={name:nm||em||rid,email:em,qtc,group:qtcShiftGroup(qtc),src:'archive'};found++;});
+    hits.forEach(rid=>{
+      const newRec={name:nm||em||rid,email:em,qtc,group:qtcShiftGroup(qtc),src:'archive',tab:tab.name};
+      // Item A.2: Conflict detection across tabs
+      if(map[rid] && map[rid].src==='archive'){
+        const existing=map[rid];
+        const isConflict = (existing.email && newRec.email && existing.email.toLowerCase() !== newRec.email.toLowerCase()) ||
+                           (existing.name && newRec.name && existing.name.toLowerCase() !== newRec.name.toLowerCase()) ||
+                           (existing.qtc && newRec.qtc && existing.qtc.toLowerCase() !== newRec.qtc.toLowerCase());
+        if(isConflict){
+          const conflictEntry={
+            id: rid,
+            tabA: existing.tab || 'Previous Tab',
+            tabB: tab.name,
+            recA: existing,
+            recB: newRec,
+            warning: "This ID (" + rid + ") exists in two different tabs (" + (existing.tab||'Previous Tab') + " and " + tab.name + ") with different data — review manually"
+          };
+          if(!archiveConflicts.some(c=>c.id===rid && (c.tabB===tab.name || c.tabA===tab.name))){
+            archiveConflicts.push(conflictEntry);
+          }
+          existing.hasConflict = true;
+          return;
+        }
+      }
+      map[rid]=newRec;
+      found++;
+    });
   }
   return found;
 }
@@ -762,7 +821,18 @@ async function runArchiveSearch(){
           if(shown>=MAX)continue;
           shown++;
           const kv=t.raw.map((name,c)=>{const v=String(row[c]==null?'':row[c]).trim();return v?`<div class="arcs-kv"><div class="k">${esc(name||('col '+(c+1)))}</div><div class="v">${esc(v)}</div></div>`:'';}).join('');
-          res.insertAdjacentHTML('beforeend',`<div class="arcs-card"><span class="arcs-tab">📦 ${esc(tab.name)}</span><div class="arcs-grid">${kv}</div></div>`);
+          const refreshedStr = (typeof archiveTabsResolvedAt !== 'undefined' && archiveTabsResolvedAt) ? new Date(archiveTabsResolvedAt).toLocaleTimeString('en-US',{timeZone:'Africa/Cairo'}) : 'Cached';
+          const isBestGuess = archiveBestGuessTabs.includes(tab.name);
+          const hasConflict = archiveConflicts.some(c => c.id === idq);
+          const warnHtml = hasConflict ? '<div style="background:rgba(255,178,56,.15);color:var(--warning);border:1px solid rgba(255,178,56,.4);border-radius:6px;padding:3px 8px;font-size:.65rem;font-weight:700;margin-bottom:8px">⚠️ This ID exists in two different tabs with different data — review manually</div>' : '';
+          const guessHtml = isBestGuess ? '<div style="background:rgba(2,132,199,.12);color:var(--accent);border:1px solid rgba(2,132,199,.3);border-radius:6px;padding:3px 8px;font-size:.65rem;font-weight:700;margin-bottom:8px">ℹ️ Scanned with best guess method — review manually</div>' : '';
+          res.insertAdjacentHTML('beforeend', '<div class="arcs-card">'
+            + warnHtml + guessHtml
+            + '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:8px;">'
+            + '<span class="arcs-tab">📦 Tab: <b>' + esc(tab.name) + '</b></span>'
+            + '<span style="font-size:0.65rem;color:var(--text-soft);background:var(--bg-2);padding:2px 8px;border-radius:6px;border:1px solid var(--border);">🕒 Tab List Refreshed: ' + esc(refreshedStr) + '</span>'
+            + '</div>'
+            + '<div class="arcs-grid">' + kv + '</div></div>');
         }
       }
     }
@@ -1208,6 +1278,26 @@ function renderQualitySection(mc){
         ${resBadge}
       </div>`;
     }).join('');
+    if(archiveConflicts && archiveConflicts.length > 0){
+      const confBox = document.createElement('div');
+      confBox.className = 'sec';
+      confBox.style.borderLeft = '4px solid var(--warning)';
+      confBox.style.background = 'rgba(255,178,56,.05)';
+      confBox.innerHTML = '<div class="sec-hd"><span class="sec-t" style="color:var(--warning)">⚠️ Archive Conflicts Detected</span><span class="sec-m">' + archiveConflicts.length + ' ID(s) exist in multiple tabs with conflicting data — review manually</span></div>'
+        + '<div style="padding:10px 18px;font-size:.68rem;line-height:1.6">'
+        + archiveConflicts.map(c => '<div style="margin-bottom:4px">• <b>Task ID ' + esc(c.id) + '</b>: Found in <b>' + esc(c.tabA) + '</b> and <b>' + esc(c.tabB) + '</b> with differing details. Please review manually.</div>').join('')
+        + '</div>';
+      mc.appendChild(confBox);
+    }
+    if(archiveBestGuessTabs && archiveBestGuessTabs.length > 0){
+      const guessBox = document.createElement('div');
+      guessBox.className = 'sec';
+      guessBox.style.borderLeft = '4px solid var(--accent)';
+      guessBox.style.background = 'rgba(2,132,199,.05)';
+      guessBox.innerHTML = '<div class="sec-hd"><span class="sec-t" style="color:var(--accent)">ℹ️ Best-Guess Archive Scan Warning</span><span class="sec-m">Scanned with cell fallback</span></div>'
+        + '<div style="padding:10px 18px;font-size:.68rem;line-height:1.6">The following archive tab(s) had no ID column header and were scanned using a cell-level best-guess fallback: <b>' + archiveBestGuessTabs.map(esc).join(', ') + '</b>. Matches require manual review.</div>';
+      mc.appendChild(guessBox);
+    }
     const umSec=document.createElement('div');umSec.className='sec';umSec.style.borderLeft='4px solid var(--danger)';
     umSec.innerHTML=`<div class="sec-hd"><span class="sec-t">🚫 Unmatched Tasks</span><span class="sec-m">${unmatchedList.length} tasks with no matching ID${archiveStatus==='searching…'?` · Searching Archive <span class="arc-bar"><span class="arc-fill" style="width:${archivePct()}%"></span></span> <b class="arc-pct">${archivePct()}%</b>`:`${archiveHits?` · ${archiveHits} found in Archive`:''}${archiveFailedTabs.length?` · ⚠️ ${archiveFailedTabs.length} archive tab(s) failed <button onclick="retryArchive()" style="margin-left:4px;padding:2px 8px;border-radius:6px;border:1px solid var(--danger);background:transparent;color:var(--danger);font-weight:800;cursor:pointer;font-size:inherit;font-family:inherit">↻ Retry</button>`:''}`}${!teamsLoaded?' · Teams loading…':''}${teamsUsingSnapshot?' · ⚠️ Teams: built-in copy':''}</span></div><div class="cgrid">${umCards}</div>`;
     mc.appendChild(umSec);
