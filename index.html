@@ -2115,6 +2115,13 @@ window.scrollTo(0, 0);
 // ============================================================
 var API_BASE = window.MEEG_API_URL || localStorage.getItem("meeg_api_url") || (window.location.hostname.includes("github.io") ? "https://meeg-secure-api.islamyasser424.workers.dev" : "");
 
+function escapeHtml(str) {
+  if (str === null || str === undefined) return "";
+  return String(str).replace(/[&<>"']/g, function(c) {
+    return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c];
+  });
+}
+
 function getAuthToken() {
   return sessionStorage.getItem("meeg_auth_token") || "";
 }
@@ -2610,14 +2617,14 @@ function buildQTCGrid(shift, preserveName){
     card.classList.add("selected");card.querySelector(".qtc-check").textContent="\u2713";
     selectedQTC=p.name;hid.value=selectedQTC;disp.innerHTML="";
     var tag=document.createElement("div");tag.className="qtc-tag";
-    tag.innerHTML=selectedQTC+'<button type="button" title="Clear">\u2715</button>';
+    tag.innerHTML=escapeHtml(selectedQTC)+'<button type="button" title="Clear">\u2715</button>';
     tag.querySelector("button").addEventListener("click",function(){selectedQTC=null;hid.value="";disp.innerHTML="";card.classList.remove("selected");card.querySelector(".qtc-check").textContent="";});
     disp.appendChild(tag);
   }
 
   list.forEach(function(p){
     var card=document.createElement("div");card.className="qtc-card";
-    card.innerHTML='<div class="qtc-check"></div><div><div class="qtc-name">'+p.name+'</div>'+(p.role?'<div class="qtc-role">'+p.role+'</div>':'')+'</div>';
+    card.innerHTML='<div class="qtc-check"></div><div><div class="qtc-name">'+escapeHtml(p.name)+'</div>'+(p.role?'<div class="qtc-role">'+escapeHtml(p.role)+'</div>':'')+'</div>';
     card.addEventListener("click",function(){ selectCard(card,p); });
     grid.appendChild(card);
     // Restore previous selection
@@ -3492,17 +3499,19 @@ function loadAdminData() {
 
       var html = "";
       rows.slice(0, 50).forEach(function(r) {
+        var v = function(idx) { return r[idx] && r[idx].value != null ? escapeHtml(r[idx].value) : ""; };
+        var isQA = r[9] && r[9].value === "QA";
         html += "<tr>"
-          + "<td><strong>#" + (r[0] ? r[0].value : "") + "</strong></td>"
-          + "<td>" + (r[1] ? r[1].value : "") + "</td>"
-          + "<td>" + (r[2] ? r[2].value : "") + "</td>"
-          + "<td>" + (r[3] ? r[3].value : "") + "</td>"
-          + "<td>" + (r[4] ? r[4].value : "") + "</td>"
-          + "<td>" + (r[5] ? r[5].value : "") + "</td>"
-          + "<td>" + (r[7] ? r[7].value : "") + "</td>"
-          + "<td><code>" + (r[8] ? r[8].value : "") + "</code></td>"
-          + "<td><span style='font-weight:700; color:" + (r[9] && r[9].value === "QA" ? "#27ae60" : "#2980b9") + ";'>" + (r[9] ? r[9].value : "") + "</span></td>"
-          + "<td>" + (r[10] ? r[10].value : "0") + "</td>"
+          + "<td><strong>#" + v(0) + "</strong></td>"
+          + "<td>" + v(1) + "</td>"
+          + "<td>" + v(2) + "</td>"
+          + "<td>" + v(3) + "</td>"
+          + "<td>" + v(4) + "</td>"
+          + "<td>" + v(5) + "</td>"
+          + "<td>" + v(7) + "</td>"
+          + "<td><code>" + v(8) + "</code></td>"
+          + "<td><span style='font-weight:700; color:" + (isQA ? "#27ae60" : "#2980b9") + ";'>" + v(9) + "</span></td>"
+          + "<td>" + (v(10) || "0") + "</td>"
           + "</tr>";
       });
       tbody.innerHTML = html;
