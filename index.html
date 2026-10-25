@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script src="config.js"></script>
 <link rel="icon" type="image/x-icon" href="favicon.ico">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
@@ -2113,7 +2114,7 @@ window.scrollTo(0, 0);
 // MEEG UNIFIED SECURE BACKEND API CLIENT
 // Zero database credentials or tokens exposed to the browser
 // ============================================================
-var API_BASE = window.MEEG_API_URL || localStorage.getItem("meeg_api_url") || (window.location.hostname.includes("github.io") ? "https://meeg-secure-api.islamyasser424.workers.dev" : "");
+var API_BASE = (window.APP_CONFIG && window.APP_CONFIG.API_BASE) || window.MEEG_API_URL || localStorage.getItem("meeg_api_url") || (window.location.hostname.includes("github.io") ? "https://meeg-secure-api.islamyasser424.workers.dev" : "");
 
 function escapeHtml(str) {
   if (str === null || str === undefined) return "";
@@ -2165,7 +2166,7 @@ function apiFetch(endpoint, options) {
 // Deploy as Web App accessible to authorized clients
 // URL must end with /exec
 // ============================================================
-var GAS_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbxa-Id35-ob1ZCgajX-NLKtz6xPLJVqBd20v7rXdlsoTmeP6nhfvl0of2U2j1RKo3A/exec";
+var GAS_WEBAPP_URL = (window.APP_CONFIG && window.APP_CONFIG.GAS_WEBAPP_URL) || "";
 
 var NK          = "meti_labeler_names";
 var NK_YK       = "meti_yk_history";

@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="light">
 <head>
+<script src="config.js"></script>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>MEEG Productivity</title>
@@ -1190,13 +1191,13 @@ let qualityLastImport=null;
 let qualityLoading=false;
 /* ---- Archive spreadsheet (a SEPARATE Google Sheet with monthly tabs): old Data Base rows, used ONLY to look up an Actual ID -> person/shift.
         They are never added to rawRows, so dashboard totals/filters don't change. ---- */
-const ARCHIVE_SHEET_ID='1BSeiRLiRTSmH_Et0B8TQAPKsuY98CVSB-gcg6ai51YQ';  // ID of the Archive spreadsheet = the long code between /d/ and /edit in its URL (must be shared "anyone with the link can view")
+const ARCHIVE_SHEET_ID = (typeof window !== 'undefined' && window.APP_CONFIG && window.APP_CONFIG.ARCHIVE_SHEET_ID) || '';  // ID of the Archive spreadsheet = the long code between /d/ and /edit in its URL (must be shared "anyone with the link can view")
 const ARCHIVE_TABS=['1/2','March 2026','May 2026','April 2026','June 2026','July 2026','Aug 2026','Sep 1/9 to 3/9']; // exact tab names — add every new tab here
 /* ---- AUTO tab discovery (so a renamed / newly added tab needs NO code change). Fill in ONE of these two; leave both '' to use the manual ARCHIVE_TABS list above.
    1) ARCHIVE_TABS_URL : the /exec URL of a tiny Apps Script web app that returns the archive spreadsheet's tab list (script is in the chat)
    2) ARCHIVE_API_KEY  : a Google Cloud API key (Sheets API enabled, restricted to your GitHub Pages domain) — the page then asks Google directly
    Tabs are fetched by their numeric gid, so even a RENAMED tab keeps working. ARCHIVE_TABS_EXCLUDE = tab names to skip (summaries etc). ---- */
-const ARCHIVE_TABS_URL='https://script.google.com/macros/s/AKfycbxIqJnT2eX1Ll1S9MY1iSQmS4FLW1p4N_kLNZcdL0xZOCD2OjxOf2ZdkTx-PDjj_dhj/exec';
+const ARCHIVE_TABS_URL = (typeof window !== 'undefined' && window.APP_CONFIG && window.APP_CONFIG.ARCHIVE_TABS_URL) || '';
 const ARCHIVE_API_KEY='';
 const ARCHIVE_TABS_EXCLUDE=[];
 let archiveIdInfo={},archiveLoading=false,archiveLoaded=false,archiveStatus='',archiveLastKey='',archiveDone=0,archiveFetched=0,archiveTotal=0;

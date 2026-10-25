@@ -30,3 +30,7 @@ temp/
 backups/
 .wrangler/
 node_modules/
+
+
+# Runtime Application Configuration (Untracked)
+config.js

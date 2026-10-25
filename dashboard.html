@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script src="config.js"></script>
   <meta charset="UTF-8">
   <script>
     (function(){
@@ -2482,7 +2483,7 @@
     // MEEG UNIFIED SECURE BACKEND API CLIENT
     // Zero database credentials or tokens exposed to the browser
     // ============================================================
-    var API_BASE = window.MEEG_API_URL || localStorage.getItem("meeg_api_url") || "https://meeg-secure-api.islamyasser424.workers.dev";
+    var API_BASE = (window.APP_CONFIG && window.APP_CONFIG.API_BASE) || window.MEEG_API_URL || localStorage.getItem("meeg_api_url") || "https://meeg-secure-api.islamyasser424.workers.dev";
 
     function getAuthToken() {
       return sessionStorage.getItem("meeg_auth_token") || "";
