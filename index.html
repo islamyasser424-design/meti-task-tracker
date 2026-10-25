@@ -2130,11 +2130,14 @@ window.scrollTo(0, 0);
 var API_BASE = (window.APP_CONFIG && window.APP_CONFIG.API_BASE) || window.MEEG_API_URL || localStorage.getItem("meeg_api_url") || (window.location.hostname.includes("github.io") ? "https://meeg-secure-api.islamyasser424.workers.dev" : "");
 
 function escapeHtml(str) {
+
   if (str === null || str === undefined) return "";
   return String(str).replace(/[&<>"']/g, function(c) {
     return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c];
   });
 }
+
+var esc = escapeHtml;
 
 function getAuthToken() {
   return sessionStorage.getItem("meeg_auth_token") || "";
@@ -3638,7 +3641,7 @@ function loadQueuesInAdmin() {
       tbody.innerHTML = html;
     })
     .catch(function(err) {
-      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:15px; color:#e74c3c;">Failed to load: ' + esc(err.message) + '</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:15px; color:#e74c3c;">Failed to load: ' + escapeHtml(err.message) + '</td></tr>';
     });
 }
 
@@ -3765,7 +3768,7 @@ function loadQtcInAdmin() {
       renderAdminQtcTable();
     })
     .catch(function(err) {
-      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:15px; color:#e74c3c;">Failed to load: ' + esc(err.message) + '</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:15px; color:#e74c3c;">Failed to load: ' + escapeHtml(err.message) + '</td></tr>';
     });
 }
 
@@ -3780,7 +3783,7 @@ function renderAdminQtcTable() {
   countEl.textContent = filtered.length;
 
   if (!filtered.length) {
-    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:15px; color:#7a96a8;">No QTC members found for ' + filterShift + '.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:15px; color:#7a96a8;">No QTC members found for ' + escapeHtml(filterShift) + '.</td></tr>';
     return;
   }
 
