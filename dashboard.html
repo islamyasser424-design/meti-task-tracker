@@ -1714,11 +1714,12 @@
               <option value="all">All QTCs</option>
             </select>
 
-            <select class="filter-select" id="filterSource" onchange="onSourceFilterChange()" style="max-width:180px; font-weight:700;">
+            <select class="filter-select" id="filterSource" onchange="onSourceFilterChange()" style="max-width:200px; font-weight:700;">
               <option value="all">🌐 All Sources</option>
               <option value="live">⚡ Live Only</option>
-              <option value="arch1">📦 ارشيف 1</option>
-              <option value="arch2">📦 ارشيف 2</option>
+              <option value="arch2026">📦 Archive 2026</option>
+              <option value="arch2025">📦 Archive 2025</option>
+              <option value="archive">📚 Both Archives (2025 + 2026)</option>
             </select>
 
             <div style="display:flex; align-items:center; gap:6px; flex:1; min-width:240px;">
@@ -3540,7 +3541,7 @@ function refreshCurrentWorkspace() {
       var el = document.getElementById("filterSource");
       if (!el || !val) return;
       el.value = (el.value === val) ? "all" : val;
-      applyFilters();
+      onSourceFilterChange();
     }
 
     function resetAllFilters() {
@@ -3660,9 +3661,13 @@ function refreshCurrentWorkspace() {
         var filterSource = document.getElementById("filterSource") ? document.getElementById("filterSource").value : "all";
         if (filterSource !== "all") {
           var s = (r.source || "Live").toLowerCase();
-          if (filterSource === "live" && s !== "live") return false;
-          if (filterSource === "arch1" && s !== "ارشيف 1") return false;
-          if (filterSource === "arch2" && s !== "ارشيف 2") return false;
+          var isLive = s === "live" || s === "" || s === "null";
+          var isArch2026 = s.indexOf("2026") !== -1 || s.indexOf("2") !== -1;
+          var isArch2025 = s.indexOf("2025") !== -1 || s.indexOf("1") !== -1;
+          if (filterSource === "live" && !isLive) return false;
+          if ((filterSource === "arch2026" || filterSource === "arch2") && !isArch2026) return false;
+          if ((filterSource === "arch2025" || filterSource === "arch1") && !isArch2025) return false;
+          if ((filterSource === "archive" || filterSource === "both") && !isArch2026 && !isArch2025) return false;
         }
 
         if (q) {
@@ -3749,10 +3754,12 @@ function refreshCurrentWorkspace() {
           : '<code title="' + r.task_id + '">' + taskDisplay + '</code>';
 
         var src = r.source || "Live";
-        var srcBadge = src === "ارشيف 1"
-          ? '<span class="badge-source" style="background:rgba(59,130,246,0.12); color:#2563eb; border:1px solid rgba(59,130,246,0.3); padding:2px 7px; border-radius:4px; font-size:0.72rem; font-weight:700; cursor:pointer;" onclick="quickFilterSource(\'arch1\')" title="Click to filter by ارشيف 1">📦 ارشيف 1</span>'
-          : (src === "ارشيف 2"
-            ? '<span class="badge-source" style="background:rgba(168,85,247,0.12); color:#9333ea; border:1px solid rgba(168,85,247,0.3); padding:2px 7px; border-radius:4px; font-size:0.72rem; font-weight:700; cursor:pointer;" onclick="quickFilterSource(\'arch2\')" title="Click to filter by ارشيف 2">📦 ارشيف 2</span>'
+        var isA26 = src.indexOf("2026") !== -1 || src.indexOf("2") !== -1;
+        var isA25 = src.indexOf("2025") !== -1 || src.indexOf("1") !== -1;
+        var srcBadge = isA26
+          ? '<span class="badge-source" style="background:rgba(168,85,247,0.12); color:#9333ea; border:1px solid rgba(168,85,247,0.3); padding:2px 7px; border-radius:4px; font-size:0.72rem; font-weight:700; cursor:pointer;" onclick="quickFilterSource(\'arch2026\')" title="Click to filter by Archive 2026">📦 Archive 2026</span>'
+          : (isA25
+            ? '<span class="badge-source" style="background:rgba(59,130,246,0.12); color:#2563eb; border:1px solid rgba(59,130,246,0.3); padding:2px 7px; border-radius:4px; font-size:0.72rem; font-weight:700; cursor:pointer;" onclick="quickFilterSource(\'arch2025\')" title="Click to filter by Archive 2025">📦 Archive 2025</span>'
             : '<span class="badge-source" style="background:rgba(16,185,129,0.12); color:#059669; border:1px solid rgba(16,185,129,0.3); padding:2px 7px; border-radius:4px; font-size:0.72rem; font-weight:700; cursor:pointer;" onclick="quickFilterSource(\'live\')" title="Click to filter by Live">⚡ Live</span>');
 
         var escUnit = (r.unit || "").replace(/'/g, "\\'");
@@ -4850,7 +4857,7 @@ async function syncGoogleSheetsClient(isAuto) {
       var filterDate = document.getElementById("filterDate");
 
       // When switching to an archive, auto-switch date filter to "all" because archives contain historical records from past dates
-      if ((filterSource === "arch1" || filterSource === "arch2") && filterDate && (filterDate.value === "today" || filterDate.value === "yesterday")) {
+      if ((filterSource === "arch2026" || filterSource === "arch2025" || filterSource === "archive" || filterSource === "arch1" || filterSource === "arch2") && filterDate && (filterDate.value === "today" || filterDate.value === "yesterday")) {
         filterDate.value = "all";
         if (typeof showToast === "function") {
           showToast("📅 Switched date to 'All Dates' for Archive view");
@@ -4869,7 +4876,7 @@ async function syncGoogleSheetsClient(isAuto) {
 
       // Otherwise, load from backend for this specific source
       var sync = document.getElementById("syncStatus");
-      var sourceLabel = filterSource === "arch1" ? "ارشيف 1" : (filterSource === "arch2" ? "ارشيف 2" : (filterSource === "live" ? "Live Only" : "All Sources"));
+      var sourceLabel = (filterSource === "arch2026" || filterSource === "arch2") ? "Archive 2026" : ((filterSource === "arch2025" || filterSource === "arch1") ? "Archive 2025" : ((filterSource === "archive" || filterSource === "both") ? "Both Archives" : (filterSource === "live" ? "Live Only" : "All Sources")));
       if (sync) sync.textContent = "📦 Loading " + sourceLabel + " from database...";
 
       var url = "/api/tasks?limit=2500";

@@ -363,8 +363,10 @@ async function syncGoogleSheetsToTurso(env) {
   const q2 = "select * order by A desc limit 100";
   const url2 = "https://docs.google.com/spreadsheets/d/1vpsYtvoZSKLsUeKj-FTXVGJmyFygSSck8DUIODJha_A/gviz/tq?tqx=responseHandler:cb2&tq=" + encodeURIComponent(q2);
 
-  const urlArch1 = "https://docs.google.com/spreadsheets/d/1oYBQ0pBqdre60Ds14sTbSijBxOBDsbCZ_kurYrdX_1o/gviz/tq?tqx=responseHandler:cbArch1&tq=" + encodeURIComponent("select * order by A desc limit 150") + "&gid=260304689";
-  const urlArch2 = "https://docs.google.com/spreadsheets/d/1BSeiRLiRTSmH_Et0B8TQAPKsuY98CVSB-gcg6ai51YQ/gviz/tq?tqx=responseHandler:cbArch2&tq=" + encodeURIComponent("select * order by A desc limit 150") + "&gid=231409283";
+  // Archive 2025 Sheet
+  const urlArch2025 = "https://docs.google.com/spreadsheets/d/15PtvFZIJbtsj1_cxvOtUDSQdQ7liHZcHRG3hClSZKpA/gviz/tq?tqx=responseHandler:cbArch2025&tq=" + encodeURIComponent("select * order by A desc limit 200") + "&gid=260304689";
+  // Archive 2026 Sheet
+  const urlArch2026 = "https://docs.google.com/spreadsheets/d/1gDtM7ykuYLFRoOUtV7WVHpOrbCusL1fSaT6nOOm67Cc/gviz/tq?tqx=responseHandler:cbArch2026&tq=" + encodeURIComponent("select * order by A desc limit 200") + "&gid=231409283";
 
   const stmts = [];
   const newQueues = new Set();
@@ -506,11 +508,11 @@ async function syncGoogleSheetsToTurso(env) {
     console.warn("Sheet 2 sync error:", e);
   }
 
-  // 3. Fetch Archive 1 (Live auto-sync of any new additions)
+  // 3. Fetch Archive 2025 (Live auto-sync of any new additions)
   try {
-    const resA1 = await fetch(urlArch1, { headers: { "User-Agent": "Mozilla/5.0" } });
+    const resA1 = await fetch(urlArch2025, { headers: { "User-Agent": "Mozilla/5.0" } });
     const txtA1 = await resA1.text();
-    const objA1 = parseGViz(txtA1, "cbArch1");
+    const objA1 = parseGViz(txtA1, "cbArch2025");
     if (objA1 && objA1.table && objA1.table.rows) {
       for (const row of objA1.table.rows) {
         if (!row.c) continue;
@@ -536,29 +538,40 @@ async function syncGoogleSheetsToTurso(env) {
         }
         if (!tid) continue;
 
+        const a25Args = [
+          { type: "text", value: ts },
+          { type: "text", value: shift },
+          { type: "text", value: unit },
+          { type: "text", value: pc_no },
+          { type: "text", value: rawId || "Labeler" },
+          { type: "text", value: "" },
+          { type: "text", value: shift },
+          { type: "text", value: yk_email },
+          { type: "text", value: qtc_name },
+          { type: "text", value: stage },
+          { type: "text", value: link },
+          { type: "text", value: tid },
+          { type: "text", value: pas },
+          { type: "text", value: mod },
+          { type: "text", value: queue },
+          { type: "integer", value: String(obj_cnt) },
+          { type: "text", value: ts },
+          { type: "text", value: "Archive 2025" }
+        ];
+
         stmts.push({
           type: "execute",
           stmt: {
-            sql: "INSERT OR IGNORE INTO task_submissions (timestamp, shift, unit, pc_no, labeler_name, national_id, qtc_shift, yubikey_email, qtc_name, stage, task_link, task_id, pass, modality, queue_name, object_count, created_at, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ارشيف 1')",
-            args: [
-              { type: "text", value: ts },
-              { type: "text", value: shift },
-              { type: "text", value: unit },
-              { type: "text", value: pc_no },
-              { type: "text", value: rawId || "Labeler" },
-              { type: "text", value: "" },
-              { type: "text", value: shift },
-              { type: "text", value: yk_email },
-              { type: "text", value: qtc_name },
-              { type: "text", value: stage },
-              { type: "text", value: link },
-              { type: "text", value: tid },
-              { type: "text", value: pas },
-              { type: "text", value: mod },
-              { type: "text", value: queue },
-              { type: "integer", value: String(obj_cnt) },
-              { type: "text", value: ts }
-            ]
+            sql: "INSERT OR IGNORE INTO archive_2025 (timestamp, shift, unit, pc_no, labeler_name, national_id, qtc_shift, yubikey_email, qtc_name, stage, task_link, task_id, pass, modality, queue_name, object_count, created_at, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            args: a25Args
+          }
+        });
+
+        stmts.push({
+          type: "execute",
+          stmt: {
+            sql: "INSERT OR IGNORE INTO task_submissions (timestamp, shift, unit, pc_no, labeler_name, national_id, qtc_shift, yubikey_email, qtc_name, stage, task_link, task_id, pass, modality, queue_name, object_count, created_at, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            args: a25Args
           }
         });
       }
@@ -567,11 +580,11 @@ async function syncGoogleSheetsToTurso(env) {
     console.warn("Archive 1 sync error:", e);
   }
 
-  // 4. Fetch Archive 2 (Live auto-sync of any new additions)
+  // 4. Fetch Archive 2026 (Live auto-sync of any new additions)
   try {
-    const resA2 = await fetch(urlArch2, { headers: { "User-Agent": "Mozilla/5.0" } });
+    const resA2 = await fetch(urlArch2026, { headers: { "User-Agent": "Mozilla/5.0" } });
     const txtA2 = await resA2.text();
-    const objA2 = parseGViz(txtA2, "cbArch2");
+    const objA2 = parseGViz(txtA2, "cbArch2026");
     if (objA2 && objA2.table && objA2.table.rows) {
       for (const row of objA2.table.rows) {
         if (!row.c) continue;
@@ -597,29 +610,40 @@ async function syncGoogleSheetsToTurso(env) {
         }
         if (!tid) continue;
 
+        const a26Args = [
+          { type: "text", value: ts },
+          { type: "text", value: shift },
+          { type: "text", value: unit },
+          { type: "text", value: pc_no },
+          { type: "text", value: lab_name || "Labeler" },
+          { type: "text", value: "" },
+          { type: "text", value: shift },
+          { type: "text", value: yk_email },
+          { type: "text", value: qtc_name },
+          { type: "text", value: stage },
+          { type: "text", value: link },
+          { type: "text", value: tid },
+          { type: "text", value: pas },
+          { type: "text", value: mod },
+          { type: "text", value: queue },
+          { type: "integer", value: String(obj_cnt) },
+          { type: "text", value: ts },
+          { type: "text", value: "Archive 2026" }
+        ];
+
         stmts.push({
           type: "execute",
           stmt: {
-            sql: "INSERT OR IGNORE INTO task_submissions (timestamp, shift, unit, pc_no, labeler_name, national_id, qtc_shift, yubikey_email, qtc_name, stage, task_link, task_id, pass, modality, queue_name, object_count, created_at, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ارشيف 2')",
-            args: [
-              { type: "text", value: ts },
-              { type: "text", value: shift },
-              { type: "text", value: unit },
-              { type: "text", value: pc_no },
-              { type: "text", value: lab_name || "Labeler" },
-              { type: "text", value: "" },
-              { type: "text", value: shift },
-              { type: "text", value: yk_email },
-              { type: "text", value: qtc_name },
-              { type: "text", value: stage },
-              { type: "text", value: link },
-              { type: "text", value: tid },
-              { type: "text", value: pas },
-              { type: "text", value: mod },
-              { type: "text", value: queue },
-              { type: "integer", value: String(obj_cnt) },
-              { type: "text", value: ts }
-            ]
+            sql: "INSERT OR IGNORE INTO archive_2026 (timestamp, shift, unit, pc_no, labeler_name, national_id, qtc_shift, yubikey_email, qtc_name, stage, task_link, task_id, pass, modality, queue_name, object_count, created_at, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            args: a26Args
+          }
+        });
+
+        stmts.push({
+          type: "execute",
+          stmt: {
+            sql: "INSERT OR IGNORE INTO task_submissions (timestamp, shift, unit, pc_no, labeler_name, national_id, qtc_shift, yubikey_email, qtc_name, stage, task_link, task_id, pass, modality, queue_name, object_count, created_at, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            args: a26Args
           }
         });
       }
@@ -1045,14 +1069,13 @@ export default {
         let params = [];
         if (sourceParam === "all") {
           sourceClause = "";
-        } else if (sourceParam === "arch1") {
-          sourceClause = "WHERE source = 'ارشيف 1'";
-        } else if (sourceParam === "arch2") {
-          sourceClause = "WHERE source = 'ارشيف 2'";
-        } else if (sourceParam === "archive") {
-          sourceClause = "WHERE (source = 'ارشيف 1' OR source = 'ارشيف 2')";
+        } else if (sourceParam === "arch2026" || sourceParam === "archive2026" || sourceParam === "archive_2026" || sourceParam === "arch2") {
+          sourceClause = "WHERE (source = 'Archive 2026' OR source = 'ارشيف 2')";
+        } else if (sourceParam === "arch2025" || sourceParam === "archive2025" || sourceParam === "archive_2025" || sourceParam === "arch1") {
+          sourceClause = "WHERE (source = 'Archive 2025' OR source = 'ارشيف 1')";
+        } else if (sourceParam === "archive" || sourceParam === "both") {
+          sourceClause = "WHERE (source IN ('Archive 2026', 'Archive 2025', 'ارشيف 1', 'ارشيف 2'))";
         } else {
-          // Default to live operational data so historical bulk archives do not starve out current shifts
           sourceClause = "WHERE (source = 'Live' OR source IS NULL OR source = '')";
         }
 
@@ -1085,6 +1108,28 @@ export default {
       if (pathname === "/api/qtc" && request.method === "GET") {
         const rows = await db(env, "SELECT id, shift, name, role, created_at FROM custom_qtc ORDER BY shift ASC, name ASC");
         return json({ ok: true, qtc: rows }, 200, corsHeaders);
+      }
+
+      // Dedicated Archive 2026 Table Endpoint
+      if (pathname === "/api/archive/2026" && request.method === "GET") {
+        const page = Math.max(1, parseInt(url.searchParams.get("page") || "1", 10));
+        const limit = Math.min(1000, Math.max(1, parseInt(url.searchParams.get("limit") || "100", 10)));
+        const offset = (page - 1) * limit;
+        const totalRows = await db(env, "SELECT count(*) AS total FROM archive_2026");
+        const total = totalRows[0]?.total || 0;
+        const rows = await db(env, "SELECT * FROM archive_2026 ORDER BY id DESC LIMIT ? OFFSET ?", [limit, offset]);
+        return json({ ok: true, archive: "2026", total: Number(total), page, limit, rows }, 200, corsHeaders);
+      }
+
+      // Dedicated Archive 2025 Table Endpoint
+      if (pathname === "/api/archive/2025" && request.method === "GET") {
+        const page = Math.max(1, parseInt(url.searchParams.get("page") || "1", 10));
+        const limit = Math.min(1000, Math.max(1, parseInt(url.searchParams.get("limit") || "100", 10)));
+        const offset = (page - 1) * limit;
+        const totalRows = await db(env, "SELECT count(*) AS total FROM archive_2025");
+        const total = totalRows[0]?.total || 0;
+        const rows = await db(env, "SELECT * FROM archive_2025 ORDER BY id DESC LIMIT ? OFFSET ?", [limit, offset]);
+        return json({ ok: true, archive: "2025", total: Number(total), page, limit, rows }, 200, corsHeaders);
       }
 
       // ============================================================
@@ -1294,16 +1339,16 @@ export default {
           params.push(s, s, s, s, s, s, s);
         }
 
-        const sourceParam = url.searchParams.get("source");
+        const sourceParam = (url.searchParams.get("source") || "").toLowerCase().trim();
         if (sourceParam && sourceParam !== "all") {
           if (sourceParam === "live") {
             whereClauses.push("(source = 'Live' OR source IS NULL OR source = '')");
-          } else if (sourceParam === "arch1") {
-            whereClauses.push("source = 'ارشيف 1'");
-          } else if (sourceParam === "arch2") {
-            whereClauses.push("source = 'ارشيف 2'");
-          } else if (sourceParam === "archive") {
-            whereClauses.push("(source = 'ارشيف 1' OR source = 'ارشيف 2')");
+          } else if (sourceParam === "arch2026" || sourceParam === "archive2026" || sourceParam === "archive_2026" || sourceParam === "arch2") {
+            whereClauses.push("(source = 'Archive 2026' OR source = 'ارشيف 2')");
+          } else if (sourceParam === "arch2025" || sourceParam === "archive2025" || sourceParam === "archive_2025" || sourceParam === "arch1") {
+            whereClauses.push("(source = 'Archive 2025' OR source = 'ارشيف 1')");
+          } else if (sourceParam === "archive" || sourceParam === "both") {
+            whereClauses.push("(source IN ('Archive 2026', 'Archive 2025', 'ارشيف 1', 'ارشيف 2'))");
           } else {
             whereClauses.push("source = ?");
             params.push(sourceParam);

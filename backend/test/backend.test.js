@@ -223,6 +223,32 @@ describe("MEEG Secure Backend Comprehensive Test Suite", () => {
     assert.equal(res.headers.get("Access-Control-Allow-Credentials"), "true");
   });
 
+  test("/api/archive/2026 returns records from archive_2026 table", async () => {
+    const req = new Request("https://worker.local/api/archive/2026?limit=5", {
+      method: "GET"
+    });
+    const res = await worker.fetch(req, TEST_ENV);
+    assert.equal(res.status, 200);
+    const data = await res.json();
+    assert.equal(data.ok, true);
+    assert.equal(data.archive, "2026");
+    assert.ok(data.total > 0, "Total in archive_2026 should be positive");
+    assert.ok(Array.isArray(data.rows));
+  });
+
+  test("/api/archive/2025 returns records from archive_2025 table", async () => {
+    const req = new Request("https://worker.local/api/archive/2025?limit=5", {
+      method: "GET"
+    });
+    const res = await worker.fetch(req, TEST_ENV);
+    assert.equal(res.status, 200);
+    const data = await res.json();
+    assert.equal(data.ok, true);
+    assert.equal(data.archive, "2025");
+    assert.ok(data.total > 0, "Total in archive_2025 should be positive");
+    assert.ok(Array.isArray(data.rows));
+  });
+
   test("Logout clears session cookie", async () => {
     const req = new Request("https://worker.local/api/auth/logout", {
       method: "POST",

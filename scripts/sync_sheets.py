@@ -107,6 +107,89 @@ def sync_sheets():
     except Exception as e:
         print(f"Error fetching Sheet 2: {e}")
 
+    # 3. Fetch Archive 2026 (Live additions)
+    print("Fetching newest 150 rows from Archive 2026 Sheet...")
+    try:
+        s26_count = 0
+        q26 = "select * order by A desc limit 150"
+        url26 = 'https://docs.google.com/spreadsheets/d/1gDtM7ykuYLFRoOUtV7WVHpOrbCusL1fSaT6nOOm67Cc/gviz/tq?tqx=responseHandler:cbArch2026&gid=231409283&tq=' + urllib.parse.quote(q26)
+        req26 = urllib.request.Request(url26, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req26, timeout=30) as resp:
+            txt26 = resp.read().decode('utf-8')
+        m26 = re.search(r'cbArch2026\((.*)\);?\s*$', txt26, re.DOTALL)
+        if m26:
+            obj26 = json.loads(m26.group(1))
+            for r in obj26['table']['rows']:
+                vals = [(cell.get('f') or cell.get('v') or '') if cell else '' for cell in r['c']]
+                if len(vals) < 12: continue
+                ts, shift, unit, qtc_name, yk_email, lab_name, pc_no, stage, mod, queue, link, obj_cnt = vals[:12]
+                pas = vals[18] if len(vals) > 18 and vals[18] else ('FP' if 'sellivandar2d' in str(link).lower() else 'QA')
+                tid = ''
+                if link:
+                    m = re.search(r'/id/(\d+)', str(link))
+                    if m: tid = m.group(1)
+                if not tid: continue
+
+                # Insert into archive_2026
+                sql_a26 = "INSERT OR IGNORE INTO archive_2026 (timestamp, shift, unit, pc_no, labeler_name, national_id, qtc_shift, yubikey_email, qtc_name, stage, task_link, task_id, pass, modality, queue_name, object_count, created_at, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Archive 2026')"
+                # Insert into task_submissions
+                sql_ts26 = "INSERT OR IGNORE INTO task_submissions (timestamp, shift, unit, pc_no, labeler_name, national_id, qtc_shift, yubikey_email, qtc_name, stage, task_link, task_id, pass, modality, queue_name, object_count, created_at, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Archive 2026')"
+                args26 = [
+                    to_val(ts), to_val(shift), to_val(unit), to_val(pc_no), to_val(lab_name or 'Labeler'),
+                    to_val(''), to_val(shift), to_val(str(yk_email).lower()), to_val(qtc_name),
+                    to_val(stage), to_val(link), to_val(tid), to_val(str(pas).upper()), to_val(mod),
+                    to_val(queue), to_val(obj_cnt, 'integer'), to_val(ts)
+                ]
+                stmts.append({'type': 'execute', 'stmt': {'sql': sql_a26, 'args': args26}})
+                stmts.append({'type': 'execute', 'stmt': {'sql': sql_ts26, 'args': args26}})
+                s26_count += 1
+            print(f"Archive 2026: prepared {s26_count} rows.")
+    except Exception as e:
+        print(f"Error fetching Archive 2026: {e}")
+
+    # 4. Fetch Archive 2025 (Live additions)
+    print("Fetching newest 150 rows from Archive 2025 Sheet...")
+    try:
+        s25_count = 0
+        q25 = "select * order by A desc limit 150"
+        url25 = 'https://docs.google.com/spreadsheets/d/15PtvFZIJbtsj1_cxvOtUDSQdQ7liHZcHRG3hClSZKpA/gviz/tq?tqx=responseHandler:cbArch2025&gid=260304689&tq=' + urllib.parse.quote(q25)
+        req25 = urllib.request.Request(url25, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req25, timeout=30) as resp:
+            txt25 = resp.read().decode('utf-8')
+        m25 = re.search(r'cbArch2025\((.*)\);?\s*$', txt25, re.DOTALL)
+        if m25:
+            obj25 = json.loads(m25.group(1))
+            for r in obj25['table']['rows']:
+                vals = [(cell.get('f') or cell.get('v') or '') if cell else '' for cell in r['c']]
+                if len(vals) < 15: continue
+                ts, shift, unit, qtc_name, raw_id, pc_no, stage = vals[:7]
+                queue = vals[12] if len(vals) > 12 else ''
+                mod = vals[13] if len(vals) > 13 else ''
+                pas = vals[14] if len(vals) > 14 else 'QA'
+                link = vals[15] if len(vals) > 15 else ''
+                obj_cnt = vals[16] if len(vals) > 16 else 0
+                tid = vals[25] if len(vals) > 25 and vals[25] else ''
+                if not tid and link:
+                    m = re.search(r'/id/(\d+)', str(link))
+                    if m: tid = m.group(1)
+                if not tid: continue
+                yk_email = f"me{raw_id}@meti.ai" if raw_id and '@' not in str(raw_id) else str(raw_id).lower()
+
+                sql_a25 = "INSERT OR IGNORE INTO archive_2025 (timestamp, shift, unit, pc_no, labeler_name, national_id, qtc_shift, yubikey_email, qtc_name, stage, task_link, task_id, pass, modality, queue_name, object_count, created_at, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Archive 2025')"
+                sql_ts25 = "INSERT OR IGNORE INTO task_submissions (timestamp, shift, unit, pc_no, labeler_name, national_id, qtc_shift, yubikey_email, qtc_name, stage, task_link, task_id, pass, modality, queue_name, object_count, created_at, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Archive 2025')"
+                args25 = [
+                    to_val(ts), to_val(shift), to_val(unit), to_val(pc_no), to_val(raw_id or 'Labeler'),
+                    to_val(''), to_val(shift), to_val(yk_email), to_val(qtc_name),
+                    to_val(stage), to_val(link), to_val(tid), to_val(str(pas).upper()), to_val(mod),
+                    to_val(queue), to_val(obj_cnt, 'integer'), to_val(ts)
+                ]
+                stmts.append({'type': 'execute', 'stmt': {'sql': sql_a25, 'args': args25}})
+                stmts.append({'type': 'execute', 'stmt': {'sql': sql_ts25, 'args': args25}})
+                s25_count += 1
+            print(f"Archive 2025: prepared {s25_count} rows.")
+    except Exception as e:
+        print(f"Error fetching Archive 2025: {e}")
+
     # Sync custom queues & QTCs if new ones detected
     if new_queues:
         q_stmts = [{'type': 'execute', 'stmt': {'sql': 'INSERT OR IGNORE INTO custom_queues (queue_name, description) VALUES (?, ?)', 'args': [{'type': 'text', 'value': q}, {'type': 'text', 'value': 'Auto-synced from Google Sheets'}]}} for q in new_queues]
