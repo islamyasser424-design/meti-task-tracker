@@ -1,0 +1,24 @@
+{
+  "name": "meti-task-tracker",
+  "version": "1.0.0",
+  "description": "MEEG Operations & Task Tracker with Edge SQLite Backend and Analytics Engine",
+  "main": "analytics-engine.js",
+  "scripts": {
+    "build": "node scripts/build_minify.js",
+    "test": "node scripts/test_all_pages.js && cd backend && node --test test/*.test.js",
+    "test:pages": "node scripts/test_all_pages.js",
+    "test:backend": "cd backend && node --test test/*.test.js"
+  },
+  "keywords": [
+    "operations",
+    "task-tracker",
+    "analytics",
+    "turso"
+  ],
+  "author": "MEEG Team",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "terser": "^5.51.2"
+  }
+}
