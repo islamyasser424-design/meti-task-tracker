@@ -4890,12 +4890,16 @@ async function syncGoogleSheetsClient(isAuto) {
       var sourceLabel = (filterSource === "arch2026" || filterSource === "arch2") ? "Archive 2026" : ((filterSource === "arch2025" || filterSource === "arch1") ? "Archive 2025" : ((filterSource === "archive" || filterSource === "both") ? "Both Archives" : (filterSource === "live" ? "Live Only" : "All Sources")));
       if (sync) sync.textContent = "📦 Loading " + sourceLabel + " from database...";
 
-      var url = "/api/tasks?limit=2500";
+      var url = "/api/tasks?limit=1000";
       if (filterSource !== "all") {
         url += "&source=" + encodeURIComponent(filterSource);
       }
 
       apiFetch(url)
+        .catch(function(err) {
+          console.warn("Primary fetch failed, retrying with limit=500...", err);
+          return apiFetch(url.replace("limit=1000", "limit=500"));
+        })
         .then(function(r) { return r.json(); })
         .then(function(data) {
           if (!data.ok) throw new Error(data.message || "Failed to load tasks");

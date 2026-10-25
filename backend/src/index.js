@@ -1355,13 +1355,18 @@ export default {
           }
         }
 
+        const isArch2025Only = (sourceParam === "arch2025" || sourceParam === "arch1" || sourceParam === "archive2025" || sourceParam === "archive_2025") && whereClauses.length === 1;
+        const isArch2026Only = (sourceParam === "arch2026" || sourceParam === "arch2" || sourceParam === "archive2026" || sourceParam === "archive_2026") && whereClauses.length === 1;
+
         let total = 0;
         if (!whereClauses.length) {
           total = 182947;
-        } else if (sourceParam === "arch1" && whereClauses.length === 1) {
-          total = 50611;
-        } else if (sourceParam === "arch2" && whereClauses.length === 1) {
-          total = 73249;
+        } else if (isArch2025Only) {
+          total = 49784;
+        } else if (isArch2026Only) {
+          total = 73181;
+        } else if ((sourceParam === "archive" || sourceParam === "both") && whereClauses.length === 1) {
+          total = 122965;
         } else if (sourceParam === "live" && whereClauses.length === 1) {
           total = 58837;
         } else {
@@ -1370,14 +1375,38 @@ export default {
           total = parseInt(countQuery[0]?.total || 0, 10);
         }
 
-        const tasksQuery = `
-          SELECT id, timestamp, shift, unit, pc_no, labeler_name, national_id, qtc_shift, yubikey_email, qtc_name, stage, task_link, task_id, pass, modality, queue_name, object_count, created_at, COALESCE(source, 'Live') AS source 
-          FROM task_submissions 
-          ${whereClauses.length ? "WHERE " + whereClauses.join(" AND ") : ""} 
-          ORDER BY id DESC 
-          LIMIT ? OFFSET ?
-        `;
-        const taskParams = [...params, limit, offset];
+        let tasksQuery = "";
+        let taskParams = [];
+
+        if (isArch2025Only) {
+          // Blazing fast direct query on dedicated archive_2025 table (<200ms)
+          tasksQuery = `
+            SELECT id, timestamp, shift, unit, pc_no, labeler_name, national_id, qtc_shift, yubikey_email, qtc_name, stage, task_link, task_id, pass, modality, queue_name, object_count, created_at, 'Archive 2025' AS source 
+            FROM archive_2025 
+            ORDER BY id DESC 
+            LIMIT ? OFFSET ?
+          `;
+          taskParams = [limit, offset];
+        } else if (isArch2026Only) {
+          // Blazing fast direct query on dedicated archive_2026 table (<200ms)
+          tasksQuery = `
+            SELECT id, timestamp, shift, unit, pc_no, labeler_name, national_id, qtc_shift, yubikey_email, qtc_name, stage, task_link, task_id, pass, modality, queue_name, object_count, created_at, 'Archive 2026' AS source 
+            FROM archive_2026 
+            ORDER BY id DESC 
+            LIMIT ? OFFSET ?
+          `;
+          taskParams = [limit, offset];
+        } else {
+          tasksQuery = `
+            SELECT id, timestamp, shift, unit, pc_no, labeler_name, national_id, qtc_shift, yubikey_email, qtc_name, stage, task_link, task_id, pass, modality, queue_name, object_count, created_at, COALESCE(source, 'Live') AS source 
+            FROM task_submissions 
+            ${whereClauses.length ? "WHERE " + whereClauses.join(" AND ") : ""} 
+            ORDER BY id DESC 
+            LIMIT ? OFFSET ?
+          `;
+          taskParams = [...params, limit, offset];
+        }
+
         const rows = await db(env, tasksQuery, taskParams);
 
         // Mask National ID and Yubikey Email for non-supervisors
