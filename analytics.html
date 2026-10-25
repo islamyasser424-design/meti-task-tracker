@@ -1237,6 +1237,9 @@ async function resolveArchiveTabs(){
 // normalise an ID so "1,234,567", "1234567.0", " ABC " and "abc" all compare equal
 function normId(v){
   let t=String(v==null?'':v).trim().replace(/^["']+|["']+$/g,'');
+  if(/^\d(\.\d+)?e\+?\d+$/i.test(t)){
+    try{const num=Number(t);if(!isNaN(num)&&isFinite(num))t=num.toFixed(0);}catch(e){}
+  }
   if(/^\d{1,3}(,\d{3})+(\.0+)?$/.test(t))t=t.replace(/,/g,'');
   t=t.replace(/^(\d+)\.0+$/,'$1');
   return t.toLowerCase();
