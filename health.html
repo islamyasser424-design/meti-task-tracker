@@ -266,10 +266,10 @@
 
   <script>
     const cfg = window.APP_CONFIG || {};
-    const API_BASE = cfg.API_BASE || window.MEEG_API_URL || localStorage.getItem("meeg_api_url") || "";
-    const GAS_WEBAPP_URL = cfg.GAS_WEBAPP_URL || "";
-    const ARCHIVE_TABS_URL = cfg.ARCHIVE_TABS_URL || "";
-    const ARCHIVE_SHEET_ID = cfg.ARCHIVE_SHEET_ID || "";
+    const API_BASE = cfg.API_BASE || window.MEEG_API_URL || localStorage.getItem("meeg_api_url") || "https://meeg-secure-api.islamyasser424.workers.dev";
+    const GAS_WEBAPP_URL = cfg.GAS_WEBAPP_URL || "https://script.google.com/macros/s/AKfycbxa-Id35-ob1ZCgajX-NLKtz6xPLJVqBd20v7rXdlsoTmeP6nhfvl0of2U2j1RKo3A/exec";
+    const ARCHIVE_TABS_URL = cfg.ARCHIVE_TABS_URL || "https://script.google.com/macros/s/AKfycbxIqJnT2eX1Ll1S9MY1iSQmS4FLW1p4N_kLNZcdL0xZOCD2OjxOf2ZdkTx-PDjj_dhj/exec";
+    const ARCHIVE_SHEET_ID = cfg.ARCHIVE_SHEET_ID || "1gDtM7ykuYLFRoOUtV7WVHpOrbCusL1fSaT6nOOm67Cc";
 
     document.getElementById("epWorker").textContent = API_BASE || "Not configured";
     document.getElementById("epGas").textContent = GAS_WEBAPP_URL ? (GAS_WEBAPP_URL.slice(0, 45) + '...') : "Not configured";
