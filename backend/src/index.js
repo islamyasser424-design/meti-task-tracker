@@ -338,6 +338,18 @@ function maskNationalId(natId, role) {
   return s.slice(0, 4) + "*".repeat(Math.max(4, s.length - 8)) + s.slice(-4);
 }
 
+// Mask sensitive yubikey email for non-supervisors
+function maskYubikeyEmail(email, role) {
+  if (isSupervisorOrAdmin(role)) return email || "";
+  const s = String(email || "").trim();
+  if (!s || !s.includes("@")) return s ? "***" : "";
+  const parts = s.split("@");
+  const local = parts[0];
+  const domain = parts.slice(1).join("@");
+  if (local.length <= 2) return `*@${domain}`;
+  return `${local.slice(0, 2)}***@${domain}`;
+}
+
 // ============================================================
 // MAIN ROUTER
 // ============================================================
@@ -1055,7 +1067,8 @@ export default {
         );
         const rows = rawRows.map(r => ({
           ...r,
-          national_id: maskNationalId(r.national_id, role)
+          national_id: maskNationalId(r.national_id, role),
+          yubikey_email: maskYubikeyEmail(r.yubikey_email, role)
         }));
         return json({ ok: true, count: rows.length, rows }, 200, {
           ...corsHeaders,
@@ -1322,10 +1335,11 @@ export default {
         const taskParams = [...params, limit, offset];
         const rows = await db(env, tasksQuery, taskParams);
 
-        // Mask National ID for non-supervisors
+        // Mask National ID and Yubikey Email for non-supervisors
         const tasks = rows.map(t => ({
           ...t,
-          national_id: maskNationalId(t.national_id, user.role)
+          national_id: maskNationalId(t.national_id, user.role),
+          yubikey_email: maskYubikeyEmail(t.yubikey_email, user.role)
         }));
 
         return json({ ok: true, tasks, total, page, limit }, 200, corsHeaders);

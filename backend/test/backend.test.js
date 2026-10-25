@@ -122,6 +122,16 @@ describe("MEEG Secure Backend Comprehensive Test Suite", () => {
     assert.ok(tasksData.total > 0, "Total count should be positive");
   });
 
+  test("/api/tasks rejects unauthenticated request without token", async () => {
+    const unauthReq = new Request("https://worker.local/api/tasks?limit=5", {
+      method: "GET"
+    });
+    const res = await worker.fetch(unauthReq, TEST_ENV);
+    assert.equal(res.status, 401);
+    const data = await res.json();
+    assert.equal(data.error, "unauthorized");
+  });
+
   test("/api/analytics/overview returns aggregate KPI metrics", async () => {
     const overviewReq = new Request("https://worker.local/api/analytics/overview", {
       method: "GET",
