@@ -131,6 +131,14 @@ function hashContent(str) {
   return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
 }
 
+// RFC 7232 compliant ETag matcher (strips optional W/ prefix added by Cloudflare gzip/brotli proxy)
+function etagMatches(clientHeader, serverEtag) {
+  if (!clientHeader || !serverEtag) return false;
+  const cleanClient = String(clientHeader).replace(/^W\//i, '').replace(/^"|"$/g, '').trim();
+  const cleanServer = String(serverEtag).replace(/^W\//i, '').replace(/^"|"$/g, '').trim();
+  return cleanClient === cleanServer;
+}
+
 // DATABASE CONNECTOR (Turso / LibSQL Parameterized Pipeline)
 // ============================================================
 async function db(env, sql, params = []) {
@@ -1216,7 +1224,7 @@ export default {
         // 1. Check in-memory Worker cache (15-second TTL per roleScope & source)
         const cached = IN_MEMORY_CACHE.get(cacheKey);
         if (cached && (Date.now() - cached.timestamp < 15000)) {
-          if (ifNoneMatch && ifNoneMatch === cached.etag) {
+          if (ifNoneMatch && etagMatches(ifNoneMatch, cached.etag)) {
             return new Response(null, {
               status: 304,
               headers: {
@@ -1279,7 +1287,7 @@ export default {
         }
         IN_MEMORY_CACHE.set(cacheKey, { etag, payload, timestamp: Date.now() });
 
-        if (ifNoneMatch && ifNoneMatch === etag) {
+        if (ifNoneMatch && etagMatches(ifNoneMatch, etag)) {
           return new Response(null, {
             status: 304,
             headers: {
@@ -1721,7 +1729,7 @@ export default {
         const etag = `"tasks-${sourceParam || 'all'}-${roleScope}-${hashContent(responseBody)}"`;
 
         const ifNoneMatch = request.headers.get("if-none-match");
-        if (ifNoneMatch && ifNoneMatch === etag) {
+        if (ifNoneMatch && etagMatches(ifNoneMatch, etag)) {
           return new Response(null, {
             status: 304,
             headers: {
