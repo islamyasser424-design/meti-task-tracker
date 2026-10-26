@@ -1,9 +1,7 @@
-name: Sync Google Sheets to Turso Database
+name: Sync Google Sheets to Cloudflare D1 Database
 
 on:
-  schedule:
-    - cron: '*/30 * * * *'  # Runs every 30 minutes
-  workflow_dispatch:        # Allows manual 1-click trigger from GitHub Actions tab
+  workflow_dispatch:        # Manual trigger only (Automated sync is executed natively every 5 min by Cloudflare Worker cron)
 
 concurrency:
   group: sync-sheets-job
@@ -23,7 +21,8 @@ jobs:
 
       - name: Run sync script
         env:
-          TURSO_URL: ${{ secrets.TURSO_URL }}
-          TURSO_TOKEN: ${{ secrets.TURSO_TOKEN }}
+          SYNC_TARGET: 'd1'
+          API_SYNC_URL: ${{ secrets.API_SYNC_URL || 'https://meeg-secure-api.islamyasser424.workers.dev/api/sync-sheets' }}
+          SYNC_TOKEN: ${{ secrets.SYNC_TOKEN || 'meeg_internal_sync_secure_token_2026' }}
         run: |
           python scripts/sync_sheets.py

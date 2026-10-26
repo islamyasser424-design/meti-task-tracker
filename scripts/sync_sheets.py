@@ -2,9 +2,32 @@ import json, urllib.request, urllib.error, re, urllib.parse, time, os
 
 TURSO_URL = os.environ.get('TURSO_URL', 'https://meti-tasks-islamyasser424-design.aws-eu-west-1.turso.io/v2/pipeline')
 TURSO_TOKEN = os.environ.get('TURSO_TOKEN', '')
+API_SYNC_URL = os.environ.get('API_SYNC_URL', 'https://meeg-secure-api.islamyasser424.workers.dev/api/sync-sheets')
+SYNC_TOKEN = os.environ.get('SYNC_TOKEN', 'meeg_internal_sync_secure_token_2026')
+SYNC_TARGET = os.environ.get('SYNC_TARGET', 'd1').lower() # Default to Cloudflare D1 Native Edge Sync
 
-if not TURSO_TOKEN:
-    print("Warning: TURSO_TOKEN environment variable not set. Please set TURSO_TOKEN.")
+def trigger_worker_d1_sync(include_archives=False):
+    print("Triggering Cloudflare D1 Sync via Worker endpoint:", API_SYNC_URL)
+    url = API_SYNC_URL + ("?include_archives=1" if include_archives else "")
+    req = urllib.request.Request(url, data=b"{}", headers={
+        'Content-Type': 'application/json',
+        'X-Sync-Token': SYNC_TOKEN
+    }, method='POST')
+    try:
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            data = json.loads(resp.read().decode('utf-8'))
+            print("✓ Cloudflare D1 Edge Sync succeeded:", data)
+            return data
+    except urllib.error.HTTPError as he:
+        body = he.read().decode('utf-8', errors='ignore')
+        print(f"Worker D1 Sync HTTP {he.code}: {body}")
+        raise he
+    except Exception as e:
+        print("Worker D1 Sync error:", e)
+        raise e
+
+if not TURSO_TOKEN and SYNC_TARGET != 'd1':
+    print("Notice: TURSO_TOKEN environment variable not set. If running against Turso, set TURSO_TOKEN.")
 
 def execute_pipeline(requests, retries=3):
     payload = json.dumps({'requests': requests}).encode('utf-8')
@@ -108,6 +131,16 @@ WHERE (
 )"""
 
 def sync_sheets():
+    if SYNC_TARGET == 'd1':
+        print("SYNC_TARGET is set to 'd1'. Routing sync directly to Cloudflare D1 Worker endpoint...")
+        trigger_worker_d1_sync(False)
+        return
+
+    if not TURSO_TOKEN:
+        print("Notice: No TURSO_TOKEN provided. Routing sync directly to Cloudflare D1 Worker endpoint...")
+        trigger_worker_d1_sync(False)
+        return
+
     print("=== STARTING TARGETED DELTA GOOGLE SHEETS SYNC (INSERTS & UPDATES) ===")
     candidate_items = []
     new_queues = set()
@@ -379,4 +412,12 @@ def sync_sheets():
     print(f"✓ Sync complete successfully. Write statements: {len(stmts)}.")
 
 if __name__ == '__main__':
-    sync_sheets()
+    try:
+        sync_sheets()
+    except Exception as e:
+        if ('QUOTA_BLOCKED' in str(e) or 'BLOCKED' in str(e) or 'forbidden' in str(e).lower()) and SYNC_TARGET != 'turso':
+            print(f"Notice: Turso rejected sync due to quota/blocked state ({e}).")
+            print("Seamlessly falling back to Cloudflare D1 Worker sync...")
+            trigger_worker_d1_sync(False)
+        else:
+            raise e

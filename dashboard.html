@@ -1878,7 +1878,10 @@
             <span>📋 Operational Task Telemetry</span>
             <span style="font-size:0.75rem; color:var(--text-secondary); font-weight:700; background:rgba(13,148,136,0.1); border:1px solid rgba(13,148,136,0.25); padding:2px 10px; border-radius:12px;" id="tableCounterText">(Loading records...)</span>
           </div>
-          <span id="syncStatus" style="font-size:0.75rem; color:var(--primary); font-weight:600;">● Live Edge Synced</span>
+          <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+            <span id="syncStatus" style="font-size:0.75rem; color:var(--primary); font-weight:600; background:rgba(13,148,136,0.08); padding:3px 8px; border-radius:6px; border:1px solid rgba(13,148,136,0.25);">🖥️ شاشة العرض: جاري الاتصال...</span>
+            <span id="sheetsSyncStatus" style="font-size:0.75rem; color:var(--text-secondary); font-weight:600; background:rgba(0,0,0,0.04); padding:3px 8px; border-radius:6px; border:1px solid var(--border);">📊 مزامنة الشيت: بانتظار البيانات...</span>
+          </div>
         </div>
         <div class="table-wrap">
           <table>
@@ -4852,6 +4855,12 @@ async function syncGoogleSheetsClient(isAuto) {
       if (_sourceCache[filterSource] && _sourceCache[filterSource].length > 0) {
         _allSubmissions = _sourceCache[filterSource];
         _totalDbCount = _sourceCache[filterSource + "_total"] || _allSubmissions.length;
+        _deltaCursor = _sourceCache[filterSource + "_cursor"] || null;
+        _submissionsMap.clear();
+        _allSubmissions.forEach(function(row) {
+          var itemKey = String(row.id || row.submission_key || row.task_id).trim();
+          if (itemKey) _submissionsMap.set(itemKey, row);
+        });
         calculateKPIs();
         _currentPage = 1;
         applyFilters();
@@ -4879,10 +4888,17 @@ async function syncGoogleSheetsClient(isAuto) {
           if (sync) sync.textContent = "● " + sourceLabel + " Synced (" + new Date().toLocaleTimeString("en-US", {timeZone:"Africa/Cairo"}) + ")";
           _totalDbCount = data.total || 0;
           _allSubmissions = (data.tasks || []).map(mapSubmissionRow);
+          _submissionsMap.clear();
+          _allSubmissions.forEach(function(row) {
+            var itemKey = String(row.id || row.submission_key || row.task_id).trim();
+            if (itemKey) _submissionsMap.set(itemKey, row);
+          });
+          _deltaCursor = data.cursor || (_allSubmissions[0] ? ((_allSubmissions[0].updated_at || _allSubmissions[0].created_at || _allSubmissions[0].timestamp) + ":" + _allSubmissions[0].id) : null);
 
           // Save into cache for instant switching
           _sourceCache[filterSource] = _allSubmissions;
           _sourceCache[filterSource + "_total"] = _totalDbCount;
+          _sourceCache[filterSource + "_cursor"] = _deltaCursor;
 
           _allSubmissions.forEach(function(s) {
             if (s.queue_name && !_allQueuesList.includes(s.queue_name)) {
@@ -4906,10 +4922,14 @@ async function syncGoogleSheetsClient(isAuto) {
     }
 
 var _tasksEtag = "";
+var _deltaCursor = "";
+var _submissionsMap = new Map();
 var _isTasksInFlight = false;
 var _quotaBlocked = false;
 var _lastTasksFetchTime = 0;
+var _lastSuccessfulSyncTime = null;
 var _tasksRetryCount = 0;
+var _POLL_INTERVAL = 60000; // 60s background verification
 
 function showQuotaAlertBanner(msg) {
   var b = document.getElementById("quotaAlertBanner");
@@ -4931,10 +4951,56 @@ function retryQuotaFetch() {
   _quotaBlocked = false;
   _tasksRetryCount = 0;
   hideQuotaAlertBanner();
-  fetchLiveData();
+  fetchLiveDataOnly(true);
 }
 
-function fetchLiveDataOnly() {
+var _cachedSyncMeta = null;
+
+// Format localized timestamp display
+function formatSyncTime(date) {
+  if (!date) return "";
+  try {
+    return date.toLocaleTimeString("en-US", { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+  } catch(e) {
+    return date.toLocaleTimeString();
+  }
+}
+
+// Telemetry Indicators: Screen Update vs Google Sheets Sync
+function updateSyncIndicators(screenDate, syncMeta) {
+  var screenEl = document.getElementById("syncStatus");
+  if (screenEl && screenDate) {
+    screenEl.innerHTML = "🖥️ شاشة العرض: محدثة (" + formatSyncTime(screenDate) + ")";
+  }
+  var sheetsEl = document.getElementById("sheetsSyncStatus");
+  if (!sheetsEl) return;
+  if (!syncMeta || !syncMeta.status || syncMeta.status === "idle") {
+    sheetsEl.innerHTML = "📊 مزامنة الشيت: بانتظار الدورة الأولى";
+    sheetsEl.style.color = "var(--text-secondary)";
+    sheetsEl.style.borderColor = "var(--border)";
+    sheetsEl.style.background = "rgba(0,0,0,0.04)";
+    return;
+  }
+  if (syncMeta.status === "error") {
+    sheetsEl.innerHTML = "⚠️ تعثرت آخر مزامنة من Google Sheets";
+    sheetsEl.style.color = "#dc2626";
+    sheetsEl.style.borderColor = "rgba(220,38,38,0.35)";
+    sheetsEl.style.background = "rgba(220,38,38,0.08)";
+    return;
+  }
+  if (syncMeta.status === "success") {
+    var syncDate = syncMeta.last_sync_time ? new Date(syncMeta.last_sync_time) : null;
+    var timeTxt = syncDate ? formatSyncTime(syncDate) : "مؤخرًا";
+    var rowsTxt = (syncMeta.new_rows_count > 0 ? " (+" + syncMeta.new_rows_count + " جديدة)" : " (0 جديدة)");
+    sheetsEl.innerHTML = "📊 مزامنة الشيت: " + timeTxt + rowsTxt;
+    sheetsEl.style.color = "#059669";
+    sheetsEl.style.borderColor = "rgba(5,150,105,0.35)";
+    sheetsEl.style.background = "rgba(5,150,105,0.08)";
+  }
+}
+
+// 1. Initial Full/Source Load
+function fetchLiveDataOnly(isManualReset) {
   if (_isTasksInFlight) return;
   if (_quotaBlocked) return;
   _isTasksInFlight = true;
@@ -4942,19 +5008,25 @@ function fetchLiveDataOnly() {
   var sync = document.getElementById("syncStatus");
   if (sync) sync.textContent = "⚡ Loading from edge database...";
 
+  var filterSource = document.getElementById("filterSource") ? document.getElementById("filterSource").value : "live";
+  var url = "/api/tasks?limit=1000";
+  if (filterSource && filterSource !== "all") {
+    url += "&source=" + encodeURIComponent(filterSource);
+  }
+
   var reqHeaders = {};
-  if (_tasksEtag) {
+  if (_tasksEtag && !isManualReset) {
     reqHeaders["If-None-Match"] = _tasksEtag;
   }
 
-  apiFetch("/api/tasks?limit=2000", { headers: reqHeaders })
+  apiFetch(url, { headers: reqHeaders })
     .then(function(res) {
       _lastTasksFetchTime = Date.now();
       if (res.status === 304) {
-        // Data is unchanged on server! Zero row read cost!
         _tasksRetryCount = 0;
         _isTasksInFlight = false;
-        if (sync) sync.textContent = "● Live Edge Synced (" + new Date().toLocaleTimeString("en-US", {timeZone:"Africa/Cairo"}) + ") [Up to date]";
+        _lastSuccessfulSyncTime = new Date();
+        updateSyncIndicators(_lastSuccessfulSyncTime, _cachedSyncMeta);
         return null;
       }
       if (res.status === 429) {
@@ -4974,9 +5046,27 @@ function fetchLiveDataOnly() {
       _tasksRetryCount = 0;
       hideQuotaAlertBanner();
       if (!data.ok) throw new Error(data.message || "Failed to load tasks");
-      if (sync) sync.textContent = "● Live Edge Synced (" + new Date().toLocaleTimeString("en-US", {timeZone:"Africa/Cairo"}) + ")";
+
+      _lastSuccessfulSyncTime = new Date();
+      if (sync) sync.textContent = "● Live Synced (" + formatSyncTime(_lastSuccessfulSyncTime) + ")";
       _totalDbCount = data.total || 0;
-      _allSubmissions = (data.tasks || []).map(mapSubmissionRow);
+
+      // Initialize map for duplicate-free local merges
+      _submissionsMap.clear();
+      _allSubmissions = (data.tasks || []).map(function(t) {
+        var row = mapSubmissionRow(t);
+        var itemKey = String(row.id || row.submission_key || row.task_id).trim();
+        if (itemKey) _submissionsMap.set(itemKey, row);
+        return row;
+      });
+
+      // Record cursor for incremental updates
+      if (data.cursor) {
+        _deltaCursor = data.cursor;
+      } else if (data.tasks && data.tasks.length > 0) {
+        var top = data.tasks[0];
+        _deltaCursor = (top.updated_at || top.created_at || top.timestamp) + ":" + top.id;
+      }
 
       _allSubmissions.forEach(function(s) {
         if (s.queue_name && !_allQueuesList.includes(s.queue_name)) {
@@ -5003,22 +5093,111 @@ function fetchLiveDataOnly() {
       }
       _tasksRetryCount++;
       var backoffSeconds = Math.min(60, 5 * Math.pow(2, _tasksRetryCount));
-      console.warn("Telemetry fetch error (attempt " + _tasksRetryCount + "), backing off " + backoffSeconds + "s:", err.message);
+      console.warn("Tasks fetch error (attempt " + _tasksRetryCount + "), backing off " + backoffSeconds + "s:", err.message);
       if (sync) sync.textContent = "API error: " + err.message;
-      var tbody = document.getElementById("tableBody");
-      if (tbody && !_allSubmissions.length) {
-        tbody.innerHTML = '<tr><td colspan="17" style="text-align:center; padding:48px 20px;">'
-          + '<div class="table-state-box error">'
-          + '<div class="state-icon">⚠️</div>'
-          + '<div class="state-title">Failed to Load Telemetry</div>'
-          + '<div class="state-sub">' + (err.message || "Database connection error") + '</div>'
-          + '<div class="state-actions" style="margin-top:14px;">'
-          + '<button class="btn-action" onclick="fetchLiveData()">🔄 Retry Connection</button>'
-          + '</div>'
-          + '</div>'
-          + '</td></tr>';
-      }
     });
+}
+
+// 2. Incremental Delta Verification (fetches only new or modified rows since _deltaCursor)
+function pollTaskDeltas(isManual) {
+  if (_isTasksInFlight || _quotaBlocked) return;
+  if (!navigator.onLine) return;
+  if (!_deltaCursor) {
+    fetchLiveDataOnly();
+    return;
+  }
+
+  _isTasksInFlight = true;
+  var sync = document.getElementById("syncStatus");
+  if (isManual && sync) sync.textContent = "⚡ Checking delta changes...";
+
+  var filterSource = document.getElementById("filterSource") ? document.getElementById("filterSource").value : "live";
+  var deltaUrl = "/api/tasks/delta?cursor=" + encodeURIComponent(_deltaCursor);
+  if (filterSource && filterSource !== "all") {
+    deltaUrl += "&source=" + encodeURIComponent(filterSource);
+  }
+
+  apiFetch(deltaUrl)
+    .then(function(res) {
+      _lastTasksFetchTime = Date.now();
+      if (res.status === 429) {
+        _quotaBlocked = true;
+        _isTasksInFlight = false;
+        showQuotaAlertBanner("تم إيقاف التحديث التلقائي مؤقتًا لتجاوز حصة الاستعلامات.");
+        if (sync) sync.textContent = "⚠️ Quota limit reached (Auto-refresh paused)";
+        throw new Error("QUOTA_BLOCKED");
+      }
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      return res.json();
+    })
+    .then(function(data) {
+      _isTasksInFlight = false;
+      if (!data || !data.ok) return;
+
+      _lastSuccessfulSyncTime = new Date();
+      var changes = data.changes || [];
+      var deleted = data.deleted || [];
+
+      if (data.cursor) {
+        _deltaCursor = data.cursor;
+      }
+
+      if (changes.length === 0 && deleted.length === 0) {
+        if (data && data.sync_meta) _cachedSyncMeta = data.sync_meta;
+        updateSyncIndicators(_lastSuccessfulSyncTime, _cachedSyncMeta);
+        return;
+      }
+
+      // Merge newly inserted or modified tasks into local map
+      changes.forEach(function(t) {
+        var row = mapSubmissionRow(t);
+        var itemKey = String(row.id || row.submission_key || row.task_id || '').trim();
+        if (itemKey) {
+          _submissionsMap.set(itemKey, row);
+        }
+      });
+
+      // Remove any tombstones
+      deleted.forEach(function(delId) {
+        var target = String(delId).trim();
+        _submissionsMap.delete(target);
+        for (var entry of _submissionsMap.entries()) {
+          if (String(entry[1].task_id).trim() === target || String(entry[1].id).trim() === target) {
+            _submissionsMap.delete(entry[0]);
+          }
+        }
+      });
+
+      // Rebuild sorted array
+      _allSubmissions = Array.from(_submissionsMap.values()).sort(function(a, b) {
+        return (parseInt(b.id, 10) || 0) - (parseInt(a.id, 10) || 0);
+      });
+      _totalDbCount = Math.max(_totalDbCount, _allSubmissions.length);
+
+      calculateKPIs();
+      applyFilters();
+
+      if (sync) sync.textContent = "● Synced +" + changes.length + " changes (" + formatSyncTime(_lastSuccessfulSyncTime) + ")";
+    })
+    .catch(function(err) {
+      _isTasksInFlight = false;
+      if (err.message === "QUOTA_BLOCKED") return;
+      console.warn("Delta poll warning:", err.message);
+    });
+}
+
+// 3. User Action Local Fast-Path (Updates UI immediately without network reload)
+function addTaskToLocalState(newTask) {
+  if (!newTask || !newTask.task_id) return;
+  var row = mapSubmissionRow(newTask);
+  var itemKey = String(row.id || row.submission_key || row.task_id || '').trim();
+  if (itemKey) _submissionsMap.set(itemKey, row);
+  _allSubmissions = Array.from(_submissionsMap.values()).sort(function(a, b) {
+    return (parseInt(b.id, 10) || 0) - (parseInt(a.id, 10) || 0);
+  });
+  _totalDbCount++;
+  calculateKPIs();
+  applyFilters();
 }
 
 function fetchLiveData() {
@@ -5188,23 +5367,24 @@ function searchFullDatabase() {
     });
 }
 
-// Smart visibility-aware and quota-protected 30s background polling
+// Smart visibility-aware and quota-protected 60s incremental background polling
 setInterval(function() {
   if (document.visibilityState !== "visible") return;
+  if (!navigator.onLine) return;
   if (_quotaBlocked || _isTasksInFlight) return;
   if (document.getElementById('dashView') && document.getElementById('dashView').style.display !== 'none' && _activeTab === 'tasks') {
-    if (Date.now() - _lastTasksFetchTime >= 30000) {
-      fetchLiveDataOnly();
+    if (Date.now() - _lastTasksFetchTime >= _POLL_INTERVAL) {
+      pollTaskDeltas(false);
     }
   }
-}, 30000);
+}, _POLL_INTERVAL);
 
 document.addEventListener("visibilitychange", function() {
   if (document.visibilityState === "visible") {
-    if (!_quotaBlocked && !_isTasksInFlight) {
+    if (!_quotaBlocked && !_isTasksInFlight && navigator.onLine) {
       if (document.getElementById('dashView') && document.getElementById('dashView').style.display !== 'none' && _activeTab === 'tasks') {
-        if (Date.now() - _lastTasksFetchTime >= 30000) {
-          fetchLiveDataOnly();
+        if (Date.now() - _lastTasksFetchTime >= _POLL_INTERVAL) {
+          pollTaskDeltas(false);
         }
       }
     }

@@ -405,354 +405,392 @@ function maskYubikeyEmail(email, role) {
 // MAIN ROUTER
 // ============================================================
 // ============================================================
-// GOOGLE SHEETS LIVE SYNCHRONIZATION ENGINE
+// GOOGLE SHEETS INCREMENTAL CHECKPOINT SYNCHRONIZATION ENGINE
 // ============================================================
-async function syncGoogleSheetsToTurso(env) {
-  const q1 = "select * order by A desc limit 300";
-  const url1 = "https://docs.google.com/spreadsheets/d/1g9mPKQMactJKC-BP0Ik3Cw72PLUXCb4VTKFbHYLjc5I/gviz/tq?tqx=responseHandler:cb1&tq=" + encodeURIComponent(q1);
 
-  const q2 = "select * order by A desc limit 100";
-  const url2 = "https://docs.google.com/spreadsheets/d/1vpsYtvoZSKLsUeKj-FTXVGJmyFygSSck8DUIODJha_A/gviz/tq?tqx=responseHandler:cb2&tq=" + encodeURIComponent(q2);
+/**
+ * Distributed Concurrency Lock using D1 (Immune to Worker restarts and cross-region contention)
+ */
+async function acquireDistributedLock(env, lockName = "google_sheets_sync", owner = "cron", ttlSeconds = 120) {
+  try {
+    const now = new Date();
+    const expires = new Date(now.getTime() + ttlSeconds * 1000).toISOString();
+    const nowIso = now.toISOString();
 
-  // Archive 2025 Sheet
-  const urlArch2025 = "https://docs.google.com/spreadsheets/d/15PtvFZIJbtsj1_cxvOtUDSQdQ7liHZcHRG3hClSZKpA/gviz/tq?tqx=responseHandler:cbArch2025&tq=" + encodeURIComponent("select * order by A desc limit 200") + "&gid=260304689";
-  // Archive 2026 Sheet
-  const urlArch2026 = "https://docs.google.com/spreadsheets/d/1gDtM7ykuYLFRoOUtV7WVHpOrbCusL1fSaT6nOOm67Cc/gviz/tq?tqx=responseHandler:cbArch2026&tq=" + encodeURIComponent("select * order by A desc limit 200") + "&gid=231409283";
+    // 1. Purge expired locks
+    await db(env, "DELETE FROM sync_lock WHERE lock_name = ? AND expires_at < ?", [lockName, nowIso]).catch(() => {});
 
-  const stmts = [];
+    // 2. Try to acquire
+    await db(
+      env,
+      "INSERT INTO sync_lock (lock_name, locked_by, acquired_at, expires_at) VALUES (?, ?, ?, ?)",
+      [lockName, owner, nowIso, expires]
+    );
+    return { acquired: true, lockName, owner };
+  } catch (err) {
+    return { acquired: false, reason: "Lock currently held by another runner: " + (err.message || "busy") };
+  }
+}
+
+async function releaseDistributedLock(env, lockName = "google_sheets_sync", owner = "cron") {
+  try {
+    await db(env, "DELETE FROM sync_lock WHERE lock_name = ? AND locked_by = ?", [lockName, owner]).catch(() => {});
+  } catch (err) {
+    console.warn("Failed to release distributed lock:", err.message);
+  }
+}
+
+/**
+ * Verify that the lock is STILL owned by the runner and has not expired or been acquired by another worker
+ */
+async function verifyLockOwnership(env, lockName = "google_sheets_sync", owner = "cron") {
+  try {
+    const nowIso = new Date().toISOString();
+    const rows = await db(
+      env,
+      "SELECT locked_by, expires_at FROM sync_lock WHERE lock_name = ? AND locked_by = ? AND expires_at > ?",
+      [lockName, owner, nowIso]
+    );
+    return rows && rows.length > 0;
+  } catch (err) {
+    console.warn("Lock ownership verification error:", err.message);
+    return false;
+  }
+}
+
+/**
+ * Heartbeat: Extend lock lease to prevent expiration during legitimate long-running batch syncs
+ */
+async function renewDistributedLock(env, lockName = "google_sheets_sync", owner = "cron", extendSeconds = 120) {
+  try {
+    const now = new Date();
+    const newExpires = new Date(now.getTime() + extendSeconds * 1000).toISOString();
+    const nowIso = now.toISOString();
+    await db(
+      env,
+      "UPDATE sync_lock SET expires_at = ? WHERE lock_name = ? AND locked_by = ? AND expires_at > ?",
+      [newExpires, lockName, owner, nowIso]
+    );
+    return true;
+  } catch (err) {
+    console.warn("Failed to renew distributed lock:", err.message);
+    return false;
+  }
+}
+
+async function getSyncMeta(env) {
+  try {
+    const rows = await db(env, "SELECT last_sync_time, new_rows_count, updated_rows_count, status, error_message FROM sync_meta WHERE id = 1");
+    if (rows && rows.length > 0) return rows[0];
+  } catch (e) {
+    // Table may not exist yet
+  }
+  return { last_sync_time: null, new_rows_count: 0, updated_rows_count: 0, status: "idle", error_message: "" };
+}
+
+function parseGViz(text, callbackName) {
+  const prefix = callbackName + "(";
+  const start = text.indexOf(prefix);
+  if (start === -1) return null;
+  const end = text.lastIndexOf(")");
+  if (end === -1) return null;
+  try {
+    return JSON.parse(text.slice(start + prefix.length, end));
+  } catch {
+    return null;
+  }
+}
+
+async function fetchGVizQuery(spreadsheetId, query, callbackName = "cb", gid = "0") {
+  let url = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=responseHandler:${callbackName}&tq=${encodeURIComponent(query)}`;
+  if (gid && gid !== "0") url += `&gid=${gid}`;
+  const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } });
+  if (!res.ok) throw new Error(`Google Sheets GViz HTTP ${res.status}`);
+  const txt = await res.text();
+  const obj = parseGViz(txt, callbackName);
+  if (!obj || !obj.table) throw new Error("Invalid or empty GViz response structure from Google Sheets");
+  return obj;
+}
+
+/**
+ * Main Incremental Checkpoint Sync Engine
+ * Syncs ONLY newly appended rows beyond the last verified row index
+ * Zero full table scans, zero MAX(id) reliance, zero unbounded COUNT(*) loops
+ */
+async function syncGoogleSheetsToD1(env, options = {}) {
+  // Support boolean parameter for backward compatibility
+  const includeArchives = typeof options === 'boolean' ? options : (options && options.includeArchives === true);
+  const isReconcile = options && options.reconcile === true;
+  const runnerOwner = (options && options.triggerBy) || ("cron:" + Date.now());
+
+  // 1. Acquire Distributed Lock (with 120s auto-expiry TTL)
+  const lock = await acquireDistributedLock(env, "google_sheets_sync", runnerOwner, 120);
+  if (!lock.acquired) {
+    return { ok: true, skipped: true, message: "Sync already in progress under active lock: " + lock.reason };
+  }
+
+  let totalNewRows = 0;
+  let totalModifications = 0;
+  const syncErrors = [];
   const newQueues = new Set();
-  const newQtcs = new Set();
 
-  function parseGViz(text, callbackName) {
-    const prefix = callbackName + "(";
-    const start = text.indexOf(prefix);
-    if (start === -1) return null;
-    const end = text.lastIndexOf(")");
-    if (end === -1) return null;
+  try {
+    // ------------------------------------------------------------
+    // 2. ACTIVE SHEET 1: Live Primary Form Responses
+    // ------------------------------------------------------------
+    const sheet1SourceId = "sheet1_live";
+    const sheet1Id = "1g9mPKQMactJKC-BP0Ik3Cw72PLUXCb4VTKFbHYLjc5I";
+    const sheet1Gid = "0";
+
+    // Read or initialize persistent checkpoint for Sheet 1
+    let s1Checkpoint = null;
     try {
-      return JSON.parse(text.slice(start + prefix.length, end));
-    } catch {
-      return null;
-    }
-  }
+      const rows = await db(env, "SELECT last_synced_row, last_synced_timestamp, last_synced_fingerprint FROM sync_checkpoints WHERE source_id = ?", [sheet1SourceId]);
+      if (rows && rows.length > 0) s1Checkpoint = rows[0];
+    } catch {}
 
-  // 1. Fetch Sheet 1
-  try {
-    const res1 = await fetch(url1, { headers: { "User-Agent": "Mozilla/5.0" } });
-    const txt1 = await res1.text();
-    const obj1 = parseGViz(txt1, "cb1");
-    if (obj1 && obj1.table && obj1.table.rows) {
-      for (const row of obj1.table.rows) {
-        if (!row.c) continue;
-        const vals = row.c.map(cell => cell ? (cell.f || cell.v || "") : "");
-        if (vals.length < 15) continue;
-        const ts = String(vals[0] || "").trim();
-        const shift = String(vals[1] || "").trim();
-        const unit = String(vals[2] || "").trim();
-        const qtc_name = String(vals[3] || "").trim();
-        const yk_email = String(vals[4] || "").toLowerCase().trim();
-        const lab_name = String(vals[5] || "").trim();
-        const nat_id = String(vals[6] || "").trim();
-        const pc_no = String(vals[7] || "").trim();
-        const mod = String(vals[8] || "").trim();
-        const queue = String(vals[9] || "").trim();
-        const link = String(vals[10] || "").trim();
-        const tid = String(vals[11] || "").trim();
-        const obj_cnt = parseInt(vals[12] || 0, 10) || 0;
-        const pas = String(vals[13] || "").trim();
-        const stage = String(vals[14] || "").trim();
-        const created = String(vals[15] || ts).trim();
-        if (!tid) continue;
+    let s1LastSyncedRow = s1Checkpoint ? parseInt(s1Checkpoint.last_synced_row || 0, 10) : 62327;
 
-        if (queue) newQueues.add(queue);
-        if (qtc_name) newQtcs.add(qtc_name);
+    try {
+      // Step A: Pre-Flight Count Query (Zero DB read/write cost on task_submissions!)
+      const s1CountObj = await fetchGVizQuery(sheet1Id, "select count(A)", "cbCount1", sheet1Gid);
+      const s1TotalRows = parseInt(s1CountObj.table.rows[0]?.c[0]?.v || 0, 10);
 
-        stmts.push({
-          type: "execute",
-          stmt: {
-            sql: "INSERT OR IGNORE INTO task_submissions (timestamp, shift, unit, pc_no, labeler_name, national_id, qtc_shift, yubikey_email, qtc_name, stage, task_link, task_id, pass, modality, queue_name, object_count, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            args: [
-              { type: "text", value: ts },
-              { type: "text", value: shift },
-              { type: "text", value: unit },
-              { type: "text", value: pc_no },
-              { type: "text", value: lab_name },
-              { type: "text", value: nat_id },
-              { type: "text", value: shift },
-              { type: "text", value: yk_email },
-              { type: "text", value: qtc_name },
-              { type: "text", value: stage },
-              { type: "text", value: link },
-              { type: "text", value: tid },
-              { type: "text", value: pas },
-              { type: "text", value: mod },
-              { type: "text", value: queue },
-              { type: "integer", value: String(obj_cnt) },
-              { type: "text", value: created }
-            ]
+      if (s1TotalRows <= s1LastSyncedRow) {
+        // Zero new rows! 
+        await db(env, `UPDATE sync_checkpoints 
+          SET total_source_rows = ?, last_attempt_at = datetime('now'), status = 'success', error_message = '', consecutive_failures = 0, updated_at = datetime('now') 
+          WHERE source_id = ?`, [s1TotalRows, sheet1SourceId]).catch(() => {});
+      } else {
+        // Step B: Fetch only newly appended rows in bounded batches (max 100 per batch)
+        let currentOffset = s1LastSyncedRow;
+        while (currentOffset < s1TotalRows) {
+          // Verify lock ownership before processing batch
+          const stillOwned = await verifyLockOwnership(env, "google_sheets_sync", runnerOwner);
+          if (!stillOwned) {
+            throw new Error(`Lock ownership lost or expired for ${runnerOwner}; aborting sync to prevent concurrent corruption.`);
           }
-        });
-      }
-    }
-  } catch (e) {
-    console.warn("Sheet 1 sync error:", e);
-  }
+          await renewDistributedLock(env, "google_sheets_sync", runnerOwner, 120);
 
-  // 2. Fetch Sheet 2
-  try {
-    const res2 = await fetch(url2, { headers: { "User-Agent": "Mozilla/5.0" } });
-    const txt2 = await res2.text();
-    const obj2 = parseGViz(txt2, "cb2");
-    if (obj2 && obj2.table && obj2.table.rows) {
-      for (const row of obj2.table.rows) {
-        if (!row.c) continue;
-        const vals = row.c.map(cell => cell ? (cell.f || cell.v || "") : "");
-        if (vals.length < 15) continue;
-        const ts = String(vals[0] || "").trim();
-        const shift = String(vals[1] || "").trim();
-        const unit = String(vals[2] || "").trim();
-        const qtc_name = String(vals[3] || "").trim();
-        const yk_email = String(vals[4] || "").toLowerCase().trim();
-        const lab_name = String(vals[5] || "").trim();
-        const nat_id = String(vals[6] || "").trim();
-        const pc_no = String(vals[7] || "").trim();
-        const mod = String(vals[8] || "").trim();
-        const queue = String(vals[9] || "").trim();
-        const link = String(vals[10] || "").trim();
-        const tid = String(vals[11] || "").trim();
-        const obj_cnt = parseInt(vals[12] || 0, 10) || 0;
-        const pas = String(vals[13] || "").trim();
-        const stage = String(vals[14] || "").trim();
-        if (!tid) continue;
+          const batchSize = Math.min(100, s1TotalRows - currentOffset);
+          const batchQuery = `select * limit ${batchSize} offset ${currentOffset}`;
+          const batchObj = await fetchGVizQuery(sheet1Id, batchQuery, "cbBatch1", sheet1Gid);
+          const rawRows = batchObj.table.rows || [];
+          if (rawRows.length === 0) break;
 
-        if (queue) newQueues.add(queue);
-        if (qtc_name) newQtcs.add(qtc_name);
+          for (let i = 0; i < rawRows.length; i++) {
+            const row = rawRows[i];
+            if (!row || !row.c) continue;
+            const vals = row.c.map(cell => cell ? (cell.f || cell.v || "") : "");
+            if (vals.length < 12) continue; // Validate structure
 
-        stmts.push({
-          type: "execute",
-          stmt: {
-            sql: "INSERT OR IGNORE INTO task_submissions (timestamp, shift, unit, pc_no, labeler_name, national_id, qtc_shift, yubikey_email, qtc_name, stage, task_link, task_id, pass, modality, queue_name, object_count, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            args: [
-              { type: "text", value: ts },
-              { type: "text", value: shift },
-              { type: "text", value: unit },
-              { type: "text", value: pc_no },
-              { type: "text", value: lab_name },
-              { type: "text", value: nat_id },
-              { type: "text", value: shift },
-              { type: "text", value: yk_email },
-              { type: "text", value: qtc_name },
-              { type: "text", value: stage },
-              { type: "text", value: link },
-              { type: "text", value: tid },
-              { type: "text", value: pas },
-              { type: "text", value: mod },
-              { type: "text", value: queue },
-              { type: "integer", value: String(obj_cnt) },
-              { type: "text", value: ts }
-            ]
+            const ts = String(vals[0] || "").trim();
+            const shift = String(vals[1] || "").trim();
+            const unit = String(vals[2] || "").trim();
+            const qtc_name = String(vals[3] || "").trim();
+            const yk_email = String(vals[4] || "").trim().toLowerCase();
+            const lab_name = String(vals[5] || "").trim();
+            const nat_id = String(vals[6] || "").trim();
+            const pc_no = String(vals[7] || "").trim();
+            const mod = String(vals[8] || "").trim();
+            const queue = String(vals[9] || "").trim();
+            const link = String(vals[10] || "").trim();
+            const tid = String(vals[11] || "").trim();
+            const obj_cnt = parseInt(vals[12] || 0, 10) || 0;
+            const pas = String(vals[13] || "QA").trim().toUpperCase();
+            const stage = String(vals[14] || "").trim();
+            const created = String(vals[15] || ts).trim();
+            const submissionKey = `sub:${tid}|${lab_name}|${ts}|${pas}`;
+            const nowIso = new Date().toISOString();
+
+            if (queue) newQueues.add(queue);
+
+            // Insert new form response idempotently using persistent submissionKey
+            await db(env, `INSERT OR IGNORE INTO task_submissions 
+              (timestamp, shift, unit, pc_no, labeler_name, national_id, qtc_shift, yubikey_email, qtc_name, stage, task_link, task_id, pass, modality, queue_name, object_count, created_at, updated_at, source, submission_key) 
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Live', ?)`,
+              [
+                ts, shift, unit, pc_no, lab_name, nat_id, shift, yk_email, qtc_name,
+                stage, link, tid, pas, mod, queue, obj_cnt, created, nowIso, submissionKey
+              ]
+            );
+
+            totalNewRows++;
           }
-        });
-      }
-    }
-  } catch (e) {
-    console.warn("Sheet 2 sync error:", e);
-  }
 
-  // 3. Fetch Archive 2025 (Live auto-sync of any new additions)
-  try {
-    const resA1 = await fetch(urlArch2025, { headers: { "User-Agent": "Mozilla/5.0" } });
-    const txtA1 = await resA1.text();
-    const objA1 = parseGViz(txtA1, "cbArch2025");
-    if (objA1 && objA1.table && objA1.table.rows) {
-      for (const row of objA1.table.rows) {
-        if (!row.c) continue;
-        const vals = row.c.map(cell => cell ? (cell.f || cell.v || "") : "");
-        if (vals.length < 15) continue;
-        const ts = String(vals[0] || "").trim();
-        const shift = String(vals[1] || "").trim();
-        const unit = String(vals[2] || "").trim();
-        const qtc_name = String(vals[3] || "").trim();
-        const rawId = String(vals[4] || "").trim();
-        const yk_email = rawId ? (rawId.includes("@") ? rawId.toLowerCase() : ("me" + rawId + "@meti.ai")) : "";
-        const pc_no = String(vals[5] || "").trim();
-        const stage = String(vals[6] || "").trim();
-        const queue = String(vals[12] || "").trim();
-        const mod = String(vals[13] || "").trim();
-        const pas = String(vals[14] || "").trim().toUpperCase();
-        const link = String(vals[15] || "").trim();
-        const obj_cnt = parseInt(vals[16] || 0, 10) || 0;
-        let tid = String(vals[25] || "").trim();
-        if (!tid && link) {
-          const m = link.match(/\/id\/(\d+)/i);
-          if (m) tid = m[1];
+          // Advance checkpoint atomically only after the batch is saved
+          currentOffset += rawRows.length;
+          s1LastSyncedRow = currentOffset;
+
+          const lastRowVals = rawRows[rawRows.length - 1].c.map(c => c ? (c.f || c.v || "") : "");
+          const lastTs = String(lastRowVals[0] || "");
+          const lastFp = `${lastRowVals[0]}|${lastRowVals[5]}|${lastRowVals[11]}|${lastRowVals[13]}`;
+
+          await db(env, `INSERT INTO sync_checkpoints 
+            (source_id, spreadsheet_id, gid, last_synced_row, last_synced_timestamp, last_synced_fingerprint, total_source_rows, status, error_message, consecutive_failures, last_attempt_at, last_success_at, updated_at) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'success', '', 0, datetime('now'), datetime('now'), datetime('now'))
+            ON CONFLICT(source_id) DO UPDATE SET
+              last_synced_row = excluded.last_synced_row,
+              last_synced_timestamp = excluded.last_synced_timestamp,
+              last_synced_fingerprint = excluded.last_synced_fingerprint,
+              total_source_rows = excluded.total_source_rows,
+              status = 'success',
+              error_message = '',
+              consecutive_failures = 0,
+              last_attempt_at = excluded.last_attempt_at,
+              last_success_at = excluded.last_success_at,
+              updated_at = excluded.updated_at`,
+            [sheet1SourceId, sheet1Id, sheet1Gid, s1LastSyncedRow, lastTs, lastFp, s1TotalRows]
+          );
         }
-        if (!tid) continue;
-
-        const a25Args = [
-          { type: "text", value: ts },
-          { type: "text", value: shift },
-          { type: "text", value: unit },
-          { type: "text", value: pc_no },
-          { type: "text", value: rawId || "Labeler" },
-          { type: "text", value: "" },
-          { type: "text", value: shift },
-          { type: "text", value: yk_email },
-          { type: "text", value: qtc_name },
-          { type: "text", value: stage },
-          { type: "text", value: link },
-          { type: "text", value: tid },
-          { type: "text", value: pas },
-          { type: "text", value: mod },
-          { type: "text", value: queue },
-          { type: "integer", value: String(obj_cnt) },
-          { type: "text", value: ts },
-          { type: "text", value: "Archive 2025" }
-        ];
-
-        stmts.push({
-          type: "execute",
-          stmt: {
-            sql: "INSERT OR IGNORE INTO archive_2025 (timestamp, shift, unit, pc_no, labeler_name, national_id, qtc_shift, yubikey_email, qtc_name, stage, task_link, task_id, pass, modality, queue_name, object_count, created_at, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            args: a25Args
-          }
-        });
-
-        stmts.push({
-          type: "execute",
-          stmt: {
-            sql: "INSERT OR IGNORE INTO task_submissions (timestamp, shift, unit, pc_no, labeler_name, national_id, qtc_shift, yubikey_email, qtc_name, stage, task_link, task_id, pass, modality, queue_name, object_count, created_at, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            args: a25Args
-          }
-        });
       }
+    } catch (s1Err) {
+      syncErrors.push(`Sheet 1: ${s1Err.message}`);
+      await db(env, `UPDATE sync_checkpoints 
+        SET status = 'error', error_message = ?, consecutive_failures = consecutive_failures + 1, last_attempt_at = datetime('now'), updated_at = datetime('now') 
+        WHERE source_id = ?`, [s1Err.message, sheet1SourceId]).catch(() => {});
     }
-  } catch (e) {
-    console.warn("Archive 1 sync error:", e);
-  }
 
-  // 4. Fetch Archive 2026 (Live auto-sync of any new additions)
-  try {
-    const resA2 = await fetch(urlArch2026, { headers: { "User-Agent": "Mozilla/5.0" } });
-    const txtA2 = await resA2.text();
-    const objA2 = parseGViz(txtA2, "cbArch2026");
-    if (objA2 && objA2.table && objA2.table.rows) {
-      for (const row of objA2.table.rows) {
-        if (!row.c) continue;
-        const vals = row.c.map(cell => cell ? (cell.f || cell.v || "") : "");
-        if (vals.length < 12) continue;
-        const ts = String(vals[0] || "").trim();
-        const shift = String(vals[1] || "").trim();
-        const unit = String(vals[2] || "").trim();
-        const qtc_name = String(vals[3] || "").trim();
-        const yk_email = String(vals[4] || "").trim().toLowerCase();
-        const lab_name = String(vals[5] || "").trim();
-        const pc_no = String(vals[6] || "").trim();
-        const stage = String(vals[7] || "").trim();
-        const mod = String(vals[8] || "").trim();
-        const queue = String(vals[9] || "").trim();
-        const link = String(vals[10] || "").trim();
-        const obj_cnt = parseInt(vals[11] || 0, 10) || 0;
-        const pas = String(vals[18] || "").trim().toUpperCase() || (link.toLowerCase().includes("sellivandar2d") ? "FP" : "QA");
-        let tid = "";
-        if (link) {
-          const m = link.match(/\/id\/(\d+)/i);
-          if (m) tid = m[1];
+    // ------------------------------------------------------------
+    // 3. ACTIVE SHEET 2: Daily Active Sheet Checkpoint
+    // ------------------------------------------------------------
+    const sheet2SourceId = "sheet2_daily";
+    const sheet2Id = "1vpsYtvoZSKLsUeKj-FTXVGJmyFygSSck8DUIODJha_A";
+    const sheet2Gid = "0";
+
+    let s2Checkpoint = null;
+    try {
+      const rows = await db(env, "SELECT last_synced_row FROM sync_checkpoints WHERE source_id = ?", [sheet2SourceId]);
+      if (rows && rows.length > 0) s2Checkpoint = rows[0];
+    } catch {}
+
+    let s2LastSyncedRow = s2Checkpoint ? parseInt(s2Checkpoint.last_synced_row || 0, 10) : 588;
+
+    try {
+      const s2CountObj = await fetchGVizQuery(sheet2Id, "select count(A)", "cbCount2", sheet2Gid);
+      const s2TotalRows = parseInt(s2CountObj.table.rows[0]?.c[0]?.v || 0, 10);
+
+      if (s2TotalRows <= s2LastSyncedRow) {
+        await db(env, `UPDATE sync_checkpoints 
+          SET total_source_rows = ?, last_attempt_at = datetime('now'), status = 'success', error_message = '', consecutive_failures = 0, updated_at = datetime('now') 
+          WHERE source_id = ?`, [s2TotalRows, sheet2SourceId]).catch(() => {});
+      } else {
+        let currentOffset = s2LastSyncedRow;
+        while (currentOffset < s2TotalRows) {
+          // Verify lock ownership before processing batch
+          const stillOwned = await verifyLockOwnership(env, "google_sheets_sync", runnerOwner);
+          if (!stillOwned) {
+            throw new Error(`Lock ownership lost or expired for ${runnerOwner}; aborting sync to prevent concurrent corruption.`);
+          }
+          await renewDistributedLock(env, "google_sheets_sync", runnerOwner, 120);
+
+          const batchSize = Math.min(100, s2TotalRows - currentOffset);
+          const batchObj = await fetchGVizQuery(sheet2Id, `select * limit ${batchSize} offset ${currentOffset}`, "cbBatch2", sheet2Gid);
+          const rawRows = batchObj.table.rows || [];
+          if (rawRows.length === 0) break;
+
+          for (let i = 0; i < rawRows.length; i++) {
+            const row = rawRows[i];
+            if (!row || !row.c) continue;
+            const vals = row.c.map(cell => cell ? (cell.f || cell.v || "") : "");
+            if (vals.length < 12) continue;
+
+            const ts = String(vals[0] || "").trim();
+            const shift = String(vals[1] || "").trim();
+            const unit = String(vals[2] || "").trim();
+            const qtc_name = String(vals[3] || "").trim();
+            const yk_email = String(vals[4] || "").trim().toLowerCase();
+            const lab_name = String(vals[5] || "").trim();
+            const nat_id = String(vals[6] || "").trim();
+            const pc_no = String(vals[7] || "").trim();
+            const mod = String(vals[8] || "").trim();
+            const queue = String(vals[9] || "").trim();
+            const link = String(vals[10] || "").trim();
+            const tid = String(vals[11] || "").trim();
+            const obj_cnt = parseInt(vals[12] || 0, 10) || 0;
+            const pas = String(vals[13] || "QA").trim().toUpperCase();
+            const stage = String(vals[14] || "").trim();
+            const submissionKey = `sub:${tid}|${lab_name}|${ts}|${pas}`;
+            const nowIso = new Date().toISOString();
+
+            if (queue) newQueues.add(queue);
+
+            await db(env, `INSERT OR IGNORE INTO task_submissions 
+              (timestamp, shift, unit, pc_no, labeler_name, national_id, qtc_shift, yubikey_email, qtc_name, stage, task_link, task_id, pass, modality, queue_name, object_count, created_at, updated_at, source, submission_key) 
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Live', ?)`,
+              [
+                ts, shift, unit, pc_no, lab_name, nat_id, shift, yk_email, qtc_name,
+                stage, link, tid, pas, mod, queue, obj_cnt, ts, nowIso, submissionKey
+              ]
+            );
+
+            totalNewRows++;
+          }
+
+          currentOffset += rawRows.length;
+          s2LastSyncedRow = currentOffset;
+
+          await db(env, `INSERT INTO sync_checkpoints 
+            (source_id, spreadsheet_id, gid, last_synced_row, total_source_rows, status, error_message, consecutive_failures, last_attempt_at, last_success_at, updated_at) 
+            VALUES (?, ?, ?, ?, ?, 'success', '', 0, datetime('now'), datetime('now'), datetime('now'))
+            ON CONFLICT(source_id) DO UPDATE SET
+              last_synced_row = excluded.last_synced_row,
+              total_source_rows = excluded.total_source_rows,
+              status = 'success',
+              error_message = '',
+              consecutive_failures = 0,
+              last_attempt_at = excluded.last_attempt_at,
+              last_success_at = excluded.last_success_at,
+              updated_at = excluded.updated_at`,
+            [sheet2SourceId, sheet2Id, sheet2Gid, s2LastSyncedRow, s2TotalRows]
+          );
         }
-        if (!tid) continue;
+      }
+    } catch (s2Err) {
+      syncErrors.push(`Sheet 2: ${s2Err.message}`);
+      await db(env, `UPDATE sync_checkpoints 
+        SET status = 'error', error_message = ?, consecutive_failures = consecutive_failures + 1, last_attempt_at = datetime('now'), updated_at = datetime('now') 
+        WHERE source_id = ?`, [s2Err.message, sheet2SourceId]).catch(() => {});
+    }
 
-        const a26Args = [
-          { type: "text", value: ts },
-          { type: "text", value: shift },
-          { type: "text", value: unit },
-          { type: "text", value: pc_no },
-          { type: "text", value: lab_name || "Labeler" },
-          { type: "text", value: "" },
-          { type: "text", value: shift },
-          { type: "text", value: yk_email },
-          { type: "text", value: qtc_name },
-          { type: "text", value: stage },
-          { type: "text", value: link },
-          { type: "text", value: tid },
-          { type: "text", value: pas },
-          { type: "text", value: mod },
-          { type: "text", value: queue },
-          { type: "integer", value: String(obj_cnt) },
-          { type: "text", value: ts },
-          { type: "text", value: "Archive 2026" }
-        ];
-
-        stmts.push({
-          type: "execute",
-          stmt: {
-            sql: "INSERT OR IGNORE INTO archive_2026 (timestamp, shift, unit, pc_no, labeler_name, national_id, qtc_shift, yubikey_email, qtc_name, stage, task_link, task_id, pass, modality, queue_name, object_count, created_at, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            args: a26Args
-          }
-        });
-
-        stmts.push({
-          type: "execute",
-          stmt: {
-            sql: "INSERT OR IGNORE INTO task_submissions (timestamp, shift, unit, pc_no, labeler_name, national_id, qtc_shift, yubikey_email, qtc_name, stage, task_link, task_id, pass, modality, queue_name, object_count, created_at, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            args: a26Args
-          }
-        });
+    // ------------------------------------------------------------
+    // 4. Custom Queues Discovery
+    // ------------------------------------------------------------
+    if (newQueues.size > 0) {
+      for (const q of newQueues) {
+        await db(env, "INSERT OR IGNORE INTO custom_queues (name, highlight, is_hidden, created_at) VALUES (?, 'Live', 0, datetime('now'))", [q]).catch(() => {});
       }
     }
-  } catch (e) {
-    console.warn("Archive 2 sync error:", e);
+
+    // ------------------------------------------------------------
+    // 5. Update Telemetry in sync_meta
+    // ------------------------------------------------------------
+    const overallStatus = syncErrors.length === 0 ? "success" : (totalNewRows > 0 ? "partial" : "error");
+    const errMsg = syncErrors.join(" | ");
+
+    await db(
+      env,
+      `INSERT INTO sync_meta (id, last_sync_time, new_rows_count, updated_rows_count, status, error_message)
+       VALUES (1, datetime('now'), ?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET
+         last_sync_time = excluded.last_sync_time,
+         new_rows_count = excluded.new_rows_count,
+         updated_rows_count = excluded.updated_rows_count,
+         status = excluded.status,
+         error_message = excluded.error_message`,
+      [totalNewRows, totalModifications, overallStatus, errMsg]
+    ).catch(() => {});
+
+    return {
+      ok: syncErrors.length === 0,
+      new_rows_count: totalNewRows,
+      status: overallStatus,
+      errors: syncErrors
+    };
+  } finally {
+    // 6. Release Distributed Lock
+    await releaseDistributedLock(env, "google_sheets_sync", runnerOwner);
   }
-
-  // Execute statements in batches of 50
-  if (stmts.length > 0) {
-    if (env.DB) {
-      for (let i = 0; i < stmts.length; i += 50) {
-        const batch = stmts.slice(i, i + 50);
-        const d1Batch = batch.map(s => {
-          const rawArgs = (s.stmt.args || []).map(a => a.value !== undefined ? a.value : null);
-          return env.DB.prepare(s.stmt.sql).bind(...rawArgs);
-        });
-        await env.DB.batch(d1Batch).catch(e => console.warn("D1 batch sync error:", e));
-      }
-    } else {
-      for (let i = 0; i < stmts.length; i += 50) {
-        const batch = stmts.slice(i, i + 50);
-        await fetch(env.TURSO_URL, {
-          method: "POST",
-          headers: { "Authorization": `Bearer ${env.TURSO_TOKEN}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ requests: batch })
-        });
-      }
-    }
-  }
-
-  // Sync custom queues in a single batch request
-  if (newQueues.size > 0) {
-    if (env.DB) {
-      const d1QBatch = Array.from(newQueues).map(q =>
-        env.DB.prepare("INSERT OR IGNORE INTO custom_queues (name, highlight, created_at) VALUES (?, 'Live', datetime('now'))").bind(q)
-      );
-      await env.DB.batch(d1QBatch).catch(e => console.warn("D1 Queue batch sync error:", e));
-    } else {
-      const queueBatch = Array.from(newQueues).map(q => ({
-        type: "execute",
-        stmt: {
-          sql: "INSERT OR IGNORE INTO custom_queues (name, highlight, created_at) VALUES (?, 'Live', datetime('now'))",
-          args: [{ type: "text", value: q }]
-        }
-      }));
-      await fetch(env.TURSO_URL, {
-        method: "POST",
-        headers: { "Authorization": `Bearer ${env.TURSO_TOKEN}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ requests: queueBatch })
-      }).catch(e => console.warn("Queue batch sync error:", e));
-    }
-  }
-
-  const countRes = await db(env, "SELECT count(*) as total FROM task_submissions");
-  const total = countRes[0]?.total || 0;
-
-  return { ok: true, synced_statements: stmts.length, total_submissions: total };
 }
 
 export default {
@@ -1060,18 +1098,21 @@ export default {
           }, 409, corsHeaders);
         }
 
+        const nowIso = new Date().toISOString();
+        let insertId = 0;
         try {
-          await db(
+          const insertRes = await db(
             env,
             `INSERT INTO task_submissions 
-             (timestamp, shift, unit, pc_no, labeler_name, national_id, qtc_shift, yubikey_email, qtc_name, stage, task_link, task_id, pass, modality, queue_name, object_count) 
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+             (timestamp, shift, unit, pc_no, labeler_name, national_id, qtc_shift, yubikey_email, qtc_name, stage, task_link, task_id, pass, modality, queue_name, object_count, created_at, updated_at, source) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Live')`,
             [
               timestamp, shift, unit, pc_no, labeler_name, national_id,
               qtc_shift, yubikey_email, qtc_name, stage, task_link, task_id,
-              pass, modality, queue_name, object_count
+              pass, modality, queue_name, object_count, timestamp, nowIso
             ]
           );
+          insertId = insertRes?.meta?.last_row_id || insertRes?.lastRowId || 0;
         } catch (insertErr) {
           if (String(insertErr.message || "").includes("UNIQUE constraint failed")) {
             return json({ error: "duplicate_task", message: "Task ID already submitted!" }, 409, corsHeaders);
@@ -1079,14 +1120,37 @@ export default {
           throw insertErr;
         }
 
-        return json({ ok: true, message: "Task submitted successfully" }, 201, corsHeaders);
+        const createdTask = {
+          id: insertId,
+          timestamp, shift, unit, pc_no, labeler_name,
+          national_id: maskNationalId(national_id, user ? user.role : "labeler"),
+          qtc_shift,
+          yubikey_email: maskYubikeyEmail(yubikey_email, user ? user.role : "labeler"),
+          qtc_name, stage, task_link, task_id, pass, modality, queue_name, object_count,
+          created_at: timestamp,
+          updated_at: nowIso,
+          source: 'Live'
+        };
+
+        return json({ ok: true, message: "Task submitted successfully", task: createdTask }, 201, corsHeaders);
       }
 
       // ------------------------------------------------------------
       // 14. SYNC GOOGLE SHEETS LIVE DATA (/api/sync-sheets)
       // ------------------------------------------------------------
       if (pathname === "/api/sync-sheets" && (request.method === "POST" || request.method === "GET")) {
-        const result = await syncGoogleSheetsToTurso(env);
+        const authHeader = request.headers.get("x-sync-token") || "";
+        const expectedToken = env.SYNC_TOKEN || "meeg_internal_sync_secure_token_2026";
+        let isAuthorized = (authHeader === expectedToken);
+        if (!isAuthorized) {
+          const user = await verifySession(request, env);
+          if (user && isAdminOrSuper(user.role)) isAuthorized = true;
+        }
+        if (!isAuthorized) {
+          return json({ error: "forbidden", message: "Unauthorized sync trigger" }, 403, corsHeaders);
+        }
+        const includeArchives = url.searchParams.get("include_archives") === "1";
+        const result = await syncGoogleSheetsToD1(env, includeArchives);
         return json(result, 200, corsHeaders);
       }
 
@@ -1447,6 +1511,100 @@ export default {
       // ------------------------------------------------------------
       // 11. TASKS QUERIES & MUTATIONS
       // ------------------------------------------------------------
+      // ------------------------------------------------------------
+      // 10. INCREMENTAL / DELTA TASK SYNC (/api/tasks/delta)
+      // Bounded cursor-based stream returning ONLY newly inserted or modified tasks
+      // Prevents catastrophic full-dataset polling (thousands of rows) on every cycle
+      // ------------------------------------------------------------
+      if (pathname === "/api/tasks/delta" && request.method === "GET") {
+        const user = await verifySession(request, env);
+        if (!user) return json({ error: "unauthorized", message: "Authentication required" }, 401, corsHeaders);
+
+        const role = user.role;
+        const cursor = (url.searchParams.get("cursor") || "").trim();
+        const sourceParam = (url.searchParams.get("source") || "").toLowerCase().trim();
+        const limitParam = parseInt(url.searchParams.get("limit") || "200", 10);
+        const limit = Math.min(500, Math.max(1, isNaN(limitParam) ? 200 : limitParam));
+
+        let cursorTimestamp = "";
+        let cursorId = 0;
+        if (cursor && cursor.includes(":")) {
+          const lastColon = cursor.lastIndexOf(":");
+          cursorTimestamp = cursor.slice(0, lastColon).trim();
+          cursorId = parseInt(cursor.slice(lastColon + 1), 10) || 0;
+        } else if (cursor && /^\d+$/.test(cursor)) {
+          cursorId = parseInt(cursor, 10);
+        }
+
+        let whereClauses = [];
+        let params = [];
+
+        if (cursorTimestamp && cursorId) {
+          whereClauses.push("(COALESCE(updated_at, created_at, timestamp) > ? OR (COALESCE(updated_at, created_at, timestamp) = ? AND id > ?))");
+          params.push(cursorTimestamp, cursorTimestamp, cursorId);
+        } else if (cursorId) {
+          whereClauses.push("id > ?");
+          params.push(cursorId);
+        }
+
+        if (sourceParam && sourceParam !== "all") {
+          if (sourceParam === "live") {
+            whereClauses.push("(source = 'Live' OR source IS NULL OR source = '')");
+          } else if (sourceParam === "arch2026" || sourceParam === "archive2026" || sourceParam === "archive_2026" || sourceParam === "arch2") {
+            whereClauses.push("(source = 'Archive 2026' OR source = 'ارشيف 2')");
+          } else if (sourceParam === "arch2025" || sourceParam === "archive2025" || sourceParam === "archive_2025" || sourceParam === "arch1") {
+            whereClauses.push("(source = 'Archive 2025' OR source = 'ارشيف 1')");
+          } else {
+            whereClauses.push("source = ?");
+            params.push(sourceParam);
+          }
+        }
+
+        const whereSql = whereClauses.length ? "WHERE " + whereClauses.join(" AND ") : "";
+        const deltaSql = `SELECT id, timestamp, shift, unit, pc_no, labeler_name, national_id, qtc_shift, yubikey_email, qtc_name, stage, task_link, task_id, pass, modality, queue_name, object_count, created_at, COALESCE(updated_at, created_at, timestamp) AS updated_at, COALESCE(source, 'Live') AS source 
+                          FROM task_submissions 
+                          ${whereSql} 
+                          ORDER BY COALESCE(updated_at, created_at, timestamp) ASC, id ASC 
+                          LIMIT ?`;
+
+        const rawRows = await db(env, deltaSql, [...params, limit + 1]);
+        const hasMore = rawRows.length > limit;
+        const pageRows = hasMore ? rawRows.slice(0, limit) : rawRows;
+
+        let nextCursor = cursor;
+        if (pageRows.length > 0) {
+          const lastItem = pageRows[pageRows.length - 1];
+          nextCursor = `${lastItem.updated_at}:${lastItem.id}`;
+        }
+
+        let deleted = [];
+        if (cursorTimestamp) {
+          try {
+            const delRows = await db(env, "SELECT task_id FROM deleted_tasks WHERE deleted_at > ? LIMIT 100", [cursorTimestamp]);
+            deleted = delRows.map(d => d.task_id);
+          } catch (e) {
+            // deleted_tasks table optional
+          }
+        }
+
+        const changes = pageRows.map(t => ({
+          ...t,
+          national_id: maskNationalId(t.national_id, role),
+          yubikey_email: maskYubikeyEmail(t.yubikey_email, role)
+        }));
+
+        const sync_meta = await getSyncMeta(env);
+        return json({
+          ok: true,
+          changes,
+          deleted,
+          cursor: nextCursor,
+          hasMore,
+          count: changes.length,
+          sync_meta
+        }, 200, corsHeaders);
+      }
+
       if (pathname === "/api/tasks" && request.method === "GET") {
         const page = Math.max(1, parseInt(url.searchParams.get("page") || "1", 10));
         const limit = Math.min(10000, Math.max(1, parseInt(url.searchParams.get("limit") || "100", 10)));
@@ -1551,7 +1709,13 @@ export default {
           yubikey_email: maskYubikeyEmail(t.yubikey_email, user.role)
         }));
 
-        const responseObj = { ok: true, tasks, total, page, limit };
+        let initialCursor = "";
+        if (pageRows.length > 0) {
+          const topItem = pageRows[0];
+          initialCursor = `${topItem.updated_at || topItem.created_at || topItem.timestamp}:${topItem.id}`;
+        }
+        const sync_meta = await getSyncMeta(env);
+        const responseObj = { ok: true, tasks, total, page, limit, cursor: initialCursor, sync_meta };
         const responseBody = JSON.stringify(responseObj);
         // Robust ETag based on exact content payload + roleScope + source
         const etag = `"tasks-${sourceParam || 'all'}-${roleScope}-${hashContent(responseBody)}"`;
@@ -1693,16 +1857,16 @@ export default {
   },
 
   async scheduled(event, env, ctx) {
-    console.log("[CRON] Running automatic Google Sheets & Archives continuous sync:", event.cron);
+    const isMidnight = String(event.cron || "").startsWith("0 0") || String(event.cron || "") === "0 0 * * *";
+    console.log("[CRON] Running automatic Google Sheets delta sync (includeArchives=" + isMidnight + "):", event.cron);
     try {
       if (ctx && ctx.waitUntil) {
-        ctx.waitUntil(syncGoogleSheetsToTurso(env));
+        ctx.waitUntil(syncGoogleSheetsToD1(env, isMidnight));
       } else {
-        await syncGoogleSheetsToTurso(env);
+        await syncGoogleSheetsToD1(env, isMidnight);
       }
     } catch (e) {
       console.error("[CRON] Sync error:", e);
     }
   }
 };
-

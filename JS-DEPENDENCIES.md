@@ -7,7 +7,7 @@ This document is the verified safety net of all DOM element IDs, classes, and da
 
 ## 1. dashboard.html (+ dashboard-ui.js & analytics-engine.js)
 
-### Critical IDs (225)
+### Critical IDs (226)
 - `#actConfirmPass`
 - `#actModalDesc`
 - `#actModalTitle`
@@ -191,6 +191,7 @@ This document is the verified safety net of all DOM element IDs, classes, and da
 - `#sharedApplyRange`
 - `#sharedFrom`
 - `#sharedTo`
+- `#sheetsSyncStatus`
 - `#shiftBanner`
 - `#sideThemeBtn`
 - `#sidebarAvatar`
