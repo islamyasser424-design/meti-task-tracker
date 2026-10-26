@@ -114,26 +114,21 @@ async function checkPassword(password, stored) {
 }
 
 // ============================================================
+// WORKER IN-MEMORY CACHES & CONTENT HASHER (Rate & Quota Protection)
 // ============================================================
-// WORKER IN-MEMORY CACHES & METADATA ACCELERATOR (Quota Protection)
-// ============================================================
-const DATASET_CACHE = new Map();
-const TASKS_META_CACHE = { maxId: 0, count: 0, checkedAt: 0 };
+const IN_MEMORY_CACHE = new Map(); // key -> { etag, payload, timestamp }
 
-async function getQuickTasksMeta(env) {
-  const now = Date.now();
-  if (TASKS_META_CACHE.maxId && (now - TASKS_META_CACHE.checkedAt < 10000)) {
-    return TASKS_META_CACHE;
+// Fast 64-bit content hasher for accurate, collision-free ETags
+function hashContent(str) {
+  let h1 = 0xdeadbeef, h2 = 0x41c64e6d;
+  for (let i = 0, ch; i < str.length; i++) {
+    ch = str.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
   }
-  try {
-    const rows = await db(env, "SELECT MAX(id) AS max_id, COUNT(*) AS count FROM task_submissions");
-    TASKS_META_CACHE.maxId = parseInt(rows[0]?.max_id || 0, 10);
-    TASKS_META_CACHE.count = parseInt(rows[0]?.count || 0, 10);
-    TASKS_META_CACHE.checkedAt = now;
-  } catch (e) {
-    if (!TASKS_META_CACHE.maxId) TASKS_META_CACHE.maxId = 182947;
-  }
-  return TASKS_META_CACHE;
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
 }
 
 // DATABASE CONNECTOR (Turso / LibSQL Parameterized Pipeline)
@@ -1151,33 +1146,28 @@ export default {
         const limit = Math.min(25000, Math.max(1, isNaN(limitParam) ? 25000 : limitParam));
         const sourceParam = (url.searchParams.get("source") || "live").toLowerCase().trim();
 
-        // Fast metadata check (10s memory cache)
-        const meta = await getQuickTasksMeta(env);
-        const etag = `"ds-${sourceParam}-${roleScope}-${meta.maxId}-${limit}"`;
-
-        // 1. Conditional HTTP 304 Not Modified
+        const cacheKey = `ds:${sourceParam}:${roleScope}:${limit}`;
         const ifNoneMatch = request.headers.get("if-none-match");
-        if (ifNoneMatch && ifNoneMatch === etag) {
-          return new Response(null, {
-            status: 304,
-            headers: {
-              "ETag": etag,
-              "Cache-Control": "private, no-cache, must-revalidate",
-              "Vary": "Authorization, Cookie",
-              ...corsHeaders
-            }
-          });
-        }
 
-        // 2. Check Worker memory cache
-        const cacheKey = `${sourceParam}:${roleScope}:${meta.maxId}:${limit}`;
-        const cached = DATASET_CACHE.get(cacheKey);
-        if (cached && (Date.now() - cached.timestamp < 30000)) {
-          return new Response(cached.body, {
+        // 1. Check in-memory Worker cache (15-second TTL per roleScope & source)
+        const cached = IN_MEMORY_CACHE.get(cacheKey);
+        if (cached && (Date.now() - cached.timestamp < 15000)) {
+          if (ifNoneMatch && ifNoneMatch === cached.etag) {
+            return new Response(null, {
+              status: 304,
+              headers: {
+                "ETag": cached.etag,
+                "Cache-Control": "private, no-cache, must-revalidate",
+                "Vary": "Authorization, Cookie",
+                ...corsHeaders
+              }
+            });
+          }
+          return new Response(cached.payload, {
             status: 200,
             headers: {
               "Content-Type": "application/json",
-              "ETag": etag,
+              "ETag": cached.etag,
               "Cache-Control": "private, no-cache, must-revalidate",
               "Vary": "Authorization, Cookie",
               ...corsHeaders
@@ -1215,11 +1205,27 @@ export default {
         }));
 
         const payload = JSON.stringify({ ok: true, count: rows.length, rows });
-        if (DATASET_CACHE.size > 8) {
-          const firstKey = DATASET_CACHE.keys().next().value;
-          DATASET_CACHE.delete(firstKey);
+        // Genuine content-based ETag reflecting edits, deletes, and role differences
+        const etag = `"ds-${sourceParam}-${roleScope}-${hashContent(payload)}"`;
+
+        // Maintain bounded in-memory cache
+        if (IN_MEMORY_CACHE.size > 16) {
+          const firstKey = IN_MEMORY_CACHE.keys().next().value;
+          IN_MEMORY_CACHE.delete(firstKey);
         }
-        DATASET_CACHE.set(cacheKey, { body: payload, timestamp: Date.now() });
+        IN_MEMORY_CACHE.set(cacheKey, { etag, payload, timestamp: Date.now() });
+
+        if (ifNoneMatch && ifNoneMatch === etag) {
+          return new Response(null, {
+            status: 304,
+            headers: {
+              "ETag": etag,
+              "Cache-Control": "private, no-cache, must-revalidate",
+              "Vary": "Authorization, Cookie",
+              ...corsHeaders
+            }
+          });
+        }
 
         return new Response(payload, {
           status: 200,
@@ -1461,25 +1467,6 @@ export default {
         const isSupervisor = isAdminOrSuper(role);
         const roleScope = isSupervisor ? "supervisor" : "standard";
 
-        // Fast 304 check for initial dashboard telemetry page (30s polling optimization)
-        const isUnfilteredPage1 = (page === 1 && !shift && !modality && !queue_name && !pass && !labeler && !qtc && !search && !dateFrom && !dateTo && (!sourceParam || sourceParam === "all" || sourceParam === "live"));
-        if (isUnfilteredPage1) {
-          const meta = await getQuickTasksMeta(env);
-          const tasksEtag = `"tasks-${sourceParam || 'all'}-${roleScope}-${meta.maxId}-${limit}"`;
-          const ifNoneMatch = request.headers.get("if-none-match");
-          if (ifNoneMatch && ifNoneMatch === tasksEtag) {
-            return new Response(null, {
-              status: 304,
-              headers: {
-                "ETag": tasksEtag,
-                "Cache-Control": "private, no-cache, must-revalidate",
-                "Vary": "Authorization, Cookie",
-                ...corsHeaders
-              }
-            });
-          }
-        }
-
         let whereClauses = [];
         let params = [];
 
@@ -1491,16 +1478,12 @@ export default {
         if (qtc) { whereClauses.push("qtc_name = ?"); params.push(qtc); }
         if (dateFrom) { whereClauses.push("timestamp >= ?"); params.push(dateFrom); }
         if (dateTo) { whereClauses.push("timestamp <= ?"); params.push(dateTo); }
-        if (search) {
-          const trimmed = search.trim();
-          if (/^[A-Za-z0-9_-]{3,64}$/.test(trimmed)) {
-            whereClauses.push("(task_id = ? OR task_id LIKE ? OR pc_no = ? OR labeler_name LIKE ?)");
-            params.push(trimmed, trimmed + "%", trimmed, `%${trimmed}%`);
-          } else {
-            whereClauses.push("(task_id LIKE ? OR task_link LIKE ? OR labeler_name LIKE ? OR national_id LIKE ? OR pc_no LIKE ? OR qtc_name LIKE ? OR queue_name LIKE ?)");
-            const s = `%${trimmed}%`;
-            params.push(s, s, s, s, s, s, s);
-          }
+
+        // Preserved full search across ALL fields without heuristic shortcuts
+        if (search && search.trim()) {
+          const s = `%${search.trim()}%`;
+          whereClauses.push("(task_id LIKE ? OR task_link LIKE ? OR labeler_name LIKE ? OR national_id LIKE ? OR pc_no LIKE ? OR qtc_name LIKE ? OR queue_name LIKE ?)");
+          params.push(s, s, s, s, s, s, s);
         }
 
         if (sourceParam && sourceParam !== "all") {
@@ -1521,7 +1504,7 @@ export default {
         const isArch2025Only = (sourceParam === "arch2025" || sourceParam === "arch1" || sourceParam === "archive2025" || sourceParam === "archive_2025") && whereClauses.length === 1;
         const isArch2026Only = (sourceParam === "arch2026" || sourceParam === "arch2" || sourceParam === "archive2026" || sourceParam === "archive_2026") && whereClauses.length === 1;
 
-        // Fetch limit + 1 rows to determine total without separate COUNT query
+        // Fetch limit + 1 rows to accurately determine pagination
         let tasksQuery = "";
         let taskParams = [];
 
@@ -1540,21 +1523,23 @@ export default {
         const hasMore = rawRows.length > limit;
         const pageRows = hasMore ? rawRows.slice(0, limit) : rawRows;
 
+        // ACCURATE TOTAL CALCULATION (No hardcoded constants, no MAX(id) substitutions)
         let total = 0;
-        if (!whereClauses.length) {
-          const meta = await getQuickTasksMeta(env);
-          total = meta.count || 182947;
-        } else if (isArch2025Only) {
-          total = 49784;
-        } else if (isArch2026Only) {
-          total = 73181;
-        } else if ((sourceParam === "archive" || sourceParam === "both") && whereClauses.length === 1) {
-          total = 122965;
-        } else if (sourceParam === "live" && whereClauses.length === 1) {
-          total = 58837;
-        } else if (!hasMore && page === 1) {
+        if (!hasMore && page === 1) {
+          // Exact count: when on page 1 and results are <= limit, total is mathematically pageRows.length
           total = pageRows.length;
+        } else if (!whereClauses.length) {
+          // Unfiltered total: Query actual COUNT(*) from database
+          const countQuery = await db(env, "SELECT COUNT(*) AS total FROM task_submissions");
+          total = parseInt(countQuery[0]?.total || 0, 10);
+        } else if (isArch2025Only) {
+          const countQuery = await db(env, "SELECT COUNT(*) AS total FROM archive_2025");
+          total = parseInt(countQuery[0]?.total || 0, 10);
+        } else if (isArch2026Only) {
+          const countQuery = await db(env, "SELECT COUNT(*) AS total FROM archive_2026");
+          total = parseInt(countQuery[0]?.total || 0, 10);
         } else {
+          // Filtered count with deeper pagination: query exact COUNT(*) with parameters
           const whereSql = "WHERE " + whereClauses.join(" AND ");
           const countQuery = await db(env, `SELECT COUNT(*) AS total FROM task_submissions ${whereSql}`, params);
           total = parseInt(countQuery[0]?.total || 0, 10);
@@ -1566,14 +1551,33 @@ export default {
           yubikey_email: maskYubikeyEmail(t.yubikey_email, user.role)
         }));
 
-        const meta = await getQuickTasksMeta(env);
-        const tasksEtag = `"tasks-${sourceParam || 'all'}-${roleScope}-${meta.maxId}-${limit}"`;
+        const responseObj = { ok: true, tasks, total, page, limit };
+        const responseBody = JSON.stringify(responseObj);
+        // Robust ETag based on exact content payload + roleScope + source
+        const etag = `"tasks-${sourceParam || 'all'}-${roleScope}-${hashContent(responseBody)}"`;
 
-        return json({ ok: true, tasks, total, page, limit }, 200, {
-          "ETag": tasksEtag,
-          "Cache-Control": "private, no-cache, must-revalidate",
-          "Vary": "Authorization, Cookie",
-          ...corsHeaders
+        const ifNoneMatch = request.headers.get("if-none-match");
+        if (ifNoneMatch && ifNoneMatch === etag) {
+          return new Response(null, {
+            status: 304,
+            headers: {
+              "ETag": etag,
+              "Cache-Control": "private, no-cache, must-revalidate",
+              "Vary": "Authorization, Cookie",
+              ...corsHeaders
+            }
+          });
+        }
+
+        return new Response(responseBody, {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+            "ETag": etag,
+            "Cache-Control": "private, no-cache, must-revalidate",
+            "Vary": "Authorization, Cookie",
+            ...corsHeaders
+          }
         });
       }
 
@@ -1674,6 +1678,16 @@ export default {
       return json({ error: "not_found", message: "Endpoint not found" }, 404, corsHeaders);
     } catch (err) {
       console.error("Backend exception:", err);
+      if (err && (err.code === "QUOTA_EXCEEDED" || (err.message && err.message.toLowerCase().includes("quota exceeded")))) {
+        return json({
+          ok: false,
+          error: "quota_exceeded",
+          message: "Database query quota exceeded. Polling paused to prevent degradation."
+        }, 429, {
+          "Retry-After": "3600",
+          ...corsHeaders
+        });
+      }
       return json({ error: "server_error", message: err.message || "Internal server error" }, 500, corsHeaders);
     }
   },
