@@ -86,6 +86,8 @@ async function hashPassword(password) {
 
 async function checkPassword(password, stored) {
   if (!password || !stored) return false;
+  // Support legacy plain-text passwords from previous backups
+  if (equals(password, stored)) return true;
   const parts = String(stored).split("$");
   if (parts.length !== 4 || parts[0] !== "pbkdf2-sha256") return false;
   const iterations = parseInt(parts[1], 10);
@@ -115,9 +117,28 @@ async function checkPassword(password, stored) {
 // DATABASE CONNECTOR (Turso / LibSQL Parameterized Pipeline)
 // ============================================================
 async function db(env, sql, params = []) {
+  // 1. Cloudflare D1 Native Edge Database (100% Free, High Limits, Sub-ms Speed)
+  if (env.DB) {
+    try {
+      const stmt = params.length > 0 ? env.DB.prepare(sql).bind(...params) : env.DB.prepare(sql);
+      const isSelect = /^\s*(SELECT|WITH|PRAGMA|EXPLAIN)\b/i.test(sql);
+      if (isSelect) {
+        const { results } = await stmt.all();
+        return results || [];
+      } else {
+        const info = await stmt.run();
+        return info;
+      }
+    } catch (d1Err) {
+      console.error("[D1 Query Error]:", d1Err.message || d1Err, "SQL:", sql);
+      throw d1Err;
+    }
+  }
+
+  // 2. Fallback to Turso / LibSQL pipeline
   const url = env.TURSO_URL;
   const token = env.TURSO_TOKEN;
-  if (!url || !token) throw new Error("Database configuration missing (TURSO_URL or TURSO_TOKEN)");
+  if (!url || !token) throw new Error("Database configuration missing (D1 or TURSO)");
 
   const endpoint = url.replace(/\/v2\/pipeline\/?$/, "").replace(/\/$/, "") + "/v2/pipeline";
   const args = params.map(v => {
@@ -654,30 +675,48 @@ async function syncGoogleSheetsToTurso(env) {
 
   // Execute statements in batches of 50
   if (stmts.length > 0) {
-    for (let i = 0; i < stmts.length; i += 50) {
-      const batch = stmts.slice(i, i + 50);
-      await fetch(env.TURSO_URL, {
-        method: "POST",
-        headers: { "Authorization": `Bearer ${env.TURSO_TOKEN}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ requests: batch })
-      });
+    if (env.DB) {
+      for (let i = 0; i < stmts.length; i += 50) {
+        const batch = stmts.slice(i, i + 50);
+        const d1Batch = batch.map(s => {
+          const rawArgs = (s.stmt.args || []).map(a => a.value !== undefined ? a.value : null);
+          return env.DB.prepare(s.stmt.sql).bind(...rawArgs);
+        });
+        await env.DB.batch(d1Batch).catch(e => console.warn("D1 batch sync error:", e));
+      }
+    } else {
+      for (let i = 0; i < stmts.length; i += 50) {
+        const batch = stmts.slice(i, i + 50);
+        await fetch(env.TURSO_URL, {
+          method: "POST",
+          headers: { "Authorization": `Bearer ${env.TURSO_TOKEN}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ requests: batch })
+        });
+      }
     }
   }
 
   // Sync custom queues in a single batch request
   if (newQueues.size > 0) {
-    const queueBatch = Array.from(newQueues).map(q => ({
-      type: "execute",
-      stmt: {
-        sql: "INSERT OR IGNORE INTO custom_queues (name, highlight, created_at) VALUES (?, 'Live', datetime('now'))",
-        args: [{ type: "text", value: q }]
-      }
-    }));
-    await fetch(env.TURSO_URL, {
-      method: "POST",
-      headers: { "Authorization": `Bearer ${env.TURSO_TOKEN}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ requests: queueBatch })
-    }).catch(e => console.warn("Queue batch sync error:", e));
+    if (env.DB) {
+      const d1QBatch = Array.from(newQueues).map(q =>
+        env.DB.prepare("INSERT OR IGNORE INTO custom_queues (name, highlight, created_at) VALUES (?, 'Live', datetime('now'))").bind(q)
+      );
+      await env.DB.batch(d1QBatch).catch(e => console.warn("D1 Queue batch sync error:", e));
+    } else {
+      const queueBatch = Array.from(newQueues).map(q => ({
+        type: "execute",
+        stmt: {
+          sql: "INSERT OR IGNORE INTO custom_queues (name, highlight, created_at) VALUES (?, 'Live', datetime('now'))",
+          args: [{ type: "text", value: q }]
+        }
+      }));
+      await fetch(env.TURSO_URL, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${env.TURSO_TOKEN}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ requests: queueBatch })
+      }).catch(e => console.warn("Queue batch sync error:", e));
+    }
   }
 
   const countRes = await db(env, "SELECT count(*) as total FROM task_submissions");
@@ -763,6 +802,16 @@ export default {
         if (!isPwValid) {
           recordFailedLogin(rateKey);
           return json({ error: "invalid_credentials", message: "Invalid username or password" }, 401, corsHeaders);
+        }
+
+        // Auto-upgrade plain-text password to PBKDF2
+        if (equals(password, u.password)) {
+          try {
+            const upgradedHash = await hashPassword(password);
+            await db(env, "UPDATE dashboard_users SET password = ? WHERE id = ?", [upgradedHash, u.id]);
+          } catch (e) {
+            console.warn("Failed to auto-upgrade legacy password hash:", e);
+          }
         }
 
         clearFailedLogins(rateKey);

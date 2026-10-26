@@ -6,5 +6,10 @@ compatibility_date = "2026-10-22"
 [vars]
 ALLOWED_ORIGIN = "https://islamyasser424-design.github.io"
 
+[[d1_databases]]
+binding = "DB"
+database_name = "meti-db"
+database_id = "10d9d4b7-1e7f-4f49-97fe-80a2a67caa6a"
+
 [triggers]
-crons = ["*/15 * * * *"]
+crons = ["0 */2 * * *"]
