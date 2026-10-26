@@ -735,6 +735,10 @@ async function syncGoogleSheetsToD1(env, options = {}) {
             totalNewRows++;
           }
 
+          if (totalNewRows > 0) {
+            IN_MEMORY_CACHE.clear();
+          }
+
           currentOffset += rawRows.length;
           s2LastSyncedRow = currentOffset;
 
@@ -1632,6 +1636,35 @@ export default {
         const role = user ? user.role : "qt";
         const isSupervisor = isAdminOrSuper(role);
         const roleScope = isSupervisor ? "supervisor" : "standard";
+        const cacheKey = `tasks:${url.search}:${roleScope}`;
+        const ifNoneMatch = request.headers.get("if-none-match");
+
+        // 1. Check in-memory Worker cache (15-second TTL per roleScope & query)
+        // Eliminates D1 database reads completely on repeated polls or 304 revalidations
+        const cached = IN_MEMORY_CACHE.get(cacheKey);
+        if (cached && (Date.now() - cached.timestamp < 15000)) {
+          if (ifNoneMatch && etagMatches(ifNoneMatch, cached.etag)) {
+            return new Response(null, {
+              status: 304,
+              headers: {
+                "ETag": cached.etag,
+                "Cache-Control": "private, no-cache, must-revalidate",
+                "Vary": "Authorization, Cookie",
+                ...corsHeaders
+              }
+            });
+          }
+          return new Response(cached.responseBody, {
+            status: 200,
+            headers: {
+              "Content-Type": "application/json",
+              "ETag": cached.etag,
+              "Cache-Control": "private, no-cache, must-revalidate",
+              "Vary": "Authorization, Cookie",
+              ...corsHeaders
+            }
+          });
+        }
 
         let whereClauses = [];
         let params = [];
@@ -1728,7 +1761,13 @@ export default {
         // Robust ETag based on exact content payload + roleScope + source
         const etag = `"tasks-${sourceParam || 'all'}-${roleScope}-${hashContent(responseBody)}"`;
 
-        const ifNoneMatch = request.headers.get("if-none-match");
+        // Cache response in memory to eliminate future D1 reads within 15s window
+        if (IN_MEMORY_CACHE.size > 32) {
+          const firstKey = IN_MEMORY_CACHE.keys().next().value;
+          IN_MEMORY_CACHE.delete(firstKey);
+        }
+        IN_MEMORY_CACHE.set(cacheKey, { etag, responseBody, timestamp: Date.now() });
+
         if (ifNoneMatch && etagMatches(ifNoneMatch, etag)) {
           return new Response(null, {
             status: 304,
