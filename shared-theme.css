@@ -465,3 +465,381 @@ html[lang="ar"] .metric-hero-stat {
   padding-inline-start: 16px;
   padding-left: 0;
 }
+
+/* ----------------------------------------------------------------------------
+   12. DASHBOARD TELEMETRY & OPERATIONS SUITE (Phase 3 Redesign)
+   ---------------------------------------------------------------------------- */
+
+/* --- Executive KPI Cards --- */
+.dash-kpis {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)) !important;
+  gap: 16px !important;
+  margin-bottom: 20px !important;
+}
+
+.kpi-card {
+  background: var(--card) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius-lg) !important;
+  padding: 18px 20px !important;
+  box-shadow: var(--shadow-sm) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  position: relative !important;
+  overflow: hidden !important;
+  transition: transform var(--transition), box-shadow var(--transition), border-color var(--transition) !important;
+}
+
+.kpi-card:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: var(--shadow-hover) !important;
+  border-color: var(--meeg-turquoise) !important;
+}
+
+.kpi-card-header {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  margin-bottom: 10px !important;
+}
+
+.kpi-lbl {
+  font-size: 0.8rem !important;
+  font-weight: 600 !important;
+  color: var(--text-secondary) !important;
+  letter-spacing: 0.2px !important;
+  text-transform: none !important;
+}
+
+.kpi-icon-wrap {
+  width: 36px !important;
+  height: 36px !important;
+  border-radius: 10px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 1.1rem !important;
+}
+
+.kpi-icon-wrap.icon-petrol {
+  background: var(--meeg-turquoise-bg) !important;
+  color: var(--meeg-turquoise) !important;
+}
+
+.kpi-icon-wrap.icon-turquoise {
+  background: rgba(25, 172, 188, 0.15) !important;
+  color: var(--meeg-turquoise) !important;
+}
+
+.kpi-icon-wrap.icon-blue {
+  background: rgba(2, 132, 199, 0.12) !important;
+  color: #0284c7 !important;
+}
+
+.kpi-icon-wrap.icon-amber {
+  background: rgba(217, 119, 6, 0.12) !important;
+  color: #d97706 !important;
+}
+
+.kpi-val {
+  font-family: var(--font-sans) !important;
+  font-size: 1.85rem !important;
+  font-weight: 800 !important;
+  color: var(--text) !important;
+  line-height: 1.2 !important;
+  letter-spacing: -0.5px !important;
+}
+
+.kpi-footer-sub {
+  font-size: 0.72rem !important;
+  color: var(--text-muted) !important;
+  margin-top: 6px !important;
+  font-weight: 500 !important;
+}
+
+/* --- Filter Card & Controls --- */
+.filter-card {
+  background: var(--card) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius-lg) !important;
+  padding: 16px 20px !important;
+  box-shadow: var(--shadow-sm) !important;
+  margin-bottom: 20px !important;
+}
+
+.filter-primary-row {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  flex-wrap: wrap !important;
+  gap: 12px !important;
+}
+
+.filter-left-group, .filter-right-group {
+  display: flex !important;
+  align-items: center !important;
+  flex-wrap: wrap !important;
+  gap: 8px !important;
+}
+
+.filter-select, .filter-input {
+  height: 38px !important;
+  padding: 0 12px !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius-sm) !important;
+  background: var(--bg-3) !important;
+  color: var(--text) !important;
+  font-size: 0.82rem !important;
+  font-family: var(--font-sans) !important;
+}
+
+.filter-select:focus, .filter-input:focus {
+  border-color: var(--meeg-turquoise) !important;
+  box-shadow: 0 0 0 3px var(--meeg-turquoise-bg) !important;
+}
+
+/* --- Action Buttons --- */
+.btn-action {
+  height: 38px !important;
+  padding: 0 14px !important;
+  background: var(--meeg-petrol) !important;
+  color: #ffffff !important;
+  border: none !important;
+  border-radius: var(--radius-sm) !important;
+  font-size: 0.82rem !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  transition: all var(--transition-fast) !important;
+}
+
+.btn-action:hover {
+  background: var(--meeg-petrol-light) !important;
+  box-shadow: 0 2px 10px rgba(7, 71, 83, 0.25) !important;
+}
+
+.btn-action.secondary {
+  background: var(--bg-3) !important;
+  color: var(--text) !important;
+  border: 1px solid var(--border) !important;
+}
+
+.btn-action.secondary:hover {
+  background: var(--bg-2) !important;
+  border-color: var(--border-hover) !important;
+}
+
+.btn-action.success {
+  background: #059669 !important;
+  color: #fff !important;
+}
+
+.btn-action.success:hover {
+  background: #047857 !important;
+}
+
+#btnSyncSheets {
+  background: linear-gradient(135deg, var(--meeg-petrol) 0%, var(--meeg-turquoise) 100%) !important;
+  color: #fff !important;
+  border: none !important;
+  box-shadow: 0 2px 10px rgba(25, 172, 188, 0.25) !important;
+}
+
+#btnSyncSheets:hover {
+  filter: brightness(1.08) !important;
+}
+
+/* --- Table Card & Presentation --- */
+.table-card {
+  background: var(--card) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius-lg) !important;
+  box-shadow: var(--shadow-sm) !important;
+  overflow: hidden !important;
+}
+
+.table-header {
+  padding: 16px 20px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  border-bottom: 1px solid var(--border) !important;
+  background: var(--bg-1) !important;
+}
+
+.table-title {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  font-size: 0.95rem !important;
+  font-weight: 700 !important;
+  color: var(--text) !important;
+}
+
+.table-wrap {
+  overflow-x: auto !important;
+  max-height: 68vh !important;
+}
+
+table {
+  width: 100% !important;
+  border-collapse: collapse !important;
+  font-size: 0.82rem !important;
+}
+
+thead th {
+  background: var(--bg-2) !important;
+  color: var(--text-secondary) !important;
+  font-size: 0.72rem !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  padding: 12px 14px !important;
+  border-bottom: 2px solid var(--border) !important;
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 10 !important;
+  white-space: nowrap !important;
+  text-align: left !important;
+}
+
+[dir="rtl"] thead th,
+html[lang="ar"] thead th {
+  text-align: right !important;
+}
+
+tbody td {
+  padding: 11px 14px !important;
+  border-bottom: 1px solid var(--border-light) !important;
+  color: var(--text) !important;
+  white-space: nowrap !important;
+  vertical-align: middle !important;
+}
+
+tbody tr:hover td {
+  background: var(--meeg-turquoise-bg) !important;
+}
+
+/* --- Status Badges --- */
+.badge-fp {
+  background: rgba(16, 185, 129, 0.12) !important;
+  color: #059669 !important;
+  border: 1px solid rgba(16, 185, 129, 0.3) !important;
+  padding: 2px 8px !important;
+  border-radius: 12px !important;
+  font-weight: 700 !important;
+  font-size: 0.72rem !important;
+  display: inline-block !important;
+}
+
+.badge-qa {
+  background: rgba(245, 158, 11, 0.12) !important;
+  color: #d97706 !important;
+  border: 1px solid rgba(245, 158, 11, 0.3) !important;
+  padding: 2px 8px !important;
+  border-radius: 12px !important;
+  font-weight: 700 !important;
+  font-size: 0.72rem !important;
+  display: inline-block !important;
+}
+
+.badge-shift {
+  background: var(--bg-2) !important;
+  color: var(--text-secondary) !important;
+  border: 1px solid var(--border) !important;
+  padding: 2px 8px !important;
+  border-radius: 12px !important;
+  font-weight: 600 !important;
+  font-size: 0.72rem !important;
+  display: inline-block !important;
+}
+
+.badge-source {
+  padding: 2px 8px !important;
+  border-radius: 6px !important;
+  font-size: 0.72rem !important;
+  font-weight: 700 !important;
+  display: inline-block !important;
+}
+
+/* --- State Boxes (Loading, Empty, Error) --- */
+.table-state-box {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 44px 20px !important;
+  text-align: center !important;
+}
+
+.table-state-box .state-spinner {
+  width: 36px !important;
+  height: 36px !important;
+  border: 3px solid var(--border) !important;
+  border-top-color: var(--meeg-turquoise) !important;
+  border-radius: 50% !important;
+  animation: meeg-spin 0.7s linear infinite !important;
+  margin-bottom: 14px !important;
+}
+
+.table-state-box .state-icon {
+  font-size: 2.2rem !important;
+  margin-bottom: 12px !important;
+  opacity: 0.8 !important;
+}
+
+.table-state-box .state-title {
+  font-size: 1rem !important;
+  font-weight: 700 !important;
+  color: var(--text) !important;
+  margin-bottom: 6px !important;
+}
+
+.table-state-box .state-sub {
+  font-size: 0.82rem !important;
+  color: var(--text-muted) !important;
+  max-width: 440px !important;
+}
+
+/* --- Table Footer Pagination Controls --- */
+.table-footer-controls {
+  padding: 12px 20px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  flex-wrap: wrap !important;
+  gap: 12px !important;
+  background: var(--bg-1) !important;
+  border-top: 1px solid var(--border) !important;
+}
+
+/* --- Mobile Responsiveness --- */
+@media (max-width: 900px) {
+  .dash-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+  .filter-primary-row {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+  .filter-left-group, .filter-right-group {
+    width: 100% !important;
+  }
+  .filter-left-group select, .filter-left-group input {
+    flex: 1 1 100% !important;
+  }
+}
+
+@media (max-width: 550px) {
+  .dash-kpis {
+    grid-template-columns: 1fr !important;
+  }
+  .table-footer-controls {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+}
