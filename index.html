@@ -15,6 +15,7 @@
 <meta property="og:type" content="website">
 <meta property="og:image" content="logo.jpg">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared-theme.css">
 <style>
 :root {
   --primary: #0d9488;
@@ -1687,7 +1688,7 @@ input[type=number] { -moz-appearance: textfield; }
   <div class="sticky-wrap">
   <header class="main-header">
     <div class="header-left">
-      <div class="header-brand-link">
+      <a href="dashboard.html" class="header-brand-link" style="text-decoration:none;" title="Open MEEG Dashboard">
         <img src="logo.jpg" alt="MEEG Logo" class="brand-logo-img">
         <div class="header-brand-text">
           <div class="header-brand-row">
@@ -1697,7 +1698,7 @@ input[type=number] { -moz-appearance: textfield; }
           <div class="header-full-name">Micro Engineering Egypt</div>
           <div class="header-dept">Labeling Operations · Task Tracker</div>
         </div>
-      </div>
+      </a>
     </div>
     <div class="header-right-actions">
       <div class="instructions-btn-wrap">
@@ -1725,6 +1726,10 @@ input[type=number] { -moz-appearance: textfield; }
           <span class="btn-arrow-big">➜</span>
         </a>
       </div>
+      
+    <a href="dashboard.html" class="topbar-admin-btn" style="margin-inline-start: 10px; text-decoration: none;" title="Go to Dashboard">
+        <span>📊</span> Dashboard
+      </a>
       
     </div>
   </header>

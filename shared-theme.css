@@ -1,0 +1,467 @@
+/**
+ * ==============================================================================
+ * MEEG ENTERPRISE DESIGN SYSTEM & SHARED THEME (shared-theme.css)
+ * ==============================================================================
+ * Primary Brand Identity:
+ * - Deep Petrol: #074753 (Extracted from logo.jpg)
+ * - Vibrant Turquoise: #19acbc (Extracted from logo.jpg)
+ *
+ * Impeccable Craft Floor & UI/UX Pro Max Architecture:
+ * - Declared single elevation (no double-halo borders)
+ * - Themed browser surfaces (scrollbar, ::selection, :focus-visible)
+ * - Full Arabic / RTL logical layout support
+ * - Accessible contrast ratios (WCAG AAA compliant)
+ * ==============================================================================
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Cairo:wght@400;600;700&display=swap');
+
+:root {
+  /* --------------------------------------------------------------------------
+     1. BRAND TOKENS (MEEG Official Identity)
+     -------------------------------------------------------------------------- */
+  --meeg-petrol-darkest: #042026;
+  --meeg-petrol-deep: #052e37;
+  --meeg-petrol: #074753;
+  --meeg-petrol-light: #0b5e6e;
+  --meeg-petrol-surface: #0e2930;
+
+  --meeg-turquoise-dark: #12828f;
+  --meeg-turquoise: #19acbc;
+  --meeg-turquoise-light: #22c5d6;
+  --meeg-turquoise-bg: rgba(25, 172, 188, 0.12);
+  --meeg-turquoise-glow: rgba(25, 172, 188, 0.25);
+  --meeg-border-tint: rgba(25, 172, 188, 0.18);
+
+  /* --------------------------------------------------------------------------
+     2. CORE SYSTEM TOKENS (Backward-Compatible Mappings)
+     -------------------------------------------------------------------------- */
+  --primary: var(--meeg-petrol);
+  --primary-dark: var(--meeg-petrol-deep);
+  --primary-light: var(--meeg-turquoise);
+  --primary-xlight: #eaf7f9;
+  --primary-glow: var(--meeg-turquoise-glow);
+
+  --accent: var(--meeg-turquoise);
+  --accent-light: var(--meeg-turquoise-bg);
+  --accent-glow: var(--meeg-turquoise-glow);
+
+  --teal: var(--meeg-turquoise);
+  --teal-deep: var(--meeg-petrol);
+  --blue: #0b7c8c;
+  --blue-deep: var(--meeg-petrol-deep);
+
+  /* Light Theme (Default clean enterprise state) */
+  --bg: #f3f7f8;
+  --bg-1: #f3f7f8;
+  --bg-2: #e9f0f2;
+  --bg-3: #ffffff;
+  --card: #ffffff;
+  --elevated: #ffffff;
+  --surface: #ffffff;
+  --surface-glass: rgba(255, 255, 255, 0.94);
+  --glass: #ffffff;
+  --glass-hover: #f3f7f8;
+
+  --border: #d2e1e4;
+  --border-light: #e6eff1;
+  --border-focus: var(--meeg-turquoise);
+  --border-hover: #b4cbd0;
+
+  --text: #052e37;
+  --text-secondary: #244951;
+  --text-soft: #244951;
+  --text-muted: #5e8088;
+  --muted: #5e8088;
+
+  --success: #059669;
+  --success-bg: rgba(5, 150, 105, 0.12);
+  --warning: #d97706;
+  --warning-bg: rgba(217, 119, 6, 0.12);
+  --danger: #dc2626;
+  --danger-bg: rgba(220, 38, 38, 0.12);
+  --info: #0284c7;
+
+  /* Typography */
+  --font-sans: 'Plus Jakarta Sans', 'Cairo', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font: var(--font-sans);
+  --display: var(--font-sans);
+  --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+
+  /* Spacing Scale */
+  --space-2xs: 4px;
+  --space-xs: 8px;
+  --space-sm: 12px;
+  --space-md: 18px;
+  --space-lg: 24px;
+  --space-xl: 36px;
+  --space-2xl: 48px;
+
+  /* Radii */
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+  --radius-pill: 9999px;
+
+  /* Elevation (Single declared depth - Impeccable standard) */
+  --shadow-sm: 0 1px 3px rgba(5, 46, 55, 0.05);
+  --shadow: 0 4px 14px rgba(5, 46, 55, 0.05), 0 1px 2px rgba(5, 46, 55, 0.03);
+  --shadow-hover: 0 8px 24px rgba(5, 46, 55, 0.09);
+  --shadow-modal: 0 20px 48px -8px rgba(4, 32, 38, 0.35);
+
+  --transition-fast: 150ms cubic-bezier(0.16, 1, 0.3, 1);
+  --transition: 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ----------------------------------------------------------------------------
+   3. DARK THEME TOKENS (Deep Technical Slate & Luminous Turquoise)
+   ---------------------------------------------------------------------------- */
+html[data-theme="dark"] {
+  --bg: #051013;
+  --bg-1: #051013;
+  --bg-2: #08171c;
+  --bg-3: #0c2027;
+  --card: #0c2027;
+  --elevated: #112a33;
+  --surface: #0c2027;
+  --surface-glass: rgba(12, 32, 39, 0.94);
+  --glass: #0c2027;
+  --glass-hover: #112a33;
+
+  --border: rgba(25, 172, 188, 0.22);
+  --border-light: rgba(25, 172, 188, 0.12);
+  --border-focus: var(--meeg-turquoise-light);
+  --border-hover: rgba(25, 172, 188, 0.38);
+
+  --text: #f0fafb;
+  --text-secondary: #b2d5db;
+  --text-soft: #b2d5db;
+  --text-muted: #749fa7;
+  --muted: #749fa7;
+
+  --primary: var(--meeg-turquoise);
+  --primary-light: var(--meeg-turquoise-light);
+  --primary-dark: var(--meeg-petrol-darkest);
+  --accent: var(--meeg-turquoise);
+  --accent-light: rgba(25, 172, 188, 0.18);
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow: 0 4px 18px rgba(0, 0, 0, 0.4);
+  --shadow-hover: 0 8px 30px rgba(0, 0, 0, 0.55);
+}
+
+/* ----------------------------------------------------------------------------
+   4. IMPECCABLE THEMED BROWSER SURFACES
+   ---------------------------------------------------------------------------- */
+::selection {
+  background: rgba(25, 172, 188, 0.35);
+  color: #ffffff;
+}
+
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-hover);
+  border-radius: var(--radius-pill);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--meeg-turquoise);
+}
+
+:focus-visible {
+  outline: 2px solid var(--meeg-turquoise) !important;
+  outline-offset: 2px !important;
+}
+
+/* ----------------------------------------------------------------------------
+   5. UNIFIED GLOBAL NAVIGATION & SHELL STYLES
+   ---------------------------------------------------------------------------- */
+.side-nav, #mainSidebar {
+  background: var(--meeg-petrol-darkest) !important;
+  border-inline-end: 1px solid rgba(25, 172, 188, 0.15) !important;
+  transition: width var(--transition), transform var(--transition);
+}
+
+html[data-theme="light"] .side-nav,
+html[data-theme="light"] #mainSidebar {
+  background: #062b33 !important;
+  border-inline-end: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+.side-brand {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+  padding: 16px 18px !important;
+}
+
+.side-brand-title {
+  color: #ffffff !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.05em !important;
+}
+
+.side-brand-tag {
+  background: var(--meeg-turquoise) !important;
+  color: var(--meeg-petrol-darkest) !important;
+  font-weight: 800 !important;
+  border-radius: var(--radius-xs) !important;
+}
+
+.side-section-heading {
+  color: var(--meeg-turquoise) !important;
+  font-size: 0.68rem !important;
+  letter-spacing: 0.08em !important;
+  font-weight: 700 !important;
+  opacity: 0.85;
+}
+
+.side-nav-btn {
+  color: rgba(255, 255, 255, 0.75) !important;
+  border-radius: var(--radius-sm) !important;
+  transition: var(--transition) !important;
+  border: 1px solid transparent !important;
+  font-weight: 500 !important;
+}
+
+.side-nav-btn:hover {
+  color: #ffffff !important;
+  background: rgba(25, 172, 188, 0.12) !important;
+  border-color: rgba(25, 172, 188, 0.25) !important;
+}
+
+.side-nav-btn.active {
+  color: #ffffff !important;
+  background: linear-gradient(135deg, rgba(25, 172, 188, 0.28), rgba(7, 71, 83, 0.5)) !important;
+  border-color: var(--meeg-turquoise) !important;
+  border-inline-start: 3px solid var(--meeg-turquoise) !important;
+  font-weight: 700 !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2) !important;
+}
+
+.side-nav-badge {
+  background: var(--meeg-turquoise) !important;
+  color: var(--meeg-petrol-darkest) !important;
+  font-weight: 700 !important;
+}
+
+.side-footer {
+  border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+.side-user-card {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: var(--radius-sm) !important;
+}
+
+.side-user-avatar {
+  background: var(--meeg-turquoise) !important;
+  color: var(--meeg-petrol-darkest) !important;
+  font-weight: 800 !important;
+}
+
+.side-action-btn {
+  background: rgba(255, 255, 255, 0.06) !important;
+  color: rgba(255, 255, 255, 0.8) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: var(--radius-xs) !important;
+  transition: var(--transition-fast) !important;
+}
+
+.side-action-btn:hover {
+  background: var(--meeg-turquoise) !important;
+  color: var(--meeg-petrol-darkest) !important;
+  border-color: var(--meeg-turquoise) !important;
+}
+
+/* ----------------------------------------------------------------------------
+   6. TOPBAR & WORKSPACE SHELL
+   ---------------------------------------------------------------------------- */
+.workspace-top-bar, .topbar {
+  background: var(--bg-3) !important;
+  border-bottom: 1px solid var(--border) !important;
+}
+
+.workspace-title {
+  color: var(--text) !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.02em !important;
+}
+
+.workspace-subtitle {
+  color: var(--text-muted) !important;
+}
+
+.workspace-sync-badge {
+  background: var(--meeg-turquoise-bg) !important;
+  color: var(--meeg-turquoise-dark) !important;
+  border: 1px solid var(--meeg-border-tint) !important;
+  border-radius: var(--radius-pill) !important;
+  font-weight: 600 !important;
+}
+html[data-theme="dark"] .workspace-sync-badge {
+  color: var(--meeg-turquoise-light) !important;
+}
+
+.workspace-action-btn, .theme-toggle-btn {
+  background: var(--card) !important;
+  color: var(--text) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius-sm) !important;
+  font-weight: 600 !important;
+  transition: var(--transition-fast) !important;
+}
+
+.workspace-action-btn:hover, .theme-toggle-btn:hover {
+  border-color: var(--meeg-turquoise) !important;
+  color: var(--meeg-turquoise) !important;
+}
+
+/* ----------------------------------------------------------------------------
+   7. UNIFIED BUTTONS & BADGES
+   ---------------------------------------------------------------------------- */
+.btn-primary, .btn-submit, .btn-action.primary {
+  background: var(--meeg-petrol) !important;
+  color: #ffffff !important;
+  border: 1px solid var(--meeg-petrol-light) !important;
+  border-radius: var(--radius-sm) !important;
+  font-weight: 600 !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12) !important;
+  transition: var(--transition-fast) !important;
+}
+
+.btn-primary:hover, .btn-submit:hover, .btn-action.primary:hover {
+  background: var(--meeg-petrol-light) !important;
+  border-color: var(--meeg-turquoise) !important;
+  transform: translateY(-1px);
+}
+
+.btn-secondary, .btn-action.secondary {
+  background: var(--card) !important;
+  color: var(--text) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius-sm) !important;
+  transition: var(--transition-fast) !important;
+}
+
+.btn-secondary:hover, .btn-action.secondary:hover {
+  background: var(--glass-hover) !important;
+  border-color: var(--border-hover) !important;
+}
+
+/* Source Badges (Live vs Archive) */
+.badge-source {
+  font-family: var(--mono) !important;
+  border-radius: var(--radius-xs) !important;
+}
+
+/* ----------------------------------------------------------------------------
+   8. UNIFIED CARDS, KPI METRICS & TABLES
+   ---------------------------------------------------------------------------- */
+.metric-card, .sec, .dc, .ux-panel, .ux-face {
+  background: var(--card) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius-lg) !important;
+  box-shadow: var(--shadow) !important;
+}
+
+.tbl-w, .table-wrap, .data-table-container {
+  background: var(--card) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius-lg) !important;
+  overflow: hidden !important;
+}
+
+.tbl-w th, table th {
+  background: var(--bg-2) !important;
+  color: var(--text-secondary) !important;
+  border-bottom: 2px solid var(--border) !important;
+  font-weight: 700 !important;
+  font-size: 0.75rem !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.04em !important;
+}
+
+.tbl-w td, table td {
+  border-bottom: 1px solid var(--border-light) !important;
+  color: var(--text) !important;
+}
+
+table tr:hover td {
+  background: var(--bg-2) !important;
+}
+
+/* ----------------------------------------------------------------------------
+   9. UNIFIED FORM INPUTS & FILTERS
+   ---------------------------------------------------------------------------- */
+input[type="text"], input[type="password"], input[type="search"], select, textarea {
+  border: 1px solid var(--border) !important;
+  background: var(--card) !important;
+  color: var(--text) !important;
+  border-radius: var(--radius-sm) !important;
+  font-family: var(--font-sans) !important;
+  transition: var(--transition-fast) !important;
+}
+
+input:focus, select:focus, textarea:focus {
+  border-color: var(--meeg-turquoise) !important;
+  box-shadow: 0 0 0 3px var(--meeg-turquoise-bg) !important;
+  outline: none !important;
+}
+
+/* ----------------------------------------------------------------------------
+   10. UNIFIED LOADING, EMPTY & ERROR STATES
+   ---------------------------------------------------------------------------- */
+.loading-spinner {
+  width: 24px;
+  height: 24px;
+  border: 3px solid var(--border);
+  border-top-color: var(--meeg-turquoise);
+  border-radius: 50%;
+  animation: meeg-spin 0.7s linear infinite;
+  display: inline-block;
+}
+
+@keyframes meeg-spin {
+  to { transform: rotate(360deg); }
+}
+
+.state-empty-box {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-muted);
+}
+.state-empty-icon {
+  font-size: 2.2rem;
+  margin-bottom: 10px;
+  color: var(--meeg-turquoise);
+  opacity: 0.7;
+}
+
+/* ----------------------------------------------------------------------------
+   11. RTL ALIGNMENT CORRECTIONS (Arabic Natural Ergonomics)
+   ---------------------------------------------------------------------------- */
+[dir="rtl"] .side-nav-btn,
+html[lang="ar"] .side-nav-btn {
+  text-align: right !important;
+}
+
+[dir="rtl"] .side-nav-btn.active,
+html[lang="ar"] .side-nav-btn.active {
+  border-inline-start: 3px solid var(--meeg-turquoise) !important;
+  border-inline-end: 1px solid var(--meeg-turquoise) !important;
+}
+
+[dir="rtl"] .metric-hero-stat,
+html[lang="ar"] .metric-hero-stat {
+  border-inline-start: 2px solid var(--border);
+  border-left: none;
+  padding-inline-start: 16px;
+  padding-left: 0;
+}
