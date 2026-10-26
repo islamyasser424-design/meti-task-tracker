@@ -2278,12 +2278,45 @@ function loadData(){
     mc.innerHTML=`<div class="loader"><div class="spin"></div><span class="ltxt">Connecting to Turso Database…</span></div>`;
   }
 
-  apiFetch("/api/analytics/dataset?limit=25000")
+  var _anEtag = window._anEtag || "";
+  var _anInFlight = window._anInFlight || false;
+  var _anQuotaBlocked = window._anQuotaBlocked || false;
+  var _anLastFetchTime = window._anLastFetchTime || 0;
+
+  if (_anInFlight || _anQuotaBlocked) return;
+  window._anInFlight = true;
+
+  var anReqHeaders = {};
+  if (_anEtag) anReqHeaders["If-None-Match"] = _anEtag;
+
+  apiFetch("/api/analytics/dataset?limit=25000", { headers: anReqHeaders })
   .then(r => {
+    window._anLastFetchTime = Date.now();
+    if (r.status === 304) {
+      // 304 Not Modified! Data is identical. Zero row read cost!
+      window._anInFlight = false;
+      setTrafficLight('green');
+      var tl = document.getElementById('todayLabel');
+      if (tl) tl.textContent = cairoToday() + ' (Synced)';
+      return null;
+    }
+    if (r.status === 429) {
+      window._anQuotaBlocked = true;
+      window._anInFlight = false;
+      autoRefreshEnabled = false;
+      if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+      applyAutoRefreshUI();
+      showToast('⚠️ تم إيقاف التحديث التلقائي لتجاوز حصة الاستعلامات');
+      throw new Error("QUOTA_BLOCKED");
+    }
     if (!r.ok) throw new Error('HTTP ' + r.status);
+    var et = r.headers.get("ETag");
+    if (et) { _anEtag = et; window._anEtag = et; }
     return r.json();
   })
   .then(data => {
+    window._anInFlight = false;
+    if (!data) return; // 304 Not Modified
     if (!data.ok || !Array.isArray(data.rows)) {
       throw new Error((data && data.message) || "Empty response from API");
     }

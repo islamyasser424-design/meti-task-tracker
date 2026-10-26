@@ -1717,6 +1717,15 @@
         </div>
       </div>
 
+            <!-- Quota Protection Alert Banner -->
+      <div id="quotaAlertBanner" style="display:none; margin-bottom:16px; padding:12px 18px; border-radius:12px; background:rgba(217,119,6,0.12); border:1px solid rgba(217,119,6,0.3); color:#b45309; font-size:0.85rem; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="font-size:1.1rem;">⚠️</span>
+          <span id="quotaAlertText"><strong>تنبيه استهلاك الحصة:</strong> تم إيقاف التحديث التلقائي مؤقتًا لحماية حصة قاعدة البيانات. بياناتك الحالية محفوظة ومتاحة.</span>
+        </div>
+        <button type="button" class="btn-action secondary" onclick="retryQuotaFetch()" style="padding:5px 12px; font-size:0.75rem; font-weight:700;">🔄 إعادة المحاولة يدويًا</button>
+      </div>
+
       <!-- Filters & Actions Card -->
       <section class="filter-card">
         <div class="filter-primary-row">
@@ -4896,13 +4905,74 @@ async function syncGoogleSheetsClient(isAuto) {
         });
     }
 
-function fetchLiveDataOnly() {
-  var sync = document.getElementById("syncStatus");
-  if (sync) sync.textContent = "⚡ Loading from database...";
+var _tasksEtag = "";
+var _isTasksInFlight = false;
+var _quotaBlocked = false;
+var _lastTasksFetchTime = 0;
+var _tasksRetryCount = 0;
 
-  apiFetch("/api/tasks?limit=2000")
-    .then(function(r) { return r.json(); })
+function showQuotaAlertBanner(msg) {
+  var b = document.getElementById("quotaAlertBanner");
+  if (b) {
+    b.style.display = "flex";
+    if (msg) {
+      var txt = document.getElementById("quotaAlertText");
+      if (txt) txt.textContent = msg;
+    }
+  }
+}
+
+function hideQuotaAlertBanner() {
+  var b = document.getElementById("quotaAlertBanner");
+  if (b) b.style.display = "none";
+}
+
+function retryQuotaFetch() {
+  _quotaBlocked = false;
+  _tasksRetryCount = 0;
+  hideQuotaAlertBanner();
+  fetchLiveData();
+}
+
+function fetchLiveDataOnly() {
+  if (_isTasksInFlight) return;
+  if (_quotaBlocked) return;
+  _isTasksInFlight = true;
+
+  var sync = document.getElementById("syncStatus");
+  if (sync) sync.textContent = "⚡ Loading from edge database...";
+
+  var reqHeaders = {};
+  if (_tasksEtag) {
+    reqHeaders["If-None-Match"] = _tasksEtag;
+  }
+
+  apiFetch("/api/tasks?limit=2000", { headers: reqHeaders })
+    .then(function(res) {
+      _lastTasksFetchTime = Date.now();
+      if (res.status === 304) {
+        // Data is unchanged on server! Zero row read cost!
+        _tasksRetryCount = 0;
+        _isTasksInFlight = false;
+        if (sync) sync.textContent = "● Live Edge Synced (" + new Date().toLocaleTimeString("en-US", {timeZone:"Africa/Cairo"}) + ") [Up to date]";
+        return null;
+      }
+      if (res.status === 429) {
+        _quotaBlocked = true;
+        _isTasksInFlight = false;
+        showQuotaAlertBanner("تم إيقاف التحديث التلقائي مؤقتًا لتجاوز حصة الاستعلامات. تم الحفاظ على كافة البيانات الحالية.");
+        if (sync) sync.textContent = "⚠️ Quota limit reached (Auto-refresh paused)";
+        throw new Error("QUOTA_BLOCKED");
+      }
+      var newEtag = res.headers.get("ETag");
+      if (newEtag) _tasksEtag = newEtag;
+      return res.json();
+    })
     .then(function(data) {
+      _isTasksInFlight = false;
+      if (!data) return; // 304 Not Modified
+      _tasksRetryCount = 0;
+      hideQuotaAlertBanner();
       if (!data.ok) throw new Error(data.message || "Failed to load tasks");
       if (sync) sync.textContent = "● Live Edge Synced (" + new Date().toLocaleTimeString("en-US", {timeZone:"Africa/Cairo"}) + ")";
       _totalDbCount = data.total || 0;
@@ -4924,6 +4994,16 @@ function fetchLiveDataOnly() {
       applyFilters();
     })
     .catch(function(err) {
+      _isTasksInFlight = false;
+      if (err.message === "QUOTA_BLOCKED" || String(err.message).toLowerCase().includes("quota") || String(err.message).toLowerCase().includes("blocked")) {
+        _quotaBlocked = true;
+        showQuotaAlertBanner("تم إيقاف التحديث التلقائي مؤقتًا لتجاوز حصة الاستعلامات.");
+        if (sync) sync.textContent = "⚠️ Quota limit reached (Auto-refresh paused)";
+        return;
+      }
+      _tasksRetryCount++;
+      var backoffSeconds = Math.min(60, 5 * Math.pow(2, _tasksRetryCount));
+      console.warn("Telemetry fetch error (attempt " + _tasksRetryCount + "), backing off " + backoffSeconds + "s:", err.message);
       if (sync) sync.textContent = "API error: " + err.message;
       var tbody = document.getElementById("tableBody");
       if (tbody && !_allSubmissions.length) {
@@ -5108,12 +5188,28 @@ function searchFullDatabase() {
     });
 }
 
-// 30-second continuous background polling for live submissions
+// Smart visibility-aware and quota-protected 30s background polling
 setInterval(function() {
+  if (document.visibilityState !== "visible") return;
+  if (_quotaBlocked || _isTasksInFlight) return;
   if (document.getElementById('dashView') && document.getElementById('dashView').style.display !== 'none' && _activeTab === 'tasks') {
-    fetchLiveDataOnly();
+    if (Date.now() - _lastTasksFetchTime >= 30000) {
+      fetchLiveDataOnly();
+    }
   }
 }, 30000);
+
+document.addEventListener("visibilitychange", function() {
+  if (document.visibilityState === "visible") {
+    if (!_quotaBlocked && !_isTasksInFlight) {
+      if (document.getElementById('dashView') && document.getElementById('dashView').style.display !== 'none' && _activeTab === 'tasks') {
+        if (Date.now() - _lastTasksFetchTime >= 30000) {
+          fetchLiveDataOnly();
+        }
+      }
+    }
+  }
+});
 
 // Attach Enter key listener to Search input
 document.addEventListener("DOMContentLoaded", function() {

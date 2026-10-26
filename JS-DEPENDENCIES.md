@@ -7,7 +7,7 @@ This document is the verified safety net of all DOM element IDs, classes, and da
 
 ## 1. dashboard.html (+ dashboard-ui.js & analytics-engine.js)
 
-### Critical IDs (223)
+### Critical IDs (225)
 - `#actConfirmPass`
 - `#actModalDesc`
 - `#actModalTitle`
@@ -167,6 +167,8 @@ This document is the verified safety net of all DOM element IDs, classes, and da
 - `#qualityUnmatchedBtn`
 - `#queuesAdminTableBody`
 - `#queuesCountLabel`
+- `#quotaAlertBanner`
+- `#quotaAlertText`
 - `#refreshBtn`
 - `#resetReqCount`
 - `#resetReqList`

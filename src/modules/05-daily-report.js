@@ -586,11 +586,27 @@ loadData=function(){
     try{
       const token = (typeof getAuthToken === "function" ? getAuthToken() : (sessionStorage.getItem("meeg_auth_token") || ""));
       const apiBase = window.MEEG_API_URL || localStorage.getItem("meeg_api_url") || "https://meeg-secure-api.islamyasser424.workers.dev";
-      const res = await (typeof apiFetch === "function" ? apiFetch("/api/analytics/dataset?limit=25000") : fetch(apiBase + "/api/analytics/dataset?limit=25000", {
-        headers: token ? { "Authorization": "Bearer " + token } : {},
+      var _m5Etag = window._anEtag || "";
+      var m5Headers = token ? { "Authorization": "Bearer " + token } : {};
+      if (_m5Etag) m5Headers["If-None-Match"] = _m5Etag;
+
+      const res = await (typeof apiFetch === "function" ? apiFetch("/api/analytics/dataset?limit=25000", { headers: m5Headers }) : fetch(apiBase + "/api/analytics/dataset?limit=25000", {
+        headers: m5Headers,
         credentials: "include"
       }));
+
+      if (res.status === 304) {
+        // Fast 304 Not Modified
+        setTrafficLight('green');
+        return;
+      }
+      if (res.status === 429) {
+        if (typeof showToast === 'function') showToast('⚠️ تم إيقاف التحديث التلقائي لتجاوز حصة الاستعلامات');
+        throw new Error("QUOTA_BLOCKED");
+      }
       if(!res.ok) throw new Error("HTTP " + res.status);
+      var net = res.headers.get("ETag");
+      if (net) { window._anEtag = net; }
       const data = await res.json();
       const dbRows = data.rows || [];
       const headers = ['Timestamp', 'Shift', 'Unit', 'Qtc Name', 'Yubikey Email', 'Labeler Name', 'National ID', 'Pc No', 'Modality', 'Queue Name', 'Task Link', 'Id', 'Object Count', 'Pass', 'Stage', 'Created At'];

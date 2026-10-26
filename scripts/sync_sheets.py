@@ -1,13 +1,12 @@
-import json, urllib.request, re, urllib.parse, time, os
+import json, urllib.request, urllib.error, re, urllib.parse, time, os
 
 TURSO_URL = os.environ.get('TURSO_URL', 'https://meti-tasks-islamyasser424-design.aws-eu-west-1.turso.io/v2/pipeline')
 TURSO_TOKEN = os.environ.get('TURSO_TOKEN', '')
 
 if not TURSO_TOKEN:
-    # Read from local env or raise error if in CI
     print("Warning: TURSO_TOKEN environment variable not set. Please set TURSO_TOKEN.")
 
-def execute_pipeline(requests, retries=4):
+def execute_pipeline(requests, retries=3):
     payload = json.dumps({'requests': requests}).encode('utf-8')
     req = urllib.request.Request(TURSO_URL, data=payload, headers={
         'Authorization': f'Bearer {TURSO_TOKEN}',
@@ -16,8 +15,26 @@ def execute_pipeline(requests, retries=4):
     for attempt in range(retries):
         try:
             with urllib.request.urlopen(req, timeout=30) as resp:
-                return json.loads(resp.read().decode('utf-8'))
+                res = json.loads(resp.read().decode('utf-8'))
+                if res and 'results' in res:
+                    for r in res['results']:
+                        if r.get('type') == 'error':
+                            msg = r.get('error', {}).get('message', '').lower()
+                            if 'quota' in msg or 'blocked' in msg or 'forbidden' in msg or 'limit' in msg:
+                                print(f"CRITICAL: Quota exceeded or database blocked: {msg}")
+                                print("Halting further requests immediately to protect quota.")
+                                raise RuntimeError("QUOTA_BLOCKED: " + msg)
+                return res
+        except urllib.error.HTTPError as he:
+            if he.code in (429, 403):
+                print(f"CRITICAL: HTTP {he.code} Quota/Forbidden error from database service. Halting.")
+                raise he
+            if attempt == retries - 1:
+                raise he
+            time.sleep(2 + attempt * 2)
         except Exception as e:
+            if 'QUOTA_BLOCKED' in str(e):
+                raise e
             if attempt == retries - 1:
                 raise e
             time.sleep(2 + attempt * 2)
@@ -31,10 +48,23 @@ def to_val(v, typ='text'):
     return {'type': 'text', 'value': str(v).strip() if v is not None else ''}
 
 def sync_sheets():
-    print("=== STARTING GOOGLE SHEETS SYNC WORKFLOW ===")
+    print("=== STARTING OPTIMIZED GOOGLE SHEETS DELTA SYNC ===")
     stmts = []
     new_queues = set()
     new_qtcs = set()
+
+    # Pre-fetch recent task IDs from database to eliminate redundant INSERT queries
+    existing_tids = set()
+    try:
+        res = execute_pipeline([{'type': 'execute', 'stmt': {'sql': 'SELECT task_id FROM task_submissions ORDER BY id DESC LIMIT 1000'}}])
+        if res and 'results' in res and res['results']:
+            rows = res['results'][0].get('response', {}).get('result', {}).get('rows', [])
+            for r in rows:
+                if r and r[0] and r[0].get('value'):
+                    existing_tids.add(str(r[0]['value']).strip())
+        print(f"Pre-loaded {len(existing_tids)} recent task IDs from database to prevent redundant re-processing.")
+    except Exception as e:
+        print(f"Notice: proceeding without recent ID cache ({e})")
 
     # 1. Fetch Sheet 1 (Main/History with 51k+ rows)
     print("Fetching newest 300 rows from Sheet 1 via GViz...")
@@ -48,6 +78,7 @@ def sync_sheets():
         m1 = re.search(r'cb1\((.*)\);?\s*$', txt1, re.DOTALL)
         if m1:
             obj1 = json.loads(m1.group(1))
+            new_s1 = 0
             for r in obj1['table']['rows']:
                 vals = [(cell.get('f') or cell.get('v') or '') if cell else '' for cell in r['c']]
                 if len(vals) < 15: continue
@@ -55,6 +86,7 @@ def sync_sheets():
                 created = vals[15] if len(vals) > 15 and vals[15] else ts
                 tid = str(tid).strip()
                 if not tid: continue
+                if tid in existing_tids: continue
 
                 if queue: new_queues.add(queue)
                 if qtc_name: new_qtcs.add(qtc_name)
@@ -67,7 +99,9 @@ def sync_sheets():
                     to_val(queue), to_val(obj_cnt, 'integer'), to_val(created)
                 ]
                 stmts.append({'type': 'execute', 'stmt': {'sql': sql, 'args': args}})
-            print(f"Sheet 1: prepared {len(stmts)} statements.")
+                existing_tids.add(tid)
+                new_s1 += 1
+            print(f"Sheet 1: {new_s1} new rows detected (skipped {len(obj1['table']['rows']) - new_s1} existing).")
     except Exception as e:
         print(f"Error fetching Sheet 1: {e}")
 
@@ -90,6 +124,7 @@ def sync_sheets():
                 ts, shift, unit, qtc_name, yk_email, lab_name, nat_id, pc_no, mod, queue, link, tid, obj_cnt, pas, stage = vals[:15]
                 tid = str(tid).strip()
                 if not tid: continue
+                if tid in existing_tids: continue
 
                 if queue: new_queues.add(queue)
                 if qtc_name: new_qtcs.add(qtc_name)
@@ -102,8 +137,9 @@ def sync_sheets():
                     to_val(queue), to_val(obj_cnt, 'integer'), to_val(ts)
                 ]
                 stmts.append({'type': 'execute', 'stmt': {'sql': sql, 'args': args}})
+                existing_tids.add(tid)
                 s2_count += 1
-            print(f"Sheet 2: prepared {s2_count} statements.")
+            print(f"Sheet 2: {s2_count} new rows detected (skipped {len(obj2['table']['rows']) - s2_count} existing).")
     except Exception as e:
         print(f"Error fetching Sheet 2: {e}")
 
@@ -128,7 +164,7 @@ def sync_sheets():
                 if link:
                     m = re.search(r'/id/(\d+)', str(link))
                     if m: tid = m.group(1)
-                if not tid: continue
+                if not tid or tid in existing_tids: continue
 
                 # Insert into archive_2026
                 sql_a26 = "INSERT OR IGNORE INTO archive_2026 (timestamp, shift, unit, pc_no, labeler_name, national_id, qtc_shift, yubikey_email, qtc_name, stage, task_link, task_id, pass, modality, queue_name, object_count, created_at, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Archive 2026')"
@@ -142,8 +178,9 @@ def sync_sheets():
                 ]
                 stmts.append({'type': 'execute', 'stmt': {'sql': sql_a26, 'args': args26}})
                 stmts.append({'type': 'execute', 'stmt': {'sql': sql_ts26, 'args': args26}})
+                existing_tids.add(tid)
                 s26_count += 1
-            print(f"Archive 2026: prepared {s26_count} rows.")
+            print(f"Archive 2026: {s26_count} new rows detected (skipped {len(obj26['table']['rows']) - s26_count} existing).")
     except Exception as e:
         print(f"Error fetching Archive 2026: {e}")
 
@@ -172,7 +209,7 @@ def sync_sheets():
                 if not tid and link:
                     m = re.search(r'/id/(\d+)', str(link))
                     if m: tid = m.group(1)
-                if not tid: continue
+                if not tid or tid in existing_tids: continue
                 yk_email = f"me{raw_id}@meti.ai" if raw_id and '@' not in str(raw_id) else str(raw_id).lower()
 
                 sql_a25 = "INSERT OR IGNORE INTO archive_2025 (timestamp, shift, unit, pc_no, labeler_name, national_id, qtc_shift, yubikey_email, qtc_name, stage, task_link, task_id, pass, modality, queue_name, object_count, created_at, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Archive 2025')"
@@ -185,8 +222,9 @@ def sync_sheets():
                 ]
                 stmts.append({'type': 'execute', 'stmt': {'sql': sql_a25, 'args': args25}})
                 stmts.append({'type': 'execute', 'stmt': {'sql': sql_ts25, 'args': args25}})
+                existing_tids.add(tid)
                 s25_count += 1
-            print(f"Archive 2025: prepared {s25_count} rows.")
+            print(f"Archive 2025: {s25_count} new rows detected (skipped {len(obj25['table']['rows']) - s25_count} existing).")
     except Exception as e:
         print(f"Error fetching Archive 2025: {e}")
 
@@ -201,14 +239,21 @@ def sync_sheets():
         for i in range(0, len(qtc_stmts), 50):
             execute_pipeline(qtc_stmts[i:i+50])
 
-    print(f"Executing {len(stmts)} statements into Turso...")
+    if not stmts:
+        print("✓ All records are already up to date in database. 0 statements to execute. Zero quota consumed!")
+        return
+
+    print(f"Executing {len(stmts)} statements into database...")
     for b in range(0, len(stmts), 50):
         execute_pipeline(stmts[b:b+50])
 
-    # Check total in Turso
-    res = execute_pipeline([{'type': 'execute', 'stmt': {'sql': 'SELECT count(*) FROM task_submissions'}}])
-    cnt = res['results'][0]['response']['result']['rows'][0][0]['value']
-    print(f"Sync complete. Total Turso submissions: {cnt}")
+    # Fast 1-row check of latest ID instead of full-table scan COUNT(*)
+    try:
+        res = execute_pipeline([{'type': 'execute', 'stmt': {'sql': 'SELECT MAX(id) FROM task_submissions'}}])
+        cnt = res['results'][0]['response']['result']['rows'][0][0]['value']
+        print(f"Sync complete. Latest task ID in database: {cnt}")
+    except Exception as e:
+        print(f"Sync complete. {len(stmts)} statements executed.")
 
 if __name__ == '__main__':
     sync_sheets()
