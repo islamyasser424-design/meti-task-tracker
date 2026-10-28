@@ -4,6 +4,7 @@ import { chromium } from "playwright";
 import { runtime } from "./runtime.mjs";
 const r = await runtime();
 let browser;
+const diagnosticPages = [];
 try {
   browser = await chromium.launch({
     headless: true,
@@ -23,6 +24,7 @@ try {
     });
   const page = await context.newPage(),
     manager = await managerContext.newPage();
+  diagnosticPages.push(page, manager);
   for (const p of [page, manager])
     p.on("pageerror", (error) => errors.push(error.message));
   async function login(p, username) {
@@ -62,7 +64,7 @@ try {
       !document.getElementById("saveTask").disabled &&
       document.getElementById("saveTask").textContent.includes("إعادة محاولة"),
   );
-  assert.equal(await page.locator("#taskFields").isDisabled(), true);
+  assert.equal(await page.locator("#taskLink").isDisabled(), true);
   assert.equal(await page.locator("#taskCount").textContent(), "0");
   await page.reload();
   await page.locator("#workspace").waitFor({ state: "visible" });
@@ -152,6 +154,20 @@ try {
       2,
     ),
   );
+} catch (error) {
+  await mkdir(new URL("../.local/screenshots/", import.meta.url), {
+    recursive: true,
+  });
+  for (let i = 0; i < diagnosticPages.length; i++) {
+    await diagnosticPages[i]
+      .screenshot({
+        path: new URL(`../.local/screenshots/failure-${i}.png`, import.meta.url)
+          .pathname,
+        fullPage: true,
+      })
+      .catch(() => {});
+  }
+  throw error;
 } finally {
   await browser?.close();
   await r.close();
