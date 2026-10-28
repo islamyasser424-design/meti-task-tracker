@@ -5,6 +5,7 @@ import { runtime } from "./runtime.mjs";
 const r = await runtime();
 let browser;
 const diagnosticPages = [];
+const apiTrace = [];
 try {
   browser = await chromium.launch({
     headless: true,
@@ -27,6 +28,16 @@ try {
   diagnosticPages.push(page, manager);
   for (const p of [page, manager])
     p.on("pageerror", (error) => errors.push(error.message));
+  for (const p of [page, manager])
+    p.on("response", (response) => {
+      const url = new URL(response.url());
+      if (url.pathname.startsWith("/api/"))
+        apiTrace.push({
+          path: url.pathname,
+          method: response.request().method(),
+          status: response.status(),
+        });
+    });
   async function login(p, username) {
     await p.goto(r.origin);
     await p.locator("[name=username]").fill(username);
@@ -54,7 +65,14 @@ try {
   await page.route("**/api/tasks", async (route) => {
     if (route.request().method() === "POST" && !dropped) {
       dropped = true;
-      await route.fetch();
+      const forwarded = await route.fetch({
+        headers: await route.request().allHeaders(),
+      });
+      assert.equal(
+        forwarded.status(),
+        201,
+        `Original authenticated save was not confirmed: ${await forwarded.text()}`,
+      );
       await route.abort("failed");
     } else await route.continue();
   });
@@ -68,6 +86,9 @@ try {
   assert.equal(await page.locator("#taskCount").textContent(), "0");
   await page.reload();
   await page.locator("#workspace").waitFor({ state: "visible" });
+  await page.waitForFunction(
+    () => document.getElementById("taskCount").textContent === "1",
+  );
   await page.waitForFunction(() =>
     document.getElementById("saveTask").textContent.includes("إعادة محاولة"),
   );
@@ -155,6 +176,7 @@ try {
     ),
   );
 } catch (error) {
+  console.error(JSON.stringify({ api_trace: apiTrace.slice(-30) }));
   await mkdir(new URL("../.local/screenshots/", import.meta.url), {
     recursive: true,
   });
