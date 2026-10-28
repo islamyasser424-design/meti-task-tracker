@@ -1,0 +1,80 @@
+{
+  "measured_at": "2026-10-28T02:36:21.210Z",
+  "mode": "local actual API + SQLite, virtual time; not cloud billing",
+  "scenario": {
+    "users": 30,
+    "operators": 27,
+    "supervisors": 3,
+    "hours": 8,
+    "poll_seconds": 15,
+    "initial_live_rows": 50000,
+    "tasks_per_operator_hour": 6,
+    "workdays_per_month": 22,
+    "hidden_tabs": 0
+  },
+  "measured": {
+    "new_tasks": 1296,
+    "idempotent_retries": 64,
+    "version_requests": 57600,
+    "changes_requests": 5184,
+    "turso_equivalent_client_calls": 20914,
+    "sql_statements": 28818,
+    "sqlite_row_modifications_including_triggers": 7776,
+    "wall_ms": 10186
+  },
+  "billing": {
+    "actual_turso_rows_read": null,
+    "actual_turso_rows_written": null,
+    "reason": "Cloud credentials were not supplied; use measure-turso.mjs with a dedicated meti-bench-* database. SQLite total_changes excludes index maintenance and is not a Turso billing counter."
+  },
+  "projections": {
+    "api_requests_per_workday": 64204,
+    "api_requests_per_22_workdays": 1412488,
+    "version_requests_at_100_users_per_day": 192000
+  },
+  "plans": [
+    {
+      "sql": "SELECT t.id,t.owner_id,t.labeler_name,t.occurred_at,t.work_date,t.shift,t.unit,t.pc_no,t.qtc_name,t.task_link,t.task_id,t.pass,t.stage,t.modality,t.queue_name,t.object_count,t.created_at,c.seq,t.request_hash FROM meti_tasks t JOIN meti_changes c ON c.task_pk=t.id WHERE t.owner_id=? AND t.idempotency_key=?",
+      "plan": [
+        "SEARCH t USING INDEX sqlite_autoindex_meti_tasks_2 (owner_id=? AND idempotency_key=?)",
+        "SEARCH c USING COVERING INDEX sqlite_autoindex_meti_changes_1 (task_pk=?)"
+      ]
+    },
+    {
+      "sql": "SELECT task_count,object_count,version FROM meti_report_totals WHERE scope=?",
+      "plan": [
+        "SEARCH meti_report_totals USING INDEX sqlite_autoindex_meti_report_totals_1 (scope=?)"
+      ]
+    },
+    {
+      "sql": "SELECT t.id,t.owner_id,t.labeler_name,t.occurred_at,t.work_date,t.shift,t.unit,t.pc_no,t.qtc_name,t.task_link,t.task_id,t.pass,t.stage,t.modality,t.queue_name,t.object_count,t.created_at,c.seq FROM meti_changes c JOIN meti_tasks t ON t.id=c.task_pk WHERE c.seq>? AND c.owner_id=? AND c.seq<=COALESCE((SELECT version FROM meti_report_totals WHERE scope=?),0) ORDER BY c.seq ASC LIMIT ?",
+      "plan": [
+        "SEARCH c USING INDEX meti_changes_owner_seq (owner_id=? AND seq>? AND seq<?)",
+        "SCALAR SUBQUERY 1",
+        "SEARCH meti_report_totals USING INDEX sqlite_autoindex_meti_report_totals_1 (scope=?)",
+        "SEARCH t USING INTEGER PRIMARY KEY (rowid=?)"
+      ]
+    },
+    {
+      "sql": "SELECT t.id,t.owner_id,t.labeler_name,t.occurred_at,t.work_date,t.shift,t.unit,t.pc_no,t.qtc_name,t.task_link,t.task_id,t.pass,t.stage,t.modality,t.queue_name,t.object_count,t.created_at,c.seq FROM meti_changes c JOIN meti_tasks t ON t.id=c.task_pk WHERE c.seq>? AND c.seq<=COALESCE((SELECT version FROM meti_report_totals WHERE scope=?),0) ORDER BY c.seq ASC LIMIT ?",
+      "plan": [
+        "SEARCH c USING INTEGER PRIMARY KEY (rowid>? AND rowid<?)",
+        "SCALAR SUBQUERY 1",
+        "SEARCH meti_report_totals USING INDEX sqlite_autoindex_meti_report_totals_1 (scope=?)",
+        "SEARCH t USING INTEGER PRIMARY KEY (rowid=?)"
+      ]
+    },
+    {
+      "sql": "SELECT id,username,display_name,role,active,auth_version FROM meti_users WHERE id=?",
+      "plan": [
+        "SEARCH meti_users USING INDEX sqlite_autoindex_meti_users_1 (id=?)"
+      ]
+    },
+    {
+      "sql": "SELECT total_changes() n",
+      "plan": [
+        "SCAN CONSTANT ROW"
+      ]
+    }
+  ]
+}

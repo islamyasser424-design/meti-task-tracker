@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>METI · Task Tracker</title>
+    <link rel="stylesheet" href="/app.css" />
+    <script type="module" src="/app.js"></script>
+  </head>
+  <body>
+    <div id="loginView" class="login-shell">
+      <div class="login-brand">
+        <span class="mark">M</span
+        ><span>METI <small>OPERATIONS WORKSPACE</small></span>
+      </div>
+      <main class="login-card">
+        <p class="eyebrow">مساحة عمل الفريق</p>
+        <h1>كل مهمة، في مكانها.</h1>
+        <p class="muted">سجّل دخولك لمتابعة المهام وتسجيل عملك.</p>
+        <form id="loginForm">
+          <label
+            >اسم المستخدم<input
+              name="username"
+              autocomplete="username"
+              required
+              minlength="3"
+              maxlength="80"
+              dir="ltr" /></label
+          ><label
+            >كلمة المرور<input
+              name="password"
+              type="password"
+              autocomplete="current-password"
+              required
+              maxlength="256"
+              dir="ltr" /></label
+          ><button class="primary" type="submit" disabled>
+            تسجيل الدخول <span>←</span>
+          </button>
+          <p id="loginError" role="alert"></p>
+        </form>
+      </main>
+      <p class="login-foot">METI TASK TRACKER · مساحة مراجعة مستقلة</p>
+    </div>
+    <div id="workspace" hidden>
+      <aside class="sidebar">
+        <a class="brand" href="/"
+          ><span class="mark">M</span
+          ><span>METI<small>TASK TRACKER</small></span></a
+        >
+        <p class="nav-label">مساحة العمل</p>
+        <button class="nav-item active" id="liveNav">
+          <span>▦</span> لوحة المتابعة <span class="live-dot"></span></button
+        ><a class="nav-item" href="#taskForm"><span>＋</span> تسجيل مهمة</a>
+        <div class="sidebar-note">
+          <span class="live-dot"></span><strong>تسجيل مباشر</strong>
+          <p>تظهر المهمة بعد تأكيد الحفظ.</p>
+        </div>
+        <div class="profile">
+          <span class="avatar" id="avatar">M</span>
+          <div>
+            <strong id="userName"></strong><small id="userRole"></small>
+          </div>
+          <button
+            id="logout"
+            class="icon-button"
+            title="تسجيل الخروج"
+            aria-label="تسجيل الخروج"
+          >
+            ↪
+          </button>
+        </div>
+      </aside>
+      <div class="main-shell">
+        <header class="topbar">
+          <span>العمليات <span class="slash">/</span> لوحة المتابعة</span>
+          <div class="connection">
+            <span class="live-dot" id="connectionDot"></span
+            ><span id="connectionStatus">جارٍ الاتصال…</span>
+          </div>
+        </header>
+        <main class="content">
+          <div class="page-heading">
+            <div>
+              <p class="eyebrow">نظرة على سير العمل</p>
+              <h1>لوحة المهام</h1>
+              <p class="muted" id="scopeNote">
+                المهام المسجلة في قاعدة البيانات الجديدة
+              </p>
+            </div>
+            <div class="date-chip" id="today"></div>
+          </div>
+          <div id="notice" class="notice" role="status" hidden></div>
+          <section class="stats" aria-label="ملخص المهام">
+            <article class="stat">
+              <div>
+                <span class="stat-label">المهام المسجلة</span
+                ><span class="stat-icon">▧</span>
+              </div>
+              <strong id="taskCount">—</strong
+              ><small>عدد التسجيلات المؤكدة</small>
+            </article>
+            <article class="stat">
+              <div>
+                <span class="stat-label">إجمالي العناصر</span
+                ><span class="stat-icon teal">◇</span>
+              </div>
+              <strong id="objectCount">—</strong
+              ><small>من المهام المحفوظة</small>
+            </article>
+            <article class="stat">
+              <div>
+                <span class="stat-label">آخر تحديث ناجح</span
+                ><span class="stat-icon violet">◷</span>
+              </div>
+              <strong id="lastSync" class="time-value">—</strong
+              ><small>فحص التحديثات كل 15 ثانية أثناء فتح الصفحة</small>
+            </article>
+          </section>
+          <div class="work-grid">
+            <section class="panel form-panel">
+              <div class="panel-heading">
+                <div>
+                  <span class="section-kicker">01 / تسجيل</span>
+                  <h2>مهمة جديدة</h2>
+                </div>
+                <span class="tag">NEW</span>
+              </div>
+              <p class="panel-intro">
+                ستُسجّل باسم حسابك. احتفظ بالنموذج حتى تأكيد الحفظ.
+              </p>
+              <form id="taskForm">
+                <fieldset id="taskFields">
+                  <label
+                    >رابط المهمة<input
+                      type="url"
+                      name="task_link"
+                      id="taskLink"
+                      placeholder="https://labeling.robot.car/#/…"
+                      required
+                      maxlength="2048"
+                      dir="ltr"
+                  /></label>
+                  <div class="form-row">
+                    <label
+                      >Task ID<input
+                        name="task_id"
+                        id="taskId"
+                        inputmode="numeric"
+                        pattern="[0-9]{10,80}"
+                        required
+                        maxlength="80"
+                        dir="ltr" /></label
+                    ><label
+                      >المرحلة<input
+                        name="stage"
+                        id="stage"
+                        required
+                        maxlength="80"
+                        placeholder="Lidar Stage"
+                        dir="ltr"
+                    /></label>
+                  </div>
+                  <div class="form-row">
+                    <label
+                      >الوردية<select name="shift" required>
+                        <option value="">اختر الوردية</option>
+                        <option>Morning</option>
+                        <option>Evening</option>
+                        <option>Night</option>
+                      </select></label
+                    ><label
+                      >الوحدة<input
+                        name="unit"
+                        required
+                        maxlength="60"
+                        placeholder="Unit A"
+                        dir="ltr"
+                    /></label>
+                  </div>
+                  <div class="form-row">
+                    <label
+                      >رقم الجهاز<input
+                        name="pc_no"
+                        required
+                        maxlength="20"
+                        placeholder="12 / QTC / SV"
+                        dir="ltr" /></label
+                    ><label
+                      >نوع التسجيل<select name="pass" id="pass" required>
+                        <option>FP</option>
+                        <option>QA</option>
+                      </select></label
+                    >
+                  </div>
+                  <div class="form-row">
+                    <label
+                      >Modality<select name="modality" id="modality" required>
+                        <option value="">اختر النوع</option>
+                        <option>Lidar</option>
+                        <option>Lane Line</option>
+                        <option>Image</option>
+                        <option>Relabeling</option>
+                      </select></label
+                    ><label
+                      >عدد العناصر<input
+                        name="object_count"
+                        type="number"
+                        min="0"
+                        max="1000000"
+                        step="1"
+                        required
+                        placeholder="0"
+                        dir="ltr"
+                    /></label>
+                  </div>
+                  <label
+                    >اسم Queue<input
+                      name="queue_name"
+                      id="queue"
+                      required
+                      maxlength="240"
+                      dir="ltr" /></label
+                  ><label
+                    >اسم QTC <span class="optional">اختياري</span
+                    ><input name="qtc_name" maxlength="160" dir="ltr"
+                  /></label>
+                </fieldset>
+                <button
+                  class="primary submit-button"
+                  id="saveTask"
+                  type="submit"
+                >
+                  <span>＋</span> حفظ المهمة
+                </button>
+                <p id="saveStatus" class="save-status" role="status">
+                  يظهر تأكيد النجاح بعد الحفظ فقط.
+                </p>
+              </form>
+            </section>
+            <section class="panel records-panel">
+              <div class="panel-heading">
+                <div>
+                  <span class="section-kicker">02 / متابعة</span>
+                  <h2>سجل المهام</h2>
+                </div>
+                <span class="tag soft" id="loadedCount">0 معروضة</span>
+              </div>
+              <div class="table-toolbar">
+                <div class="tabs" id="sources">
+                  <button data-source="new" class="selected">الجديدة</button
+                  ><button data-source="2025" hidden>أرشيف 2025</button
+                  ><button data-source="2026" hidden>أرشيف 2026</button
+                  ><button data-source="all" hidden>ملخص الكل</button>
+                </div>
+                <button class="text-button" id="newest">الأحدث ↻</button>
+              </div>
+              <div class="table-scroll" id="tableWrap">
+                <table>
+                  <thead id="tableHead"></thead>
+                  <tbody id="tableBody"></tbody>
+                </table>
+              </div>
+              <div id="emptyState" class="empty-state" hidden>
+                <span>▧</span>
+                <h3>مساحة لمهمتك التالية</h3>
+                <p>ستظهر التسجيلات المؤكدة هنا.</p>
+              </div>
+              <div id="archivePages" class="archive-pages" hidden></div>
+              <div class="table-footer">
+                <span id="tableNote"
+                  >صفحات محدودة · التغييرات الجديدة فقط تُجلب تلقائيًا</span
+                ><button class="secondary" id="older" disabled>
+                  عرض أقدم ←
+                </button>
+              </div>
+            </section>
+          </div>
+          <footer class="page-footer">
+            <span>METI OPERATIONS</span
+            ><span>الأرشيف محفوظ منفصلًا عن المهام الجديدة</span>
+          </footer>
+        </main>
+      </div>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,22 @@
+name: METI account usage monitor
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 */6 * * *'
+permissions:
+  contents: read
+jobs:
+  check-account-quota:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm ci
+        working-directory: rebuild
+      - name: Alert at 70 percent of the shared Free quota
+        run: node rebuild/scripts/monitor.mjs --threshold 0.7
+        env:
+          TURSO_ORG: ${{ secrets.TURSO_ORG }}
+          TURSO_MANAGEMENT_TOKEN: ${{ secrets.TURSO_MANAGEMENT_TOKEN }}

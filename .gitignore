@@ -34,3 +34,20 @@ node_modules/
 
 # Runtime Application Configuration (Untracked)
 config.js
+
+# Isolated rebuild: private data, credentials, dumps and generated files
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+rebuild/.build/
+rebuild/.local/
+rebuild/private/
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+*.csv
+*.tsv
+*.xlsx
+*.xls
+*.dump.sql
