@@ -3,8 +3,8 @@ export class Poller {
     run,
     {
       isHidden = () => document.hidden,
-      setTimer = setTimeout,
-      clearTimer = clearTimeout,
+      setTimer = (callback, delay) => globalThis.setTimeout(callback, delay),
+      clearTimer = (id) => globalThis.clearTimeout(id),
       random = Math.random,
     } = {},
   ) {

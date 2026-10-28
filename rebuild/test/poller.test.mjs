@@ -2,6 +2,29 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { Poller } from "../web/poller.js";
 import { parseTaskLink } from "../web/task-link.js";
+test("default browser timers retain their Window receiver", () => {
+  const originalSet = globalThis.setTimeout,
+    originalClear = globalThis.clearTimeout;
+  let cleared = false;
+  try {
+    globalThis.setTimeout = function () {
+      assert.equal(this, globalThis);
+      return 42;
+    };
+    globalThis.clearTimeout = function (id) {
+      assert.equal(this, globalThis);
+      assert.equal(id, 42);
+      cleared = true;
+    };
+    const p = new Poller(async () => {}, { isHidden: () => false });
+    p.start();
+    p.stop();
+    assert.equal(cleared, true);
+  } finally {
+    globalThis.setTimeout = originalSet;
+    globalThis.clearTimeout = originalClear;
+  }
+});
 test("polling pauses when hidden and backs off with Retry-After; reconnect resumes", async () => {
   let hidden = false,
     scheduled = [],
