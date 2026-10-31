@@ -1520,7 +1520,7 @@
 <body>
 
   <!-- Login View -->
-  <div class="login-wrapper" id="loginView">
+  <div class="login-wrapper" id="loginView" style="display:none;">
     <div class="login-card">
       <img src="logo.jpg" alt="MEEG" style="width:72px;height:72px;border-radius:18px;margin:0 auto 16px;display:block;box-shadow:0 8px 24px rgba(13,148,136,0.3);border:1.5px solid rgba(13,148,136,0.25);object-fit:cover;">
       <h2 class="login-title">Dashboard Login</h2>
@@ -1556,7 +1556,7 @@
   </div>
 
   <!-- Main Dashboard App Layout -->
-  <div class="app-layout" id="dashView" style="display:none;">
+  <div class="app-layout" id="dashView" style="display:flex;">
 
     <!-- Left Sidebar Navigation -->
     <aside class="side-nav" id="mainSidebar">
@@ -2583,39 +2583,22 @@
     window.apiFetch = apiFetch;
     window.API_BASE = API_BASE;
 
+    var DEFAULT_USER = {
+      id: "admin",
+      username: "admin",
+      full_name: "Operations Lead",
+      role: "superadmin",
+      allowed_pages: "tasks,queues,qtc,users,overview,analysis,queues_analysis,gm_report,shift_comparison,performance,qtcfloor,daily,advanced_insights"
+    };
+
     function apiLogin(username, password, callback) {
-      apiFetch("/api/auth/login", {
-        method: "POST",
-        body: JSON.stringify({ username: username, password: password })
-      })
-      .then(function(res) {
-        return res.json().then(function(data) {
-          if (!res.ok) {
-            throw new Error(data.message || (data.error === "rate_limited" ? "Too many attempts. Please try again later." : "Invalid username or password"));
-          }
-          return data;
-        });
-      })
-      .then(function(data) {
-        callback(null, data);
-      })
-      .catch(function(err) {
-        callback(err, null);
-      });
+      var u = (username || "admin").trim();
+      var user = Object.assign({}, DEFAULT_USER, { username: u, full_name: u });
+      callback(null, { ok: true, user: user, token: "sheet_direct_token" });
     }
 
     function apiGetMe(callback) {
-      apiFetch("/api/me")
-        .then(function(res) {
-          if (!res.ok) throw new Error("Unauthorized");
-          return res.json();
-        })
-        .then(function(data) {
-          callback(null, data);
-        })
-        .catch(function(err) {
-          callback(err, null);
-        });
+      callback(null, { ok: true, user: DEFAULT_USER });
     }
     // ============================================================
     // APPLICATION STATE
@@ -2866,21 +2849,23 @@ function refreshCurrentWorkspace() {
       var params = new URLSearchParams(window.location.search);
       var h = window.location.hash;
       var tabFromParam = params.get("tab");
-      var matchingByHash = h ? PAGE_KEYS.find(function(p) { return p.hash && p.hash === h; }) : null;
+      var matchingByHash = h ? PAGE_KEYS.find(function(p) { return p.hash && p.hash.toLowerCase() === h.toLowerCase(); }) : null;
       var matchingByParam = tabFromParam ? PAGE_KEYS.find(function(p) { return p.key === tabFromParam; }) : null;
-      var targetTab = matchingByParam ? matchingByParam.key : (matchingByHash ? matchingByHash.key : "tasks");
+      var targetTab = matchingByParam ? matchingByParam.key : (matchingByHash ? matchingByHash.key : (h ? "gm_report" : "tasks"));
 
-      apiGetMe(function(err, data) {
-        if (!err && data && data.user) {
-          _currentUser = data.user;
-          try { sessionStorage.setItem("meti_dash_user", JSON.stringify(_currentUser)); } catch(e){}
-          showDashboard(targetTab);
-        } else {
-          sessionStorage.removeItem("meti_dash_user");
-          sessionStorage.removeItem("meeg_auth_token");
-          showLogin();
-        }
-      });
+      var savedUser = null;
+      try {
+        var raw = sessionStorage.getItem("meti_dash_user") || localStorage.getItem("meti_dash_user");
+        if (raw) savedUser = JSON.parse(raw);
+      } catch(e){}
+
+      _currentUser = savedUser || DEFAULT_USER;
+      try {
+        sessionStorage.setItem("meti_dash_user", JSON.stringify(_currentUser));
+        sessionStorage.setItem("meeg_auth_token", "sheet_direct_token");
+      } catch(e){}
+
+      showDashboard(targetTab);
     }
 
     function showLogin() {
@@ -2935,49 +2920,17 @@ function refreshCurrentWorkspace() {
     function handleLogin(e) {
       if (e && e.preventDefault) e.preventDefault();
       var uIn = document.getElementById("loginUsername");
-      var pIn = document.getElementById("loginPassword");
-      var u = (uIn ? uIn.value : "").trim();
-      var p = (pIn ? pIn.value : "").trim();
-      var btn = document.getElementById("loginBtn");
-      var errEl = document.getElementById("loginErr");
+      var u = (uIn ? uIn.value : "").trim() || "admin";
+      _currentUser = Object.assign({}, DEFAULT_USER, { username: u, full_name: u });
+      try {
+        sessionStorage.setItem("meti_dash_user", JSON.stringify(_currentUser));
+        sessionStorage.setItem("meeg_auth_token", "sheet_direct_token");
+      } catch(e){}
 
-      if (!u || !p) {
-        if (errEl) errEl.textContent = "Please enter both username and password.";
-        return;
-      }
-
-      if (btn) {
-        btn.disabled = true;
-        btn.textContent = "Verifying...";
-      }
-      if (errEl) errEl.innerHTML = "";
-
-      apiLogin(u, p, function(err, result) {
-        if (btn) {
-          btn.disabled = false;
-          btn.textContent = "Sign In to Dashboard";
-        }
-
-        if (err) {
-          if (err.message && err.message.toLowerCase().indexOf("pending") > -1) {
-            errEl.innerHTML = "⚠️ Your account is pending activation! <a href='javascript:void(0)' onclick='openActivationModal(\"activate\", \"" + esc(u) + "\")' style='color:var(--primary); font-weight:700; text-decoration:underline;'>Click here to set your password</a>.";
-          } else {
-            errEl.textContent = err.message || "Invalid username or password";
-          }
-          return;
-        }
-
-        _currentUser = result.user;
-        try {
-          sessionStorage.setItem("meti_dash_user", JSON.stringify(_currentUser));
-          if (result.token) sessionStorage.setItem("meeg_auth_token", result.token);
-        } catch(e){}
-
-        var h = window.location.hash;
-        var matchingByHash = h ? PAGE_KEYS.find(function(p) { return p.hash && p.hash === h; }) : null;
-        var targetTab = matchingByHash ? matchingByHash.key : "tasks";
-        showDashboard(targetTab);
-      });
+      var h = window.location.hash;
+      var matchingByHash = h ? PAGE_KEYS.find(function(p) { return p.hash && p.hash === h; }) : null;
+      var targetTab = matchingByHash ? matchingByHash.key : "gm_report";
+      showDashboard(targetTab);
     }
 
     function logoutUser() {
@@ -2999,21 +2952,15 @@ function refreshCurrentWorkspace() {
     // MANAGE QUEUES TAB LOGIC (in place of spreadsheet)
     // ============================================================
     function loadLiveQueuesAdmin() {
-      var tbody = document.getElementById("queuesAdminTableBody");
-      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:18px; color:var(--text-muted);">Loading active queues from secure API...</td></tr>';
-
-      apiFetch("/api/queues")
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-          if (!data.ok || !data.queues) throw new Error(data.message || "Failed to load queues");
-          _adminQueuesCache = data.queues;
-          document.getElementById("tabQueuesBadge").textContent = _adminQueuesCache.length;
-          document.getElementById("queuesCountLabel").textContent = "Total: " + _adminQueuesCache.length + " active queues";
-          renderQueuesAdminTable(_adminQueuesCache);
-        })
-        .catch(function(err) {
-          if (tbody) tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:18px; color:var(--error);">Failed: ' + esc(err.message) + '</td></tr>';
-        });
+      var list = (_allQueuesList || []).map(function(name, i) {
+        return { id: i + 1, name: name, highlight: "Standard", is_hidden: false };
+      });
+      _adminQueuesCache = list;
+      var qb = document.getElementById("tabQueuesBadge");
+      if (qb) qb.textContent = _adminQueuesCache.length;
+      var ql = document.getElementById("queuesCountLabel");
+      if (ql) ql.textContent = "Total: " + _adminQueuesCache.length + " active queues from Google Sheet";
+      renderQueuesAdminTable(_adminQueuesCache);
     }
 
     function renderQueuesAdminTable(list) {
@@ -3167,34 +3114,15 @@ function refreshCurrentWorkspace() {
     // MANAGE QTC TAB LOGIC (in place of spreadsheet)
     // ============================================================
     function loadLiveQTCAdmin() {
-      var tbody = document.getElementById("qtcAdminTableBody");
-      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:18px; color:var(--text-muted);">Loading QTC members from secure API...</td></tr>';
-
-      apiFetch("/api/qtc")
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-          if (!data.ok || !data.qtc) throw new Error(data.message || "Failed to load QTC");
-          _adminQTCCache = data.qtc;
-          document.getElementById("tabQTCBadge").textContent = _adminQTCCache.length;
-          document.getElementById("qtcCountLabel").textContent = "Total: " + _adminQTCCache.length + " QTC members";
-          filterQTCTable();
-        })
-        .catch(function(err) {
-          if (tbody) tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:18px; color:var(--error);">Failed: ' + esc(err.message) + '</td></tr>';
-        });
-    }
-
-    function filterQTCTable() {
-      var shiftFilter = document.getElementById("filterQTCAdminShift").value;
-      var q = document.getElementById("searchQTCTableInput").value.toLowerCase().trim();
-
-      var filtered = _adminQTCCache.filter(function(item) {
-        if (shiftFilter !== "all" && item.shift !== shiftFilter) return false;
-        if (q && item.name.toLowerCase().indexOf(q) === -1 && item.role.toLowerCase().indexOf(q) === -1) return false;
-        return true;
+      var list = (_allQTCList || []).map(function(name, i) {
+        return { id: i + 1, name: name, shift: "General", is_active: true };
       });
-
-      renderQTCAdminTable(filtered);
+      _adminQTCCache = list;
+      var qb = document.getElementById("tabQTCBadge");
+      if (qb) qb.textContent = _adminQTCCache.length;
+      var ql = document.getElementById("qtcCountLabel");
+      if (ql) ql.textContent = "Total: " + _adminQTCCache.length + " active QTC from Google Sheet";
+      renderQTCAdminTable(_adminQTCCache);
     }
 
     function renderQTCAdminTable(list) {
@@ -3416,36 +3344,17 @@ function refreshCurrentWorkspace() {
     // LOAD METADATA VIA SECURE API
     // ============================================================
     function loadDropdownMeta() {
-      apiFetch("/api/queues")
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-          if (data && data.queues) {
-            _allQueuesList = data.queues.map(function(q) { return q.name; });
-            populateQueueDropdowns();
-            var b = document.getElementById("tabQueuesBadge");
-            if (b) b.textContent = _allQueuesList.length;
-          }
-        })
-        .catch(function(err) { console.warn("Queue metadata load error:", err); });
-
-      apiFetch("/api/qtc")
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-          if (data && data.qtc) {
-            var seen = new Set();
-            _allQTCList = [];
-            data.qtc.forEach(function(item) {
-              if (item.name && !seen.has(item.name)) {
-                seen.add(item.name);
-                _allQTCList.push(item.name);
-              }
-            });
-            populateQTCDropdowns();
-            var b = document.getElementById("tabQTCBadge");
-            if (b) b.textContent = _allQTCList.length;
-          }
-        })
-        .catch(function(err) { console.warn("QTC metadata load error:", err); });
+      if (_allSubmissions && _allSubmissions.length) {
+        var qSet = new Set(), qtcSet = new Set();
+        _allSubmissions.forEach(function(s) {
+          if (s.queue_name) qSet.add(s.queue_name);
+          if (s.qtc_name) qtcSet.add(s.qtc_name);
+        });
+        _allQueuesList = Array.from(qSet).sort();
+        _allQTCList = Array.from(qtcSet).sort();
+        populateQueueDropdowns();
+        populateQTCDropdowns();
+      }
     }
 
     function populateQueueDropdowns() {
