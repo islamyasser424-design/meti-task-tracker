@@ -3465,7 +3465,7 @@ async function fetchSheetText(url,timeoutMs=45000){
 
  try{
 
-   const response=await fetch(url,{cache:'no-store',signal:controller.signal});
+   const response=await fetch(url,{cache:'default',signal:controller.signal});
 
    if(!response.ok)throw new Error('HTTP '+response.status);
 
@@ -3556,25 +3556,32 @@ function syncSubmissionsFromTable(table) {
   const submissions = [];
   const map = (typeof _submissionsMap !== 'undefined' && _submissionsMap instanceof Map) ? _submissionsMap : new Map();
   map.clear();
+  const qSet = new Set();
+  const qtcSet = new Set();
 
   for (let i = 1; i < table.length; i++) {
     const r = table[i];
     if (!r || !r.length) continue;
     const task_id = String((idI >= 0 ? r[idI] : '') || '').trim();
     const id = task_id || String(i);
+    const qn = String((qI >= 0 ? r[qI] : '') || '').trim();
+    const qtc = String((qtcI >= 0 ? r[qtcI] : '') || '').trim();
+    if (qn) qSet.add(qn);
+    if (qtc) qtcSet.add(qtc);
+
     const rowObj = {
       id: id,
       task_id: task_id,
       timestamp: String((tsI >= 0 ? r[tsI] : '') || '').trim(),
       shift: String((shiftI >= 0 ? r[shiftI] : '') || '').trim(),
       unit: String((unitI >= 0 ? r[unitI] : '') || '').trim(),
-      qtc_name: String((qtcI >= 0 ? r[qtcI] : '') || '').trim(),
+      qtc_name: qtc,
       yubikey_email: String((yubiI >= 0 ? r[yubiI] : '') || '').trim(),
       labeler_name: String((nameI >= 0 ? r[nameI] : '') || '').trim(),
       national_id: String((natI >= 0 ? r[natI] : '') || '').trim(),
       pc_no: String((pcI >= 0 ? r[pcI] : '') || '').trim(),
       modality: String((modI >= 0 ? r[modI] : '') || '').trim(),
-      queue_name: String((qI >= 0 ? r[qI] : '') || '').trim(),
+      queue_name: qn,
       task_link: String((linkI >= 0 ? r[linkI] : '') || '').trim(),
       object_count: parseInt(objI >= 0 ? r[objI] : 0, 10) || 0,
       pass: String((passI >= 0 ? r[passI] : '') || '').trim(),
@@ -3590,14 +3597,10 @@ function syncSubmissionsFromTable(table) {
     _allSubmissions = submissions;
     _totalDbCount = submissions.length;
     if (typeof _allQueuesList !== 'undefined' && Array.isArray(_allQueuesList)) {
-      const qSet = new Set(_allQueuesList);
-      submissions.forEach(s => { if (s.queue_name) qSet.add(s.queue_name); });
       _allQueuesList = Array.from(qSet).sort();
       if (typeof populateQueueDropdowns === 'function') populateQueueDropdowns();
     }
     if (typeof _allQTCList !== 'undefined' && Array.isArray(_allQTCList)) {
-      const qtcSet = new Set(_allQTCList);
-      submissions.forEach(s => { if (s.qtc_name) qtcSet.add(s.qtc_name); });
       _allQTCList = Array.from(qtcSet).sort();
       if (typeof populateQTCDropdowns === 'function') populateQTCDropdowns();
     }
@@ -3615,6 +3618,14 @@ function syncSubmissionsFromTable(table) {
 let sheetLoadPromise = null;
 let _instantCacheAttempted = false;
 
+function refreshActiveRouteView() {
+  if (typeof route === 'function') {
+    route();
+  } else if (typeof renderAllSections === 'function') {
+    renderAllSections();
+  }
+}
+
 loadData = function(force) {
   if (sheetLoadPromise) return sheetLoadPromise;
 
@@ -3627,23 +3638,22 @@ loadData = function(force) {
   if (!rawRows.length && !_instantCacheAttempted) {
     _instantCacheAttempted = true;
     idbGet('meti_dataset_cache_v2').then(cached => {
-      if (cached && cached.table && cached.table.length && !rawRows.length) {
-        onCsvTable(cached.table);
-        syncSubmissionsFromTable(cached.table);
+      const tbl = cached?.table || (Array.isArray(cached) ? cached : null);
+      if (tbl && tbl.length > 1 && !rawRows.length) {
+        onCsvTable(tbl);
+        syncSubmissionsFromTable(tbl);
+        refreshActiveRouteView();
         setTrafficLight('yellow');
         if (typeof showToast === 'function') {
           showToast('⚡ Showing cached data — syncing latest updates…');
         }
       } else {
-        idbGet('csv').then(c => {
-          if (c && c.text && !rawRows.length) {
-            parseCSVAsync(c.text).then(t => {
-              if (!rawRows.length && t && t.length) {
-                onCsvTable(t);
-                syncSubmissionsFromTable(t);
-                setTrafficLight('yellow');
-              }
-            }).catch(() => {});
+        idbGet('meeg_analytics_table').then(cTbl => {
+          if (cTbl && Array.isArray(cTbl) && cTbl.length > 1 && !rawRows.length) {
+            onCsvTable(cTbl);
+            syncSubmissionsFromTable(cTbl);
+            refreshActiveRouteView();
+            setTrafficLight('yellow');
           }
         }).catch(() => {});
       }
@@ -3652,15 +3662,17 @@ loadData = function(force) {
 
   if (!rawRows.length) {
     const mc = $('mainContent');
-    if (mc) mc.innerHTML = '<div class="loader"><div class="spin"></div><span class="ltxt">Loading source data from Google Sheet…</span></div>';
+    if (mc && !mc.querySelector('.loc-section') && !document.querySelector('.gm-container') && !document.querySelector('.qa-container')) {
+      mc.innerHTML = '<div class="loader"><div class="spin"></div><span class="ltxt">Loading source data from Google Sheet…</span></div>';
+    }
   }
 
   const base = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID;
   const cleanQuery = encodeURIComponent('select * where A is not null');
   const urls = [
-    base + '/gviz/tq?tqx=out:csv&headers=1&tq=' + cleanQuery + (SHEET_GID ? '&gid=' + encodeURIComponent(SHEET_GID) : ''),
     base + '/export?format=csv&gid=' + encodeURIComponent(SHEET_GID || '0'),
-    base + '/gviz/tq?tqx=out:csv&headers=1&gid=' + encodeURIComponent(SHEET_GID || '0')
+    base + '/gviz/tq?tqx=out:csv&headers=1&gid=' + encodeURIComponent(SHEET_GID || '0'),
+    base + '/gviz/tq?tqx=out:csv&headers=1&tq=' + cleanQuery + (SHEET_GID ? '&gid=' + encodeURIComponent(SHEET_GID) : '')
   ];
 
   sheetLoadPromise = (async () => {
@@ -3696,11 +3708,13 @@ loadData = function(force) {
     onCsvTable(table);
     _lastCsvHash = hash;
     syncSubmissionsFromTable(table);
+    refreshActiveRouteView();
 
     setTrafficLight('green');
     try {
       if (typeof idbSet === 'function') {
         idbSet('meti_dataset_cache_v2', { v: (typeof AUTH_VER !== 'undefined' ? AUTH_VER : '1'), timestamp: Date.now(), table });
+        idbSet('meeg_analytics_table', table);
         idbSet('csv', { v: (typeof AUTH_VER !== 'undefined' ? AUTH_VER : '1'), ts: Date.now(), text });
       }
     } catch (e) {}
@@ -3710,9 +3724,11 @@ loadData = function(force) {
     if (!rawRows.length) {
       try {
         const cached = await idbGet('meti_dataset_cache_v2');
-        if (cached && cached.table && cached.table.length) {
-          onCsvTable(cached.table);
-          syncSubmissionsFromTable(cached.table);
+        const tbl = cached?.table || (Array.isArray(cached) ? cached : null);
+        if (tbl && tbl.length > 1) {
+          onCsvTable(tbl);
+          syncSubmissionsFromTable(tbl);
+          refreshActiveRouteView();
           setTrafficLight('yellow');
           if (typeof showToast === 'function') {
             showToast('Showing offline cached data: ' + err.message);
@@ -3733,13 +3749,11 @@ loadData = function(force) {
     sheetLoadPromise = null;
     setSyncActive(false);
     if (button) button.disabled = false;
-    renderAllSections();
+    refreshActiveRouteView();
   });
 
   return sheetLoadPromise;
 };
-
-
 
 const rowDates=new WeakMap();
 
@@ -7693,24 +7707,17 @@ renderAllSections=function(){
 
 try{
 
- idbGet('csv-two-sources-v1').then(cached=>{
-
-   if(cached&&cached.v===AUTH_VER&&cached.text&&!rawRows.length){
-
-     parseCSVAsync(cached.text).then(table=>{
-
-       if(!rawRows.length&&table&&table.length){
-
-         onCsvTable(table);
-
-         renderAllSections();
-
-       }
-
-     }).catch(()=>{});
-
+ idbGet('meti_dataset_cache_v2').then(cached=>{
+   const tbl = cached?.table || (Array.isArray(cached) ? cached : null);
+   if(tbl && tbl.length > 1 && (!rawRows || !rawRows.length)){
+     _instantCacheAttempted = true;
+     onCsvTable(tbl);
+     if(typeof syncSubmissionsFromTable === 'function'){
+       syncSubmissionsFromTable(tbl);
+     }
+     refreshActiveRouteView();
+     setTrafficLight('yellow');
    }
-
  }).catch(()=>{});
 
 }catch(e){}

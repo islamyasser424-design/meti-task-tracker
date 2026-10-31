@@ -279,21 +279,46 @@ function toggleShift(id,btn){shiftState[id].on=!shiftState[id].on;btn.classList.
 function setShiftsUI(map){Object.keys(shiftState).forEach(k=>{const on=!!(map&&map[k]);shiftState[k].on=on;const b=document.getElementById('btn_'+k);if(b){b.classList.toggle('on',on);const d=b.querySelector('.dot');if(d)d.textContent=on?'●':'○';}});}
 function isRowAllowed(r){const ci=sIdx['Shift'];if(ci===undefined)return true;const sv=String(r[ci]||'').trim().toLowerCase();const anyOn=Object.values(shiftState).some(c=>c.on);if(!anyOn)return true;return Object.values(shiftState).some(c=>c.on&&sv===c.key);}
 function parseCSV(text){
-  const rows=[];let row=[];let field='';let inQuotes=false;
-  for(let i=0;i<text.length;i++){
-    const c=text[i];
+  const len=text.length;const rows=[];let row=[];let inQuotes=false;let fieldStart=0;let hasEscapedQuote=false;
+  for(let i=0;i<len;i++){
+    const code=text.charCodeAt(i);
     if(inQuotes){
-      if(c==='"'){ if(text[i+1]==='"'){field+='"';i++;} else inQuotes=false; }
-      else field+=c;
+      if(code===34/* " */){
+        if(i+1<len&&text.charCodeAt(i+1)===34){hasEscapedQuote=true;i++;}
+        else inQuotes=false;
+      }
     }else{
-      if(c==='"')inQuotes=true;
-      else if(c===','){row.push(field);field='';}
-      else if(c==='\r'){ /* ignore, \n handles the break */ }
-      else if(c==='\n'){row.push(field);rows.push(row);row=[];field='';}
-      else field+=c;
+      if(code===34/* " */){
+        inQuotes=true;
+      }else if(code===44/* , */){
+        let field=text.slice(fieldStart,i);
+        if(field.length>0&&field.charCodeAt(0)===34){
+          if(field.charCodeAt(field.length-1)===34)field=field.slice(1,-1);
+          if(hasEscapedQuote)field=field.replace(/""/g,'"');
+        }
+        row.push(field);fieldStart=i+1;hasEscapedQuote=false;
+      }else if(code===10/* \n */){
+        let end=i;
+        if(end>fieldStart&&text.charCodeAt(end-1)===13/* \r */)end--;
+        let field=text.slice(fieldStart,end);
+        if(field.length>0&&field.charCodeAt(0)===34){
+          if(field.charCodeAt(field.length-1)===34)field=field.slice(1,-1);
+          if(hasEscapedQuote)field=field.replace(/""/g,'"');
+        }
+        row.push(field);rows.push(row);row=[];fieldStart=i+1;hasEscapedQuote=false;
+      }
     }
   }
-  if(field.length||row.length){row.push(field);rows.push(row);}
+  if(fieldStart<len||row.length>0){
+    let end=len;
+    if(end>fieldStart&&text.charCodeAt(end-1)===13)end--;
+    let field=text.slice(fieldStart,end);
+    if(field.length>0&&field.charCodeAt(0)===34){
+      if(field.charCodeAt(field.length-1)===34)field=field.slice(1,-1);
+      if(hasEscapedQuote)field=field.replace(/""/g,'"');
+    }
+    row.push(field);rows.push(row);
+  }
   return rows;
 }
 
@@ -1494,27 +1519,24 @@ function loadData(){
 
 
   // FAST PATH: Instant boot from IndexedDB cache (< 50ms)
-
   if(!_cacheTried && rawRows.length===0){
-
     _cacheTried=true;
-
     try {
-
-      idbGet('meeg_analytics_table').then(cachedTable=>{
-
-        if(cachedTable && Array.isArray(cachedTable) && cachedTable.length>1 && rawRows.length===0){
-
-          onCsvTable(cachedTable);
-
+      idbGet('meti_dataset_cache_v2').then(cached=>{
+        const tbl=cached?.table||(Array.isArray(cached)?cached:null);
+        if(tbl&&tbl.length>1&&rawRows.length===0){
+          onCsvTable(tbl);
           setSyncActive(true);
-
+        } else {
+          idbGet('meeg_analytics_table').then(cachedTable=>{
+            if(cachedTable&&Array.isArray(cachedTable)&&cachedTable.length>1&&rawRows.length===0){
+              onCsvTable(cachedTable);
+              setSyncActive(true);
+            }
+          }).catch(()=>{});
         }
-
       }).catch(()=>{});
-
     }catch(e){}
-
   }
 
 
@@ -1590,29 +1612,147 @@ function onCsvData(text,fromCache){
 }
 function cairoToday(){try{return new Date().toLocaleDateString('en-CA',{timeZone:'Africa/Cairo'});}catch(e){const n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');}}
 function onCsvTable(table){
-  if(!table.length){showErr('No data returned.');return;}hdrs=table[0].map(h=>String(h||'').trim());const hLower=hdrs.map(h=>h.toLowerCase());sIdx={};["Shift","Unit","Qtc Name","Yubikey Email","Labeler Name","Pc No","Modality","Queue Name","Location","Pass"].forEach(name=>{const i=hLower.indexOf(name.toLowerCase());if(i>=0)sIdx[name]=i;});tsIdx=hLower.findIndex(h=>h==='timestamp');if(tsIdx<0)tsIdx=hLower.findIndex(h=>h==='created at');if(tsIdx<0)tsIdx=hLower.findIndex(h=>h==='date');if(tsIdx<0)tsIdx=hLower.findIndex(h=>h.includes('date'));locColIdx=hLower.findIndex(h=>h==='location');if(locColIdx<0)locColIdx=hLower.findIndex(h=>h==='unit');if(locColIdx<0)locColIdx=hLower.findIndex(h=>h==='site');rawRows=[];for(let ri=1;ri<table.length;ri++){const rowRaw=table[ri];if(!rowRaw||!rowRaw.length)continue;const row=hdrs.map((_,ci)=>rowRaw[ci]!==undefined?String(rowRaw[ci]).trim():'');if(row.every(c=>c===''))continue;const sci=sIdx['Shift'];if(sci!==undefined){const sv=String(row[sci]||'').trim().toLowerCase();if(!ALL_SHIFTS.some(a=>sv===a))continue;}normRow(row);rawRows.push(row);}sOpts={};["Shift","Unit","Qtc Name","Yubikey Email","Labeler Name","Pc No","Modality","Queue Name","Location","Pass"].forEach(name=>{const ci=sIdx[name];if(ci===undefined)return;const set=new Set();rawRows.forEach(r=>{const v=String(r[ci]||'').trim();if(v)set.add(v);});sOpts[name]=[...set].sort();});const dateSet=new Set();rawRows.forEach(r=>{const d=extractDate(r[tsIdx]);if(d)dateSet.add(d);});sOpts['_dates']=[...dateSet].sort().reverse();const locSet=new Set();if(locColIdx>=0)rawRows.forEach(r=>{const v=String(r[locColIdx]||'').trim();if(v)locSet.add(v);});locations=[...locSet].sort();todayStr=cairoToday();document.getElementById('todayLabel').textContent=todayStr;lastUpdateTs=Date.now();updateRelativeTime();setTrafficLight('green');window._firstDataReady=true; window.rawRows=rawRows; window.hdrs=hdrs;document.getElementById('totalBadge').textContent=rawRows.length+' rows';SC.forEach(s=>{if(!sel[s.key])sel[s.key]=new Set();});if(!_filtersRestored){restoreFilters();_filtersRestored=true;}buildStrip();buildTabs();applyAll();if(autoRefreshTimer)clearInterval(autoRefreshTimer);autoRefreshTimer=null;if(autoRefreshEnabled)autoRefreshTimer=setInterval(loadData,REFRESH_INTERVAL*1000);applyAutoRefreshUI();if(cmpMode)populateCmpSelects();try{loadArchiveIds();}catch(e){}
+  if(!table.length){showErr('No data returned.');return;}
+  hdrs=table[0].map(h=>String(h||'').trim());
+  const hLower=hdrs.map(h=>h.toLowerCase());
+  sIdx={};
+  ["Shift","Unit","Qtc Name","Yubikey Email","Labeler Name","Pc No","Modality","Queue Name","Location","Pass"].forEach(name=>{
+    const i=hLower.indexOf(name.toLowerCase());if(i>=0)sIdx[name]=i;
+  });
+  tsIdx=hLower.findIndex(h=>h==='timestamp');if(tsIdx<0)tsIdx=hLower.findIndex(h=>h==='created at');if(tsIdx<0)tsIdx=hLower.findIndex(h=>h==='date');if(tsIdx<0)tsIdx=hLower.findIndex(h=>h.includes('date'));
+  locColIdx=hLower.findIndex(h=>h==='location');if(locColIdx<0)locColIdx=hLower.findIndex(h=>h==='unit');if(locColIdx<0)locColIdx=hLower.findIndex(h=>h==='site');
+
+  const sci=sIdx['Shift'];
+  const shiftSet=new Set(ALL_SHIFTS);
+  const numCols=hdrs.length;
+  rawRows=[];
+  for(let ri=1;ri<table.length;ri++){
+    const row=table[ri];
+    if(!row||!row.length)continue;
+    if(row.length===1&&String(row[0]||'').trim()==='')continue;
+    if(sci!==undefined){
+      const sv=String(row[sci]||'').trim().toLowerCase();
+      if(!shiftSet.has(sv))continue;
+    }
+    while(row.length<numCols)row.push('');
+    normRow(row);
+    rawRows.push(row);
+  }
+
+  const sKeys=["Shift","Unit","Qtc Name","Yubikey Email","Labeler Name","Pc No","Modality","Queue Name","Location","Pass"];
+  const colSets={};
+  sKeys.forEach(name=>{if(sIdx[name]!==undefined)colSets[name]=new Set();});
+  const dateSet=new Set();
+  const locSet=new Set();
+  const sKeysLen=sKeys.length;
+  const sKeyColIdx=sKeys.map(k=>sIdx[k]);
+
+  for(let i=0;i<rawRows.length;i++){
+    const r=rawRows[i];
+    for(let k=0;k<sKeysLen;k++){
+      const ci=sKeyColIdx[k];
+      if(ci!==undefined){
+        const v=String(r[ci]||'').trim();
+        if(v)colSets[sKeys[k]].add(v);
+      }
+    }
+    if(tsIdx>=0){
+      const d=extractDate(r[tsIdx]);
+      if(d)dateSet.add(d);
+    }
+    if(locColIdx>=0){
+      const v=String(r[locColIdx]||'').trim();
+      if(v)locSet.add(v);
+    }
+  }
+
+  sOpts={};
+  sKeys.forEach(name=>{if(colSets[name])sOpts[name]=[...colSets[name]].sort();});
+  sOpts['_dates']=[...dateSet].sort().reverse();
+  locations=[...locSet].sort();
+
+  todayStr=cairoToday();
+  const todayLabelEl=document.getElementById('todayLabel');if(todayLabelEl)todayLabelEl.textContent=todayStr;
+  lastUpdateTs=Date.now();
+  updateRelativeTime();
+  setTrafficLight('green');
+  window._firstDataReady=true;
+  window.rawRows=rawRows;
+  window.hdrs=hdrs;
+  const totalBadgeEl=document.getElementById('totalBadge');if(totalBadgeEl)totalBadgeEl.textContent=rawRows.length+' rows';
+  SC.forEach(s=>{if(!sel[s.key])sel[s.key]=new Set();});
+  if(!_filtersRestored){restoreFilters();_filtersRestored=true;}
+  buildStrip();
+  buildTabs();
+  applyAll();
+  if(autoRefreshTimer)clearInterval(autoRefreshTimer);
+  autoRefreshTimer=null;
+  if(autoRefreshEnabled)autoRefreshTimer=setInterval(loadData,REFRESH_INTERVAL*1000);
+  applyAutoRefreshUI();
+  if(cmpMode)populateCmpSelects();
+  try{loadArchiveIds();}catch(e){}
+  try{
+    idbSet('meeg_analytics_table',table);
+    idbSet('meti_dataset_cache_v2',{v:(typeof AUTH_VER!=='undefined'?AUTH_VER:'1'),timestamp:Date.now(),table});
+  }catch(e){}
 }
 const _MONTH_NAMES={jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
+const _dateCache=new Map();
 function extractDate(v){
   if(!v)return null;const s=String(v).trim();if(!s)return null;
-  if(/^\d{4}-\d{2}-\d{2}/.test(s))return s.substring(0,10);
-  let m=s.match(/^Date\((\d{4}),(\d{1,2}),(\d{1,2})/);
-  if(m)return m[1]+'-'+String(+m[2]+1).padStart(2,'0')+'-'+m[3].padStart(2,'0');
-  m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-  if(m)return m[3]+'-'+m[1].padStart(2,'0')+'-'+m[2].padStart(2,'0');
-  m=s.match(/^(\d{1,2})[.\-](\d{1,2})[.\-](\d{4})/);
-  if(m)return m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0');
-  m=s.match(/^(\d{1,2})[\s-]([A-Za-z]{3,9})[\s-](\d{4})/);
-  if(m){const mm=_MONTH_NAMES[m[2].slice(0,3).toLowerCase()];if(mm)return m[3]+'-'+String(mm).padStart(2,'0')+'-'+m[1].padStart(2,'0');}
-  m=s.match(/^([A-Za-z]{3,9})\s+(\d{1,2}),?\s+(\d{4})/);
-  if(m){const mm=_MONTH_NAMES[m[1].slice(0,3).toLowerCase()];if(mm)return m[3]+'-'+String(mm).padStart(2,'0')+'-'+m[2].padStart(2,'0');}
-  if(/^\d{4,6}(\.\d+)?$/.test(s)){
-    const serial=parseFloat(s);
-    if(!isNaN(serial)){const dt=new Date(Date.UTC(1899,11,30)+serial*86400000);if(!isNaN(dt.getTime()))return dt.toISOString().substring(0,10);}
+  const cached=_dateCache.get(s);
+  if(cached!==undefined)return cached;
+
+  let res=null;
+  // Fast path 1: YYYY-MM-DD
+  if(s.length>=10&&s.charCodeAt(4)===45&&s.charCodeAt(7)===45){
+    const y=s.slice(0,4),m=s.slice(5,7),d=s.slice(8,10);
+    if(!isNaN(y)&&!isNaN(m)&&!isNaN(d))res=y+'-'+m+'-'+d;
   }
-  const generic=new Date(s);
-  if(!isNaN(generic.getTime()))return generic.getFullYear()+'-'+String(generic.getMonth()+1).padStart(2,'0')+'-'+String(generic.getDate()).padStart(2,'0');
-  return null;
+  // Fast path 2: MM/DD/YYYY or M/D/YYYY
+  if(!res&&s.indexOf('/')>0){
+    const s1=s.indexOf('/'),s2=s.indexOf('/',s1+1);
+    if(s2>s1){
+      const p1=s.slice(0,s1),p2=s.slice(s1+1,s2);
+      let s3=s.indexOf(' ',s2+1);if(s3<0)s3=s.length;
+      const yr=s.slice(s2+1,s3);
+      if(yr.length===4&&!isNaN(yr)&&!isNaN(p1)&&!isNaN(p2)){
+        res=yr+'-'+(p1.length===1?'0'+p1:p1)+'-'+(p2.length===1?'0'+p2:p2);
+      }
+    }
+  }
+  if(!res){
+    if(/^\d{4}-\d{2}-\d{2}/.test(s))res=s.substring(0,10);
+    else {
+      let m=s.match(/^Date\((\d{4}),(\d{1,2}),(\d{1,2})/);
+      if(m)res=m[1]+'-'+String(+m[2]+1).padStart(2,'0')+'-'+m[3].padStart(2,'0');
+      else {
+        m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+        if(m)res=m[3]+'-'+m[1].padStart(2,'0')+'-'+m[2].padStart(2,'0');
+        else {
+          m=s.match(/^(\d{1,2})[.\-](\d{1,2})[.\-](\d{4})/);
+          if(m)res=m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0');
+          else {
+            m=s.match(/^(\d{1,2})[\s-]([A-Za-z]{3,9})[\s-](\d{4})/);
+            if(m){const mm=_MONTH_NAMES[m[2].slice(0,3).toLowerCase()];if(mm)res=m[3]+'-'+String(mm).padStart(2,'0')+'-'+m[1].padStart(2,'0');}
+            else {
+              m=s.match(/^([A-Za-z]{3,9})\s+(\d{1,2}),?\s+(\d{4})/);
+              if(m){const mm=_MONTH_NAMES[m[1].slice(0,3).toLowerCase()];if(mm)res=m[3]+'-'+String(mm).padStart(2,'0')+'-'+m[2].padStart(2,'0');}
+              else if(/^\d{4,6}(\.\d+)?$/.test(s)){
+                const serial=parseFloat(s);
+                if(!isNaN(serial)){const dt=new Date(Date.UTC(1899,11,30)+serial*86400000);if(!isNaN(dt.getTime()))res=dt.toISOString().substring(0,10);}
+              } else {
+                const generic=new Date(s);
+                if(!isNaN(generic.getTime()))res=generic.getFullYear()+'-'+String(generic.getMonth()+1).padStart(2,'0')+'-'+String(generic.getDate()).padStart(2,'0');
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  if(_dateCache.size<10000)_dateCache.set(s,res);
+  return res;
 }
 function rDate(r){if(tsIdx<0)return'';const v=String(r[tsIdx]||'').trim();return extractDate(v)||'';}
 function _now(){const n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0')+' '+String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0');}
