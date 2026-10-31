@@ -1718,7 +1718,7 @@
       </div>
 
             <!-- Quota Protection Alert Banner -->
-      <div id="quotaAlertBanner" style="display:none; margin-bottom:16px; padding:12px 18px; border-radius:12px; background:rgba(217,119,6,0.12); border:1px solid rgba(217,119,6,0.3); color:#b45309; font-size:0.85rem; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+      <div id="quotaAlertBanner" style="display:none !important; margin-bottom:16px; padding:12px 18px; border-radius:12px; background:rgba(217,119,6,0.12); border:1px solid rgba(217,119,6,0.3); color:#b45309; font-size:0.85rem; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
         <div style="display:flex; align-items:center; gap:8px;">
           <span style="font-size:1.1rem;">⚠️</span>
           <span id="quotaAlertText"><strong>تنبيه استهلاك الحصة:</strong> تم إيقاف التحديث التلقائي مؤقتًا لحماية حصة قاعدة البيانات. بياناتك الحالية محفوظة ومتاحة.</span>
@@ -4098,71 +4098,43 @@ function refreshCurrentWorkspace() {
     }
 
     async function exportFullDatabaseCSV() {
-      var totalStr = _totalDbCount ? _totalDbCount.toLocaleString() : "51,800+";
-      var proceed = confirm("Exporting all " + totalStr + " records will stream the complete database directly into a CSV file. Proceed?");
-      if (!proceed) return;
-
-      var sync = document.getElementById("syncStatus");
-      if (sync) sync.textContent = "⏳ Streaming entire database for CSV export...";
-
+      if (!_allSubmissions || !_allSubmissions.length) {
+        alert("No submissions data loaded yet.");
+        return;
+      }
       var headers = [
-        "ID", "Timestamp", "Shift", "Unit", "PC No", "Labeler Name",
+        "ID", "Timestamp", "Shift", "Unit / Floor", "PC No", "Labeler Name",
         "National ID", "Yubikey Email", "QTC Name", "Task ID", "Task Link",
         "Pass", "Modality", "Queue Name", "Object Count", "Stage"
       ];
       var csvLines = [headers.join(",")];
-
-      var minId = Infinity;
-      var exportedCount = 0;
-
-      var exportPage = 1;
-      while (true) {
-        try {
-          var res = await apiFetch("/api/tasks?page=" + exportPage + "&limit=5000");
-          var data = await res.json();
-          if (!data.ok || !data.tasks || !data.tasks.length) break;
-
-          data.tasks.forEach(function(r) {
-            var line = [
-              r.id || "",
-              '"' + String(r.timestamp || "").replace(/"/g, '""') + '"',
-              '"' + String(r.shift || "").replace(/"/g, '""') + '"',
-              '"' + String(r.unit || "").replace(/"/g, '""') + '"',
-              '"' + String(r.pc_no || "").replace(/"/g, '""') + '"',
-              '"' + String(r.labeler_name || "").replace(/"/g, '""') + '"',
-              '"' + String(r.national_id || "").replace(/"/g, '""') + '"',
-              '"' + String(r.yubikey_email || "").replace(/"/g, '""') + '"',
-              '"' + String(r.qtc_name || "").replace(/"/g, '""') + '"',
-              '"' + String(r.task_id || "").replace(/"/g, '""') + '"',
-              '"' + String(r.task_link || "").replace(/"/g, '""') + '"',
-              '"' + String(r.pass || "").replace(/"/g, '""') + '"',
-              '"' + String(r.modality || "").replace(/"/g, '""') + '"',
-              '"' + String(r.queue_name || "").replace(/"/g, '""') + '"',
-              r.object_count || 0,
-              '"' + String(r.stage || "").replace(/"/g, '""') + '"'
-            ];
-            csvLines.push(line.join(","));
-            exportedCount++;
-          });
-
-          if (sync) sync.textContent = "⏳ Streamed " + exportedCount.toLocaleString() + " records...";
-          if (data.tasks.length < 5000 || exportedCount >= (data.total || 0)) break;
-          exportPage++;
-          await new Promise(function(r) { setTimeout(r, 40); });
-        } catch(err) {
-          alert("Error streaming full database export: " + err.message);
-          break;
-        }
-      }
-
-      if (sync) sync.textContent = "● Live Edge Synced (" + new Date().toLocaleTimeString("en-US", {timeZone:"Africa/Cairo"}) + ")";
-
+      _allSubmissions.forEach(function(r) {
+        var line = [
+          r.id || "",
+          '"' + String(r.timestamp || "").replace(/"/g, '""') + '"',
+          '"' + String(r.shift || "").replace(/"/g, '""') + '"',
+          '"' + String(r.unit || "").replace(/"/g, '""') + '"',
+          '"' + String(r.pc_no || "").replace(/"/g, '""') + '"',
+          '"' + String(r.labeler_name || "").replace(/"/g, '""') + '"',
+          '"' + String(r.national_id || "").replace(/"/g, '""') + '"',
+          '"' + String(r.yubikey_email || "").replace(/"/g, '""') + '"',
+          '"' + String(r.qtc_name || "").replace(/"/g, '""') + '"',
+          '"' + String(r.task_id || "").replace(/"/g, '""') + '"',
+          '"' + String(r.task_link || "").replace(/"/g, '""') + '"',
+          '"' + String(r.pass || "").replace(/"/g, '""') + '"',
+          '"' + String(r.modality || "").replace(/"/g, '""') + '"',
+          '"' + String(r.queue_name || "").replace(/"/g, '""') + '"',
+          r.object_count || 0,
+          '"' + String(r.stage || "").replace(/"/g, '""') + '"'
+        ];
+        csvLines.push(line.join(","));
+      });
       var csvContent = "\uFEFF" + csvLines.join(String.fromCharCode(13, 10));
       var blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
       var url = URL.createObjectURL(blob);
       var link = document.createElement("a");
       link.setAttribute("href", url);
-      link.setAttribute("download", "meti_complete_database_" + exportedCount + "_records_" + new Date().toISOString().slice(0, 10) + ".csv");
+      link.setAttribute("download", "meti_complete_database_" + _allSubmissions.length + "_records_" + new Date().toISOString().slice(0, 10) + ".csv");
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -4809,18 +4781,15 @@ async function syncGoogleSheetsClient(isAuto) {
   if (syncPill) syncPill.textContent = '⚡ Checking Google Sheets live submissions...';
 
   try {
-    var res = await apiFetch("/api/sync-sheets", { method: "POST" });
-    if (!res.ok) throw new Error("HTTP " + res.status);
-    var data = await res.json();
-    if (!data.ok) throw new Error(data.message || "Sync failed");
-
+    if (typeof loadData === 'function') {
+      await loadData(true);
+    }
     if (syncPill) {
-      syncPill.textContent = '⚡ Live Edge Synced (' + new Date().toLocaleTimeString() + ')';
+      syncPill.textContent = '● Synced directly from Google Sheet (' + new Date().toLocaleTimeString("en-US", {timeZone:"Africa/Cairo"}) + ')';
     }
     if (!isAuto) {
-      alert('✅ Google Sheets data synchronized successfully! (Total submissions: ' + (data.total_submissions || _totalDbCount) + ')');
+      alert('✅ Google Sheets data synchronized successfully! (Total submissions: ' + _allSubmissions.length.toLocaleString() + ')');
     }
-    fetchLiveDataOnly();
   } catch(err) {
     console.warn('Sync error:', err);
     if (!isAuto) {
@@ -4828,98 +4797,20 @@ async function syncGoogleSheetsClient(isAuto) {
     }
   } finally {
     _isSyncingSheets = false;
-    if (!isAuto && btn) {
+    if (btn) {
       btn.disabled = false;
-      if (icon) icon.innerHTML = '⚡';
+      if (icon) icon.innerHTML = '🔄';
       if (text) text.innerText = 'Sync Sheets';
     }
   }
 }
 
-
-    var _sourceCache = {};
-
-    function onSourceFilterChange() {
-      var filterSource = document.getElementById("filterSource") ? document.getElementById("filterSource").value : "live";
-      var filterDate = document.getElementById("filterDate");
-
-      // When switching to an archive, auto-switch date filter to "all" because archives contain historical records from past dates
-      if ((filterSource === "arch2026" || filterSource === "arch2025" || filterSource === "archive" || filterSource === "arch1" || filterSource === "arch2") && filterDate && (filterDate.value === "today" || filterDate.value === "yesterday")) {
-        filterDate.value = "all";
-        if (typeof showToast === "function") {
-          showToast("📅 Switched date to 'All Dates' for Archive view");
-        }
-      }
-
-      // Check in-memory source cache for instant switching (0ms!)
-      if (_sourceCache[filterSource] && _sourceCache[filterSource].length > 0) {
-        _allSubmissions = _sourceCache[filterSource];
-        _totalDbCount = _sourceCache[filterSource + "_total"] || _allSubmissions.length;
-        _deltaCursor = _sourceCache[filterSource + "_cursor"] || null;
-        _submissionsMap.clear();
-        _allSubmissions.forEach(function(row) {
-          var itemKey = String(row.id || row.submission_key || row.task_id).trim();
-          if (itemKey) _submissionsMap.set(itemKey, row);
-        });
-        calculateKPIs();
-        _currentPage = 1;
-        applyFilters();
-        return;
-      }
-
-      // Otherwise, load from backend for this specific source
-      var sync = document.getElementById("syncStatus");
-      var sourceLabel = (filterSource === "arch2026" || filterSource === "arch2") ? "Archive 2026" : ((filterSource === "arch2025" || filterSource === "arch1") ? "Archive 2025" : ((filterSource === "archive" || filterSource === "both") ? "Both Archives" : (filterSource === "live" ? "Live Only" : "All Sources")));
-      if (sync) sync.textContent = "📦 Loading " + sourceLabel + " from database...";
-
-      var url = "/api/tasks?limit=1000";
-      if (filterSource !== "all") {
-        url += "&source=" + encodeURIComponent(filterSource);
-      }
-
-      apiFetch(url)
-        .catch(function(err) {
-          console.warn("Primary fetch failed, retrying with limit=500...", err);
-          return apiFetch(url.replace("limit=1000", "limit=500"));
-        })
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-          if (!data.ok) throw new Error(data.message || "Failed to load tasks");
-          if (sync) sync.textContent = "● " + sourceLabel + " Synced (" + new Date().toLocaleTimeString("en-US", {timeZone:"Africa/Cairo"}) + ")";
-          _totalDbCount = data.total || 0;
-          _allSubmissions = (data.tasks || []).map(mapSubmissionRow);
-          _submissionsMap.clear();
-          _allSubmissions.forEach(function(row) {
-            var itemKey = String(row.id || row.submission_key || row.task_id).trim();
-            if (itemKey) _submissionsMap.set(itemKey, row);
-          });
-          _deltaCursor = data.cursor || (_allSubmissions[0] ? ((_allSubmissions[0].updated_at || _allSubmissions[0].created_at || _allSubmissions[0].timestamp) + ":" + _allSubmissions[0].id) : null);
-
-          // Save into cache for instant switching
-          _sourceCache[filterSource] = _allSubmissions;
-          _sourceCache[filterSource + "_total"] = _totalDbCount;
-          _sourceCache[filterSource + "_cursor"] = _deltaCursor;
-
-          _allSubmissions.forEach(function(s) {
-            if (s.queue_name && !_allQueuesList.includes(s.queue_name)) {
-              _allQueuesList.push(s.queue_name);
-            }
-            if (s.qtc_name && !_allQTCList.includes(s.qtc_name)) {
-              _allQTCList.push(s.qtc_name);
-            }
-          });
-          populateQueueDropdowns();
-          populateQTCDropdowns();
-
-          calculateKPIs();
-          _currentPage = 1;
-          applyFilters();
-        })
-        .catch(function(err) {
-          if (sync) sync.textContent = "API error: " + err.message;
-          alert("Error loading " + sourceLabel + ": " + err.message);
-        });
-    }
+function applySourceFilter() {
+  _filteredSubmissions = _allSubmissions.slice();
+  _currentPage = 1;
+  calculateKPIs();
+  applyFilters();
+}
 
 var _tasksEtag = "";
 var _deltaCursor = "";
@@ -4929,17 +4820,11 @@ var _quotaBlocked = false;
 var _lastTasksFetchTime = 0;
 var _lastSuccessfulSyncTime = null;
 var _tasksRetryCount = 0;
-var _POLL_INTERVAL = 60000; // 60s background verification
+var _POLL_INTERVAL = 180000; // 3 min background verification
 
 function showQuotaAlertBanner(msg) {
   var b = document.getElementById("quotaAlertBanner");
-  if (b) {
-    b.style.display = "flex";
-    if (msg) {
-      var txt = document.getElementById("quotaAlertText");
-      if (txt) txt.textContent = msg;
-    }
-  }
+  if (b) b.style.display = "none";
 }
 
 function hideQuotaAlertBanner() {
@@ -4956,7 +4841,6 @@ function retryQuotaFetch() {
 
 var _cachedSyncMeta = null;
 
-// Format localized timestamp display
 function formatSyncTime(date) {
   if (!date) return "";
   try {
@@ -4966,227 +4850,28 @@ function formatSyncTime(date) {
   }
 }
 
-// Telemetry Indicators: Screen Update vs Google Sheets Sync
 function updateSyncIndicators(screenDate, syncMeta) {
   var screenEl = document.getElementById("syncStatus");
   if (screenEl && screenDate) {
     screenEl.innerHTML = "🖥️ شاشة العرض: محدثة (" + formatSyncTime(screenDate) + ")";
   }
-  var sheetsEl = document.getElementById("sheetsSyncStatus");
-  if (!sheetsEl) return;
-  if (!syncMeta || !syncMeta.status || syncMeta.status === "idle") {
-    sheetsEl.innerHTML = "📊 مزامنة الشيت: بانتظار الدورة الأولى";
-    sheetsEl.style.color = "var(--text-secondary)";
-    sheetsEl.style.borderColor = "var(--border)";
-    sheetsEl.style.background = "rgba(0,0,0,0.04)";
-    return;
-  }
-  if (syncMeta.status === "error") {
-    sheetsEl.innerHTML = "⚠️ تعثرت آخر مزامنة من Google Sheets";
-    sheetsEl.style.color = "#dc2626";
-    sheetsEl.style.borderColor = "rgba(220,38,38,0.35)";
-    sheetsEl.style.background = "rgba(220,38,38,0.08)";
-    return;
-  }
-  if (syncMeta.status === "success") {
-    var syncDate = syncMeta.last_sync_time ? new Date(syncMeta.last_sync_time) : null;
-    var timeTxt = syncDate ? formatSyncTime(syncDate) : "مؤخرًا";
-    var rowsTxt = (syncMeta.new_rows_count > 0 ? " (+" + syncMeta.new_rows_count + " جديدة)" : " (0 جديدة)");
-    sheetsEl.innerHTML = "📊 مزامنة الشيت: " + timeTxt + rowsTxt;
-    sheetsEl.style.color = "#059669";
-    sheetsEl.style.borderColor = "rgba(5,150,105,0.35)";
-    sheetsEl.style.background = "rgba(5,150,105,0.08)";
-  }
 }
 
-// 1. Initial Full/Source Load
+// 1. Initial Google Sheet Load
 function fetchLiveDataOnly(isManualReset) {
-  if (_isTasksInFlight) return;
-  if (_quotaBlocked) return;
-  _isTasksInFlight = true;
-
-  var sync = document.getElementById("syncStatus");
-  if (sync) sync.textContent = "⚡ Loading from edge database...";
-
-  var filterSource = document.getElementById("filterSource") ? document.getElementById("filterSource").value : "live";
-  var url = "/api/tasks?limit=1000";
-  if (filterSource && filterSource !== "all") {
-    url += "&source=" + encodeURIComponent(filterSource);
+  if (typeof loadData === 'function') {
+    return loadData(isManualReset);
   }
-
-  var reqHeaders = {};
-  if (_tasksEtag && !isManualReset) {
-    reqHeaders["If-None-Match"] = _tasksEtag;
-  }
-
-  apiFetch(url, { headers: reqHeaders })
-    .then(function(res) {
-      _lastTasksFetchTime = Date.now();
-      if (res.status === 304) {
-        _tasksRetryCount = 0;
-        _isTasksInFlight = false;
-        _lastSuccessfulSyncTime = new Date();
-        updateSyncIndicators(_lastSuccessfulSyncTime, _cachedSyncMeta);
-        return null;
-      }
-      if (res.status === 429) {
-        _quotaBlocked = true;
-        _isTasksInFlight = false;
-        showQuotaAlertBanner("تم إيقاف التحديث التلقائي مؤقتًا لتجاوز حصة الاستعلامات. تم الحفاظ على كافة البيانات الحالية.");
-        if (sync) sync.textContent = "⚠️ Quota limit reached (Auto-refresh paused)";
-        throw new Error("QUOTA_BLOCKED");
-      }
-      var newEtag = res.headers.get("ETag");
-      if (newEtag) _tasksEtag = newEtag;
-      return res.json();
-    })
-    .then(function(data) {
-      _isTasksInFlight = false;
-      if (!data) return; // 304 Not Modified
-      _tasksRetryCount = 0;
-      hideQuotaAlertBanner();
-      if (!data.ok) throw new Error(data.message || "Failed to load tasks");
-
-      _lastSuccessfulSyncTime = new Date();
-      if (sync) sync.textContent = "● Live Synced (" + formatSyncTime(_lastSuccessfulSyncTime) + ")";
-      _totalDbCount = data.total || 0;
-
-      // Initialize map for duplicate-free local merges
-      _submissionsMap.clear();
-      _allSubmissions = (data.tasks || []).map(function(t) {
-        var row = mapSubmissionRow(t);
-        var itemKey = String(row.id || row.submission_key || row.task_id).trim();
-        if (itemKey) _submissionsMap.set(itemKey, row);
-        return row;
-      });
-
-      // Record cursor for incremental updates
-      if (data.cursor) {
-        _deltaCursor = data.cursor;
-      } else if (data.tasks && data.tasks.length > 0) {
-        var top = data.tasks[0];
-        _deltaCursor = (top.updated_at || top.created_at || top.timestamp) + ":" + top.id;
-      }
-
-      _allSubmissions.forEach(function(s) {
-        if (s.queue_name && !_allQueuesList.includes(s.queue_name)) {
-          _allQueuesList.push(s.queue_name);
-        }
-        if (s.qtc_name && !_allQTCList.includes(s.qtc_name)) {
-          _allQTCList.push(s.qtc_name);
-        }
-      });
-      populateQueueDropdowns();
-      populateQTCDropdowns();
-
-      calculateKPIs();
-      _currentPage = 1;
-      applyFilters();
-    })
-    .catch(function(err) {
-      _isTasksInFlight = false;
-      if (err.message === "QUOTA_BLOCKED" || String(err.message).toLowerCase().includes("quota") || String(err.message).toLowerCase().includes("blocked")) {
-        _quotaBlocked = true;
-        showQuotaAlertBanner("تم إيقاف التحديث التلقائي مؤقتًا لتجاوز حصة الاستعلامات.");
-        if (sync) sync.textContent = "⚠️ Quota limit reached (Auto-refresh paused)";
-        return;
-      }
-      _tasksRetryCount++;
-      var backoffSeconds = Math.min(60, 5 * Math.pow(2, _tasksRetryCount));
-      console.warn("Tasks fetch error (attempt " + _tasksRetryCount + "), backing off " + backoffSeconds + "s:", err.message);
-      if (sync) sync.textContent = "API error: " + err.message;
-    });
 }
 
-// 2. Incremental Delta Verification (fetches only new or modified rows since _deltaCursor)
 function pollTaskDeltas(isManual) {
-  if (_isTasksInFlight || _quotaBlocked) return;
+  if (document.visibilityState !== "visible") return;
   if (!navigator.onLine) return;
-  if (!_deltaCursor) {
-    fetchLiveDataOnly();
-    return;
+  if (typeof loadData === 'function') {
+    return loadData(isManual);
   }
-
-  _isTasksInFlight = true;
-  var sync = document.getElementById("syncStatus");
-  if (isManual && sync) sync.textContent = "⚡ Checking delta changes...";
-
-  var filterSource = document.getElementById("filterSource") ? document.getElementById("filterSource").value : "live";
-  var deltaUrl = "/api/tasks/delta?cursor=" + encodeURIComponent(_deltaCursor);
-  if (filterSource && filterSource !== "all") {
-    deltaUrl += "&source=" + encodeURIComponent(filterSource);
-  }
-
-  apiFetch(deltaUrl)
-    .then(function(res) {
-      _lastTasksFetchTime = Date.now();
-      if (res.status === 429) {
-        _quotaBlocked = true;
-        _isTasksInFlight = false;
-        showQuotaAlertBanner("تم إيقاف التحديث التلقائي مؤقتًا لتجاوز حصة الاستعلامات.");
-        if (sync) sync.textContent = "⚠️ Quota limit reached (Auto-refresh paused)";
-        throw new Error("QUOTA_BLOCKED");
-      }
-      if (!res.ok) throw new Error("HTTP " + res.status);
-      return res.json();
-    })
-    .then(function(data) {
-      _isTasksInFlight = false;
-      if (!data || !data.ok) return;
-
-      _lastSuccessfulSyncTime = new Date();
-      var changes = data.changes || [];
-      var deleted = data.deleted || [];
-
-      if (data.cursor) {
-        _deltaCursor = data.cursor;
-      }
-
-      if (changes.length === 0 && deleted.length === 0) {
-        if (data && data.sync_meta) _cachedSyncMeta = data.sync_meta;
-        updateSyncIndicators(_lastSuccessfulSyncTime, _cachedSyncMeta);
-        return;
-      }
-
-      // Merge newly inserted or modified tasks into local map
-      changes.forEach(function(t) {
-        var row = mapSubmissionRow(t);
-        var itemKey = String(row.id || row.submission_key || row.task_id || '').trim();
-        if (itemKey) {
-          _submissionsMap.set(itemKey, row);
-        }
-      });
-
-      // Remove any tombstones
-      deleted.forEach(function(delId) {
-        var target = String(delId).trim();
-        _submissionsMap.delete(target);
-        for (var entry of _submissionsMap.entries()) {
-          if (String(entry[1].task_id).trim() === target || String(entry[1].id).trim() === target) {
-            _submissionsMap.delete(entry[0]);
-          }
-        }
-      });
-
-      // Rebuild sorted array
-      _allSubmissions = Array.from(_submissionsMap.values()).sort(function(a, b) {
-        return (parseInt(b.id, 10) || 0) - (parseInt(a.id, 10) || 0);
-      });
-      _totalDbCount = Math.max(_totalDbCount, _allSubmissions.length);
-
-      calculateKPIs();
-      applyFilters();
-
-      if (sync) sync.textContent = "● Synced +" + changes.length + " changes (" + formatSyncTime(_lastSuccessfulSyncTime) + ")";
-    })
-    .catch(function(err) {
-      _isTasksInFlight = false;
-      if (err.message === "QUOTA_BLOCKED") return;
-      console.warn("Delta poll warning:", err.message);
-    });
 }
 
-// 3. User Action Local Fast-Path (Updates UI immediately without network reload)
 function addTaskToLocalState(newTask) {
   if (!newTask || !newTask.task_id) return;
   var row = mapSubmissionRow(newTask);
@@ -5205,191 +4890,57 @@ function fetchLiveData() {
 }
 
 function loadMoreRecords() {
-  if (_isLoadingMore || _isStreamingAll) return;
-  _isLoadingMore = true;
-
-  var btn = document.getElementById("btnLoadMore");
-  if (btn) {
-    btn.disabled = true;
-    btn.innerHTML = '<span>⏳ Loading...</span>';
-  }
-
-  var nextPage = Math.floor(_allSubmissions.length / 2000) + 1;
-  var filterSource = document.getElementById("filterSource") ? document.getElementById("filterSource").value : "live";
-  var moreUrl = "/api/tasks?page=" + nextPage + "&limit=2000";
-  if (filterSource !== "all") {
-    moreUrl += "&source=" + encodeURIComponent(filterSource);
-  }
-  apiFetch(moreUrl)
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-      _isLoadingMore = false;
-      if (btn) {
-        btn.disabled = false;
-        btn.innerHTML = '<span>📥 Load Next 2,000</span>';
-      }
-      if (!data.ok) throw new Error(data.message || "Failed to load tasks");
-      var tasks = data.tasks || [];
-      if (!tasks.length) {
-        alert("All records in database are already loaded!");
-        return;
-      }
-      var newItems = tasks.map(mapSubmissionRow);
-      var existingIds = new Set(_allSubmissions.map(function(s) { return String(s.id); }));
-      newItems.forEach(function(item) {
-        if (!existingIds.has(String(item.id))) {
-          _allSubmissions.push(item);
-        }
-      });
-      calculateKPIs();
-      applyFilters();
-    })
-    .catch(function(err) {
-      _isLoadingMore = false;
-      if (btn) {
-        btn.disabled = false;
-        btn.innerHTML = '<span>📥 Load Next 2,000</span>';
-      }
-      alert("Error loading more records: " + err.message);
-    });
+  alert("All " + _allSubmissions.length.toLocaleString() + " records from Google Sheet are already loaded in memory!");
 }
 
 async function streamAllDatabaseRecords() {
-  if (_isStreamingAll) return;
-  _isStreamingAll = true;
-  _stopStreamingFlag = false;
-
-  var container = document.getElementById("streamProgressContainer");
-  var bar = document.getElementById("streamProgressBar");
-  var label = document.getElementById("streamProgressLabel");
   var btn = document.getElementById("btnStreamAll");
-  if (container) container.style.display = "block";
-  if (btn) btn.disabled = true;
-
-  var page = 1;
-  while (!_stopStreamingFlag) {
-    try {
-      var filterSource = document.getElementById("filterSource") ? document.getElementById("filterSource").value : "all";
-      var streamUrl = "/api/tasks?page=" + page + "&limit=2000";
-      if (filterSource !== "all") {
-        streamUrl += "&source=" + encodeURIComponent(filterSource);
-      }
-      var res = await apiFetch(streamUrl);
-      var data = await res.json();
-      if (!data.ok || !data.tasks || !data.tasks.length) break;
-
-      var existingIds = new Set(_allSubmissions.map(function(s) { return String(s.id); }));
-      data.tasks.forEach(function(r) {
-        var item = mapSubmissionRow(r);
-        if (!existingIds.has(String(item.id))) {
-          _allSubmissions.push(item);
-        }
-      });
-
-      var target = data.total || _totalDbCount || 52000;
-      var pct = Math.min(100, Math.round((_allSubmissions.length / target) * 100));
-      if (bar) bar.style.width = pct + "%";
-      if (label) label.textContent = "Loading database: " + _allSubmissions.length.toLocaleString() + " / " + target.toLocaleString() + " records (" + pct + "%)...";
-
-      calculateKPIs();
-      renderTable();
-
-      if (data.tasks.length < 2000 || _allSubmissions.length >= target) break;
-      page++;
-      await new Promise(function(r) { setTimeout(r, 60); });
-    } catch(err) {
-      console.warn("Streaming batch error:", err);
-      break;
-    }
-  }
-
-  _isStreamingAll = false;
   if (btn) {
-    btn.disabled = false;
     btn.innerHTML = '<span>⚡ All ' + _allSubmissions.length.toLocaleString() + ' Loaded</span>';
   }
-  if (label) label.textContent = "✔ Completed! All " + _allSubmissions.length.toLocaleString() + " records loaded in memory.";
-  setTimeout(function() {
-    if (container) container.style.display = "none";
-  }, 3500);
 }
 
 function stopStreamingDatabase() {
-  _stopStreamingFlag = true;
-  _isStreamingAll = false;
   var container = document.getElementById("streamProgressContainer");
   if (container) container.style.display = "none";
-  var btn = document.getElementById("btnStreamAll");
-  if (btn) btn.disabled = false;
 }
 
 function searchFullDatabase() {
-  var q = document.getElementById("searchQuery").value.trim();
+  var q = (document.getElementById("searchQuery").value || "").trim().toLowerCase();
   if (!q) {
-    alert("Please enter a search term (Task ID, Labeler Name, National ID, or PC No) to search the database.");
+    alert("Please enter a search term (Task ID, Labeler Name, National ID, or PC No).");
     return;
   }
-
-  var sync = document.getElementById("syncStatus");
-  if (sync) sync.textContent = "🔍 Searching full database...";
-
-  var filterSource = document.getElementById("filterSource") ? document.getElementById("filterSource").value : "all";
-  var searchUrl = "/api/tasks?search=" + encodeURIComponent(q) + "&limit=1000";
-  if (filterSource !== "all") {
-    searchUrl += "&source=" + encodeURIComponent(filterSource);
+  var matches = _allSubmissions.filter(function(s) {
+    return String(s.id || '').toLowerCase().includes(q) ||
+           String(s.task_id || '').toLowerCase().includes(q) ||
+           String(s.labeler_name || '').toLowerCase().includes(q) ||
+           String(s.national_id || '').toLowerCase().includes(q) ||
+           String(s.pc_no || '').toLowerCase().includes(q) ||
+           String(s.queue_name || '').toLowerCase().includes(q);
+  });
+  if (!matches.length) {
+    alert("No records found matching: " + q);
+    return;
   }
-  apiFetch(searchUrl)
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-      if (sync) sync.textContent = "● Live Edge Synced (" + new Date().toLocaleTimeString("en-US", {timeZone:"Africa/Cairo"}) + ")";
-      if (!data.ok) throw new Error(data.message || "Search failed");
-      var tasks = data.tasks || [];
-      if (!tasks.length) {
-        alert("No records found in database matching: " + q);
-        return;
-      }
-
-      var newItems = tasks.map(mapSubmissionRow);
-      var existingIds = new Set(_allSubmissions.map(function(s) { return String(s.id); }));
-      newItems.forEach(function(item) {
-        if (!existingIds.has(String(item.id))) {
-          _allSubmissions.unshift(item);
-        }
-      });
-
-      _currentPage = 1;
-      calculateKPIs();
-      applyFilters();
-    })
-    .catch(function(err) {
-      if (sync) sync.textContent = "Search error: " + err.message;
-      alert("Database search error: " + err.message);
-    });
+  _filteredSubmissions = matches;
+  _currentPage = 1;
+  renderTable();
+  var sync = document.getElementById("syncStatus");
+  if (sync) sync.textContent = "🔍 Found " + matches.length.toLocaleString() + " matching records for '" + q + "'";
 }
 
-// Smart visibility-aware and quota-protected 60s incremental background polling
+// Background sync every 3 minutes
 setInterval(function() {
   if (document.visibilityState !== "visible") return;
   if (!navigator.onLine) return;
-  if (_quotaBlocked || _isTasksInFlight) return;
-  if (document.getElementById('dashView') && document.getElementById('dashView').style.display !== 'none' && _activeTab === 'tasks') {
+  if (document.getElementById('dashView') && document.getElementById('dashView').style.display !== 'none') {
     if (Date.now() - _lastTasksFetchTime >= _POLL_INTERVAL) {
-      pollTaskDeltas(false);
+      _lastTasksFetchTime = Date.now();
+      if (typeof loadData === 'function') loadData();
     }
   }
-}, _POLL_INTERVAL);
-
-document.addEventListener("visibilitychange", function() {
-  if (document.visibilityState === "visible") {
-    if (!_quotaBlocked && !_isTasksInFlight && navigator.onLine) {
-      if (document.getElementById('dashView') && document.getElementById('dashView').style.display !== 'none' && _activeTab === 'tasks') {
-        if (Date.now() - _lastTasksFetchTime >= _POLL_INTERVAL) {
-          pollTaskDeltas(false);
-        }
-      }
-    }
-  }
-});
+}, 30000);
 
 // Attach Enter key listener to Search input
 document.addEventListener("DOMContentLoaded", function() {

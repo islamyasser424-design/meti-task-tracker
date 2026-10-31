@@ -204,7 +204,7 @@ const old=document.getElementById('cmpResultSection');if(old)old.remove();const 
 sec.innerHTML=`<div class="cmp-result-hd"><div class="cmp-result-title">⚖️ Comparison Result <span class="cmp-label cmp-label-a">A: ${esc(lblA)}</span><span style="color:var(--muted);font-size:.65rem">vs</span><span class="cmp-label cmp-label-b">B: ${esc(lblB)}</span></div><button class="btn btn-d" style="padding:3px 8px;font-size:.58rem" onclick="document.getElementById('cmpResultSection').remove()">✕ Close</button></div><div class="cmp-cols"><div class="cmp-col cmp-col-a"><div class="cmp-col-hd cmp-col-hd-a">A — ${esc(lblA)}</div><div class="cmp-stat-row"><span class="cmp-stat-label">Total Submits</span><span class="cmp-stat-val" data-anim-num="${sA.total}">${sA.total}</span></div><div class="cmp-stat-row"><span class="cmp-stat-label">Total Objects</span><span class="cmp-stat-val" data-anim-num="${sA.totalObj}">${sA.totalObj.toLocaleString()}</span></div><div class="cmp-stat-row"><span class="cmp-stat-label">Top Labeler</span><span class="cmp-stat-val" style="font-size:.62rem;font-family:var(--font)">${esc(sA.topLab)}</span></div><div class="cmp-stat-row"><span class="cmp-stat-label">Top QTC</span><span class="cmp-stat-val" style="font-size:.62rem;font-family:var(--font)">${esc(sA.topQtc)}</span></div><div class="cmp-stat-row"><span class="cmp-stat-label">Top Modality</span><span class="cmp-stat-val" style="font-size:.62rem;font-family:var(--font)">${esc(sA.topMod)}</span></div></div><div class="cmp-col"><div class="cmp-col-hd cmp-col-hd-b">B — ${esc(lblB)}</div><div class="cmp-stat-row"><span class="cmp-stat-label">Total Submits</span><span class="cmp-stat-val">${sB.total} ${deltaHtml(sB.total,sA.total)}</span></div><div class="cmp-stat-row"><span class="cmp-stat-label">Total Objects</span><span class="cmp-stat-val">${sB.totalObj.toLocaleString()} ${deltaHtml(sB.totalObj,sA.totalObj)}</span></div><div class="cmp-stat-row"><span class="cmp-stat-label">Top Labeler</span><span class="cmp-stat-val" style="font-size:.62rem;font-family:var(--font)">${esc(sB.topLab)}</span></div><div class="cmp-stat-row"><span class="cmp-stat-label">Top QTC</span><span class="cmp-stat-val" style="font-size:.62rem;font-family:var(--font)">${esc(sB.topQtc)}</span></div><div class="cmp-stat-row"><span class="cmp-stat-label">Top Modality</span><span class="cmp-stat-val" style="font-size:.62rem;font-family:var(--font)">${esc(sB.topMod)}</span></div></div></div>${Object.keys(sA.labMap).length||Object.keys(sB.labMap).length?`<div style="padding:12px 16px;border-top:1px solid var(--border)"><div style="font-size:.62rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">👤 Labeler Comparison</div>${barRows(sA.labMap,sB.labMap,'var(--cmp-a)','var(--cmp-b)')}<div style="display:flex;gap:12px;margin-top:6px;font-size:.58rem"><span style="color:var(--cmp-a)">■ A: ${esc(lblA)}</span><span style="color:var(--cmp-b)">■ B: ${esc(lblB)}</span></div></div>`:''}${Object.keys(sA.modMap).length||Object.keys(sB.modMap).length?`<div style="padding:12px 16px;border-top:1px solid var(--border)"><div style="font-size:.62rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">🔬 Modality Comparison</div>${barRows(sA.modMap,sB.modMap,'var(--cmp-a)','var(--cmp-b)')}</div>`:''}${Object.keys(sA.qMap).length||Object.keys(sB.qMap).length?`<div style="padding:12px 16px;border-top:1px solid var(--border)"><div style="font-size:.62rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">📋 Queue Comparison</div>${barRows(sA.qMap,sB.qMap,'var(--cmp-a)','var(--cmp-b)')}</div>`:''}`;
 const content=document.getElementById('mainContent');content.insertBefore(sec,content.firstChild);setTimeout(animateAllNums,100);sec.scrollIntoView({behavior:'smooth',block:'start'});showToast('✅ Comparison ready!');}
 const SHEET_ID='1g9mPKQMactJKC-BP0Ik3Cw72PLUXCb4VTKFbHYLjc5I';
-const SHEET_NAME='Data Base';
+const SHEET_NAME='Sheet1';
 const REFRESH_INTERVAL=60;
 const ALL_SHIFTS=["over night","overnight","over night 12 h","morning 12 h","night","morning","over shift (m)","over shift (n)","over shift (on)"];
 const PGSZ=75;
@@ -363,13 +363,13 @@ let qualityLastImport=null;
 let qualityLoading=false;
 /* ---- Archive spreadsheet (a SEPARATE Google Sheet with monthly tabs): old Data Base rows, used ONLY to look up an Actual ID -> person/shift.
         They are never added to rawRows, so dashboard totals/filters don't change. ---- */
-const ARCHIVE_SHEET_ID = (typeof window !== 'undefined' && window.APP_CONFIG && window.APP_CONFIG.ARCHIVE_SHEET_ID) || '';  // ID of the Archive spreadsheet = the long code between /d/ and /edit in its URL (must be shared "anyone with the link can view")
+const ARCHIVE_SHEET_ID = '';  // ID of the Archive spreadsheet = the long code between /d/ and /edit in its URL (must be shared "anyone with the link can view")
 const ARCHIVE_TABS=['1/2','March 2026','May 2026','April 2026','June 2026','July 2026','Aug 2026','Sep 1/9 to 3/9']; // exact tab names — add every new tab here
 /* ---- AUTO tab discovery (so a renamed / newly added tab needs NO code change). Fill in ONE of these two; leave both '' to use the manual ARCHIVE_TABS list above.
    1) ARCHIVE_TABS_URL : the /exec URL of a tiny Apps Script web app that returns the archive spreadsheet's tab list (script is in the chat)
    2) ARCHIVE_API_KEY  : a Google Cloud API key (Sheets API enabled, restricted to your GitHub Pages domain) — the page then asks Google directly
    Tabs are fetched by their numeric gid, so even a RENAMED tab keeps working. ARCHIVE_TABS_EXCLUDE = tab names to skip (summaries etc). ---- */
-const ARCHIVE_TABS_URL = (typeof window !== 'undefined' && window.APP_CONFIG && window.APP_CONFIG.ARCHIVE_TABS_URL) || '';
+const ARCHIVE_TABS_URL = '';
 const ARCHIVE_API_KEY='';
 const ARCHIVE_TABS_EXCLUDE=[];
 let archiveIdInfo={},archiveLoading=false,archiveLoaded=false,archiveStatus='',archiveLastKey='',archiveDone=0,archiveFetched=0,archiveTotal=0;
@@ -1484,114 +1484,93 @@ function simpleHash(s){let h=0;for(let i=0;i<s.length;i++){h=(h<<5)-h+s.charCode
 /* ===== PATCH #3: loading overlay only on first load, sync-bar handles refresh feedback ===== */
 let _cacheTried=false;
 function loadData(){
+
   setSyncActive(true);setTrafficLight('yellow');
+
   const b=document.getElementById('refreshBtn');if(b)b.disabled=true;
+
   const mc=document.getElementById('mainContent');
 
+
+
   // FAST PATH: Instant boot from IndexedDB cache (< 50ms)
+
   if(!_cacheTried && rawRows.length===0){
+
     _cacheTried=true;
+
     try {
+
       idbGet('meeg_analytics_table').then(cachedTable=>{
+
         if(cachedTable && Array.isArray(cachedTable) && cachedTable.length>1 && rawRows.length===0){
+
           onCsvTable(cachedTable);
+
           setSyncActive(true);
+
         }
+
       }).catch(()=>{});
+
     }catch(e){}
+
   }
+
+
 
   if(mc && rawRows.length===0){
-    mc.innerHTML=`<div class="loader"><div class="spin"></div><span class="ltxt">Connecting to Turso Database…</span></div>`;
+
+    mc.innerHTML=`<div class="loader"><div class="spin"></div><span class="ltxt">Loading data from Google Sheet…</span></div>`;
+
   }
 
-  var _anEtag = window._anEtag || "";
-  var _anInFlight = window._anInFlight || false;
-  var _anQuotaBlocked = window._anQuotaBlocked || false;
-  var _anLastFetchTime = window._anLastFetchTime || 0;
 
-  if (_anInFlight || _anQuotaBlocked) return;
-  window._anInFlight = true;
 
-  var anReqHeaders = {};
-  if (_anEtag) anReqHeaders["If-None-Match"] = _anEtag;
+  const base = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID;
 
-  apiFetch("/api/analytics/dataset?limit=25000", { headers: anReqHeaders })
-  .then(r => {
-    window._anLastFetchTime = Date.now();
-    if (r.status === 304) {
-      // 304 Not Modified! Data is identical. Zero row read cost!
-      window._anInFlight = false;
-      setTrafficLight('green');
-      var tl = document.getElementById('todayLabel');
-      if (tl) tl.textContent = cairoToday() + ' (Synced)';
-      return null;
-    }
-    if (r.status === 429) {
-      window._anQuotaBlocked = true;
-      window._anInFlight = false;
-      autoRefreshEnabled = false;
-      if (autoRefreshTimer) clearInterval(autoRefreshTimer);
-      applyAutoRefreshUI();
-      showToast('⚠️ تم إيقاف التحديث التلقائي لتجاوز حصة الاستعلامات');
-      throw new Error("QUOTA_BLOCKED");
-    }
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    var et = r.headers.get("ETag");
-    if (et) { _anEtag = et; window._anEtag = et; }
-    return r.json();
-  })
-  .then(data => {
-    window._anInFlight = false;
-    if (!data) return; // 304 Not Modified
-    if (!data.ok || !Array.isArray(data.rows)) {
-      throw new Error((data && data.message) || "Empty response from API");
-    }
-    const dbRows = data.rows;
-    const headers = ['Timestamp', 'Shift', 'Unit', 'Qtc Name', 'Yubikey Email', 'Labeler Name', 'National ID', 'Pc No', 'Modality', 'Queue Name', 'Task Link', 'Id', 'Object Count', 'Pass', 'Stage', 'Created At'];
-    const table = [headers];
-    for (let i = 0; i < dbRows.length; i++) {
-      const row = dbRows[i];
-      table.push([
-        row.timestamp != null ? String(row.timestamp) : '',
-        row.shift != null ? String(row.shift) : '',
-        row.unit != null ? String(row.unit) : '',
-        row.qtc_name != null ? String(row.qtc_name) : '',
-        row.yubikey_email != null ? String(row.yubikey_email) : '',
-        row.labeler_name != null ? String(row.labeler_name) : '',
-        row.national_id != null ? String(row.national_id) : '',
-        row.pc_no != null ? String(row.pc_no) : '',
-        row.modality != null ? String(row.modality) : '',
-        row.queue_name != null ? String(row.queue_name) : '',
-        row.task_link != null ? String(row.task_link) : '',
-        row.id != null ? String(row.id) : '',
-        row.object_count != null ? String(row.object_count) : '0',
-        row.pass != null ? String(row.pass) : '',
-        row.stage != null ? String(row.stage) : '',
-        row.created_at != null ? String(row.created_at) : ''
-      ]);
-    }
-    setSyncActive(false);
-    if(b)b.disabled=false;
-    try { idbSet('meeg_analytics_table', table); } catch(e){}
-    onCsvTable(table);
-  })
-    .catch(e => {
-    fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=0`)
-    .then(r => {
-      if (!r.ok) throw new Error('Sheet HTTP ' + r.status);
+  const urls = [
+
+    base + '/export?format=csv&gid=' + (SHEET_GID || '0'),
+
+    base + '/gviz/tq?tqx=out:csv&headers=1&gid=' + (SHEET_GID || '0')
+
+  ];
+
+
+
+  let promise = Promise.reject();
+
+  urls.forEach(u => {
+
+    promise = promise.catch(() => fetch(u).then(r => {
+
+      if(!r.ok) throw new Error('HTTP ' + r.status);
+
       return r.text();
-    })
-    .then(csv => {
-      onCsvData(csv, false);
-    })
-    .catch(sheetErr => {
-      setSyncActive(false);setTrafficLight('red');if(b)b.disabled=false;
-      if(rawRows.length>0){showToast('⚠️ Could not refresh — showing the last loaded data');}
-      else showErr('Failed to load data: '+e.message);
-    });
+
+    }));
+
   });
+
+
+
+  promise.then(csv => {
+
+    onCsvData(csv, false);
+
+  }).catch(err => {
+
+    setSyncActive(false);setTrafficLight('red');if(b)b.disabled=false;
+
+    if(rawRows.length>0){showToast('⚠️ Could not refresh — showing last loaded data');}
+
+    else showErr('Failed to load Google Sheet: '+err.message);
+
+  });
+
 }
+
 function onCsvData(text,fromCache){
   if(!fromCache){const b=document.getElementById('refreshBtn');if(b)b.disabled=false;setSyncActive(false);}
   const newHash=simpleHash(text);

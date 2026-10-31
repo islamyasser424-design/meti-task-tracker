@@ -739,7 +739,7 @@ function route(forcedTarget){
   else if(typeof renderOverview==='function')renderOverview();
 
   if(!window.rawRows || !window.rawRows.length){
-    if(typeof loadData==='function' && typeof getAuthToken==='function' && getAuthToken()) loadData();
+    if(typeof loadData==='function') loadData();
   }
 }
 
@@ -3523,210 +3523,220 @@ parseCSVAsync=function(text){
 
 
 
-// Source data uses the existing CSV transport; no layout or calendar changes.
-function dashboardCsvSources(){
- const base='https://docs.google.com/spreadsheets/d/'+SHEET_ID;
- const query=encodeURIComponent('select * where A is not null');
- const backup='https://docs.google.com/spreadsheets/d/1vpsYtvoZSKLsUeKj-FTXVGJmyFygSSck8DUIODJha_A';
- const tab=encodeURIComponent('Backup Date Base');
- return [
-  {name:'Main Data Base',urls:[base+'/gviz/tq?tqx=out:csv&headers=1&tq='+query+(SHEET_GID?'&gid='+encodeURIComponent(SHEET_GID):''),base+'/export?format=csv&gid='+encodeURIComponent(SHEET_GID),base+'/gviz/tq?tqx=out:csv&headers=1&gid='+encodeURIComponent(SHEET_GID)]},
-  {name:'Backup Intake / Backup Date Base',urls:[backup+'/gviz/tq?tqx=out:csv&headers=1&sheet='+tab+'&tq='+query,backup+'/gviz/tq?tqx=out:csv&headers=1&sheet='+tab]}
- ];
-}
-async function fetchDashboardCsvSource(source){
- let failure;
- for(const url of source.urls){
-  try{
-   const table=await parseCSVAsync(await fetchSheetText(url,45000));
-   if(!table.length)throw new Error('Empty CSV response');
-   return table;
-  }catch(e){failure=e;}
- }
- throw new Error(source.name+': '+(failure?.message||'Source unavailable'));
-}
-function mergeDashboardCsvSources(tables){
- const canonical=value=>{const key=String(value??'').trim().toLowerCase().replace(/\s+/g,' ');return key==='task id'?'id':key;};
- const headers=[],keys=[],positions=new Map();
- tables.forEach(table=>(table[0]||[]).forEach(header=>{
-  const key=canonical(header);if(!key||positions.has(key))return;
-  positions.set(key,headers.length);keys.push(key);headers.push(key==='id'?'Id':String(header).trim());
- }));
- const combined=[headers],priorCounts=new Map();
- const context=['timestamp','shift','unit','qtc name','yubikey email','labeler name','national id','pc no','modality','queue name','task link','id','object count','pass','stage'];
- const get=(row,key)=>row[positions.get(key)]||'';
- tables.forEach(table=>{
-  const mapping=(table[0]||[]).map(h=>positions.get(canonical(h)));
-  const counts=new Map();
-  table.slice(1).forEach(input=>{
-   const row=headers.map(()=>'');
-   input.forEach((value,index)=>{const to=mapping[index];if(to!==undefined)row[to]=String(value??'').trim();});
-   if(!row.some(Boolean))return;
-   // Exact matching submission context across sources only. Keep repeated tasks,
-   // FP versus QA and different timestamps. Preserve within-source multiplicity.
-   if(get(row,'id')||get(row,'task link')){
-    const key=JSON.stringify(context.map(k=>k==='timestamp'?(get(row,k)||get(row,'created at')):get(row,k)));
-    const occurrence=(counts.get(key)||0)+1;counts.set(key,occurrence);
-    if(occurrence<=(priorCounts.get(key)||0))return;
-   }
-   combined.push(row);
-  });
-  counts.forEach((count,key)=>priorCounts.set(key,Math.max(count,priorCounts.get(key)||0)));
- });
- return combined;
-}
-function dashboardCsvText(table){return table.map(row=>row.map(value=>'"'+String(value??'').replace(/"/g,'""')+'"').join(',')).join('\r\n');}
+// ============================================================
+// SINGLE GOOGLE SHEET DATA INTEGRATION (Zero Database Calls)
+// Google Sheet: 1g9mPKQMactJKC-BP0Ik3Cw72PLUXCb4VTKFbHYLjc5I (gid=0)
+// ============================================================
+const SHEET_ID = (typeof window !== 'undefined' && window.APP_CONFIG && window.APP_CONFIG.SHEET_ID) || '1g9mPKQMactJKC-BP0Ik3Cw72PLUXCb4VTKFbHYLjc5I';
+const SHEET_GID = (typeof window !== 'undefined' && window.APP_CONFIG && window.APP_CONFIG.SHEET_GID) || '0';
+const SHEET_NAME = (typeof window !== 'undefined' && window.APP_CONFIG && window.APP_CONFIG.SHEET_NAME) || 'Sheet1';
 
-let sheetLoadPromise=null;
+function syncSubmissionsFromTable(table) {
+  if (!table || table.length < 2) return;
+  const headers = table[0].map(h => String(h || '').trim().toLowerCase());
+  const getIdx = name => headers.indexOf(name.toLowerCase());
 
-let _instantCacheAttempted=false;
+  const tsI = getIdx('timestamp');
+  const shiftI = getIdx('shift');
+  const unitI = getIdx('unit');
+  const qtcI = getIdx('qtc name');
+  const yubiI = getIdx('yubikey email');
+  const nameI = getIdx('labeler name');
+  const natI = getIdx('national id');
+  const pcI = getIdx('pc no');
+  const modI = getIdx('modality');
+  const qI = getIdx('queue name');
+  const linkI = getIdx('task link');
+  const idI = getIdx('id');
+  const objI = getIdx('object count');
+  const passI = getIdx('pass');
+  const stageI = getIdx('stage');
+  const createdI = getIdx('created at');
 
+  const submissions = [];
+  const map = (typeof _submissionsMap !== 'undefined' && _submissionsMap instanceof Map) ? _submissionsMap : new Map();
+  map.clear();
 
-
-loadData=function(){
-
- if(sheetLoadPromise)return sheetLoadPromise;
-
- // Allow data fetch for dashboard clients
-
- const button=$('refreshBtn');setSyncActive(true);setTrafficLight('yellow');if(button)button.disabled=true;
-
-
-
- // Fast cache hydration: immediately render from IndexedDB if memory is empty
-
- if(!rawRows.length&&!_instantCacheAttempted){
-    _instantCacheAttempted=true;
-    idbGet('meti_dataset_cache_v2').then(cached=>{
-      if(cached&&cached.table&&cached.table.length&&!rawRows.length){
-        onCsvTable(cached.table);
-        setTrafficLight('yellow');
-        if (typeof showToast === 'function') {
-          showToast('⚡ Loaded from instant local cache — syncing latest updates…');
-        }
-      } else {
-        idbGet('csv-two-sources-v1').then(c=>{
-          if(c&&c.text&&!rawRows.length){
-            parseCSVAsync(c.text).then(t=>{ if(!rawRows.length&&t&&t.length){ onCsvTable(t); setTrafficLight('yellow'); } }).catch(()=>{});
-          }
-        }).catch(()=>{});
-      }
-    }).catch(()=>{});
+  for (let i = 1; i < table.length; i++) {
+    const r = table[i];
+    if (!r || !r.length) continue;
+    const task_id = String((idI >= 0 ? r[idI] : '') || '').trim();
+    const id = task_id || String(i);
+    const rowObj = {
+      id: id,
+      task_id: task_id,
+      timestamp: String((tsI >= 0 ? r[tsI] : '') || '').trim(),
+      shift: String((shiftI >= 0 ? r[shiftI] : '') || '').trim(),
+      unit: String((unitI >= 0 ? r[unitI] : '') || '').trim(),
+      qtc_name: String((qtcI >= 0 ? r[qtcI] : '') || '').trim(),
+      yubikey_email: String((yubiI >= 0 ? r[yubiI] : '') || '').trim(),
+      labeler_name: String((nameI >= 0 ? r[nameI] : '') || '').trim(),
+      national_id: String((natI >= 0 ? r[natI] : '') || '').trim(),
+      pc_no: String((pcI >= 0 ? r[pcI] : '') || '').trim(),
+      modality: String((modI >= 0 ? r[modI] : '') || '').trim(),
+      queue_name: String((qI >= 0 ? r[qI] : '') || '').trim(),
+      task_link: String((linkI >= 0 ? r[linkI] : '') || '').trim(),
+      object_count: parseInt(objI >= 0 ? r[objI] : 0, 10) || 0,
+      pass: String((passI >= 0 ? r[passI] : '') || '').trim(),
+      stage: String((stageI >= 0 ? r[stageI] : '') || '').trim(),
+      created_at: String((createdI >= 0 ? r[createdI] : '') || '').trim(),
+      source: "Google Sheet"
+    };
+    submissions.push(rowObj);
+    map.set(id, rowObj);
   }
 
-  if(!rawRows.length)$('mainContent').innerHTML='<div class="loader"><div class="spin"></div><span class="ltxt">Loading source data…</span></div>';
+  if (typeof _allSubmissions !== 'undefined') {
+    _allSubmissions = submissions;
+    _totalDbCount = submissions.length;
+    if (typeof _allQueuesList !== 'undefined' && Array.isArray(_allQueuesList)) {
+      const qSet = new Set(_allQueuesList);
+      submissions.forEach(s => { if (s.queue_name) qSet.add(s.queue_name); });
+      _allQueuesList = Array.from(qSet).sort();
+      if (typeof populateQueueDropdowns === 'function') populateQueueDropdowns();
+    }
+    if (typeof _allQTCList !== 'undefined' && Array.isArray(_allQTCList)) {
+      const qtcSet = new Set(_allQTCList);
+      submissions.forEach(s => { if (s.qtc_name) qtcSet.add(s.qtc_name); });
+      _allQTCList = Array.from(qtcSet).sort();
+      if (typeof populateQTCDropdowns === 'function') populateQTCDropdowns();
+    }
+    if (typeof calculateKPIs === 'function') calculateKPIs();
+    if (typeof applyFilters === 'function') applyFilters();
+  }
 
- 
+  const sync = document.getElementById("syncStatus");
+  if (sync) {
+    const timeStr = new Date().toLocaleTimeString("en-US", { timeZone: "Africa/Cairo", hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+    sync.textContent = "● Synced directly from Google Sheet (" + timeStr + ") • " + submissions.length.toLocaleString() + " rows";
+  }
+}
 
- sheetLoadPromise=(async()=>{
-    let failure;
-    try{
-      const token = (typeof getAuthToken === "function" ? getAuthToken() : (sessionStorage.getItem("meeg_auth_token") || ""));
-      const apiBase = window.MEEG_API_URL || localStorage.getItem("meeg_api_url") || "https://meeg-secure-api.islamyasser424.workers.dev";
-      var _m5Etag = window._anEtag || "";
-      var m5Headers = token ? { "Authorization": "Bearer " + token } : {};
-      if (_m5Etag) m5Headers["If-None-Match"] = _m5Etag;
+let sheetLoadPromise = null;
+let _instantCacheAttempted = false;
 
-      const res = await (typeof apiFetch === "function" ? apiFetch("/api/analytics/dataset?limit=25000", { headers: m5Headers }) : fetch(apiBase + "/api/analytics/dataset?limit=25000", {
-        headers: m5Headers,
-        credentials: "include"
-      }));
+loadData = function(force) {
+  if (sheetLoadPromise) return sheetLoadPromise;
 
-      if (res.status === 304) {
-        // Fast 304 Not Modified
-        setTrafficLight('green');
-        return;
+  const button = $('refreshBtn');
+  setSyncActive(true);
+  setTrafficLight('yellow');
+  if (button) button.disabled = true;
+
+  // Fast cache hydration: immediately render from IndexedDB if memory is empty
+  if (!rawRows.length && !_instantCacheAttempted) {
+    _instantCacheAttempted = true;
+    idbGet('meti_dataset_cache_v2').then(cached => {
+      if (cached && cached.table && cached.table.length && !rawRows.length) {
+        onCsvTable(cached.table);
+        syncSubmissionsFromTable(cached.table);
+        setTrafficLight('yellow');
+        if (typeof showToast === 'function') {
+          showToast('⚡ Showing cached data — syncing latest updates…');
+        }
+      } else {
+        idbGet('csv').then(c => {
+          if (c && c.text && !rawRows.length) {
+            parseCSVAsync(c.text).then(t => {
+              if (!rawRows.length && t && t.length) {
+                onCsvTable(t);
+                syncSubmissionsFromTable(t);
+                setTrafficLight('yellow');
+              }
+            }).catch(() => {});
+          }
+        }).catch(() => {});
       }
-      if (res.status === 429) {
-        if (typeof showToast === 'function') showToast('⚠️ تم إيقاف التحديث التلقائي لتجاوز حصة الاستعلامات');
-        throw new Error("QUOTA_BLOCKED");
-      }
-      if(!res.ok) throw new Error("HTTP " + res.status);
-      var net = res.headers.get("ETag");
-      if (net) { window._anEtag = net; }
-      const data = await res.json();
-      const dbRows = data.rows || [];
-      const headers = ['Timestamp', 'Shift', 'Unit', 'Qtc Name', 'Yubikey Email', 'Labeler Name', 'National ID', 'Pc No', 'Modality', 'Queue Name', 'Task Link', 'Id', 'Object Count', 'Pass', 'Stage', 'Created At'];
-      const table = [headers];
-      for (let i = 0; i < dbRows.length; i++) {
-        const row = dbRows[i];
-        table.push([
-          row.timestamp != null ? String(row.timestamp) : '',
-          row.shift != null ? String(row.shift) : '',
-          row.unit != null ? String(row.unit) : '',
-          row.qtc_name != null ? String(row.qtc_name) : '',
-          row.yubikey_email != null ? String(row.yubikey_email) : '',
-          row.labeler_name != null ? String(row.labeler_name) : '',
-          row.national_id != null ? String(row.national_id) : '',
-          row.pc_no != null ? String(row.pc_no) : '',
-          row.modality != null ? String(row.modality) : '',
-          row.queue_name != null ? String(row.queue_name) : '',
-          row.task_link != null ? String(row.task_link) : '',
-          row.id != null ? String(row.id) : '',
-          row.object_count != null ? String(row.object_count) : '0',
-          row.pass != null ? String(row.pass) : '',
-          row.stage != null ? String(row.stage) : '',
-          row.created_at != null ? String(row.created_at) : ''
-        ]);
-      }
-      onCsvTable(table);
-      setTrafficLight('green');
+    }).catch(() => {});
+  }
+
+  if (!rawRows.length) {
+    const mc = $('mainContent');
+    if (mc) mc.innerHTML = '<div class="loader"><div class="spin"></div><span class="ltxt">Loading source data from Google Sheet…</span></div>';
+  }
+
+  const base = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID;
+  const cleanQuery = encodeURIComponent('select * where A is not null');
+  const urls = [
+    base + '/gviz/tq?tqx=out:csv&headers=1&tq=' + cleanQuery + (SHEET_GID ? '&gid=' + encodeURIComponent(SHEET_GID) : ''),
+    base + '/export?format=csv&gid=' + encodeURIComponent(SHEET_GID || '0'),
+    base + '/gviz/tq?tqx=out:csv&headers=1&gid=' + encodeURIComponent(SHEET_GID || '0')
+  ];
+
+  sheetLoadPromise = (async () => {
+    let failure = null;
+    let text = null;
+
+    for (const url of urls) {
       try {
-        if (typeof idbSet === 'function') {
-          idbSet('meti_dataset_cache_v2', { v: (typeof AUTH_VER !== 'undefined' ? AUTH_VER : '1'), timestamp: Date.now(), table });
+        text = await fetchSheetText(url, 45000);
+        if (text && text.trim().length > 50) break;
+      } catch (e) {
+        failure = e;
+      }
+    }
+
+    if (!text || text.trim().length <= 50) {
+      throw new Error(failure?.message || 'Unable to download Google Sheet CSV');
+    }
+
+    const hash = simpleHash(text);
+    if (hash === _lastCsvHash && rawRows.length) {
+      lastUpdateTs = Date.now();
+      updateRelativeTime();
+      setTrafficLight('green');
+      return;
+    }
+
+    const table = await parseCSVAsync(text);
+    if (!table || table.length < 2) {
+      throw new Error('Google Sheet returned an empty CSV');
+    }
+
+    onCsvTable(table);
+    _lastCsvHash = hash;
+    syncSubmissionsFromTable(table);
+
+    setTrafficLight('green');
+    try {
+      if (typeof idbSet === 'function') {
+        idbSet('meti_dataset_cache_v2', { v: (typeof AUTH_VER !== 'undefined' ? AUTH_VER : '1'), timestamp: Date.now(), table });
+        idbSet('csv', { v: (typeof AUTH_VER !== 'undefined' ? AUTH_VER : '1'), ts: Date.now(), text });
+      }
+    } catch (e) {}
+
+  })().catch(async (err) => {
+    console.warn('Google Sheet fetch error:', err);
+    if (!rawRows.length) {
+      try {
+        const cached = await idbGet('meti_dataset_cache_v2');
+        if (cached && cached.table && cached.table.length) {
+          onCsvTable(cached.table);
+          syncSubmissionsFromTable(cached.table);
+          setTrafficLight('yellow');
+          if (typeof showToast === 'function') {
+            showToast('Showing offline cached data: ' + err.message);
+          }
+          return;
         }
       } catch (e) {}
-      return;
-   }catch(e){
-      failure = e;
-   }
+      if (typeof showErr === 'function') {
+        showErr('Could not load Google Sheet: ' + (err.message || 'Network error') + '. Check connection, then retry.');
+      }
+    } else {
+      setTrafficLight('red');
+      if (typeof showToast === 'function') {
+        showToast('Refresh failed — keeping current data. ' + (err.message || ''));
+      }
+    }
+  }).finally(() => {
+    sheetLoadPromise = null;
+    setSyncActive(false);
+    if (button) button.disabled = false;
+    renderAllSections();
+  });
 
-   if(!rawRows.length){
-
-     const cached=await idbGet('csv-two-sources-v1');
-
-     if(cached&&cached.v===AUTH_VER&&cached.text){
-
-       try{
-
-         onCsvTable(await parseCSVAsync(cached.text));
-
-         setTrafficLight('yellow');
-
-         showToast('Showing saved combined data. '+(failure?.message||'A source could not be reached.'));
-
-         return;
-
-       }catch(e){}
-
-     }
-
-     showErr('Could not load both Google Sheets: '+(failure?.message||'Network error')+'. Check source viewing access, then retry.');
-
-   }else{
-
-     setTrafficLight('red');
-
-     showToast('Refresh failed — keeping the last combined data. '+(failure?.message||''));
-
-   }
-
- })().finally(()=>{
-
-   sheetLoadPromise=null;
-
-   setSyncActive(false);
-
-   if(button)button.disabled=false;
-
-   renderAllSections();
-
- });
-
-
-
- return sheetLoadPromise;
-
+  return sheetLoadPromise;
 };
 
 
