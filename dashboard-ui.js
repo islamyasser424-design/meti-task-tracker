@@ -3465,7 +3465,7 @@ async function fetchSheetText(url,timeoutMs=45000){
 
  try{
 
-   const response=await fetch(url,{cache:'default',signal:controller.signal});
+   const response=await fetch(url,{cache:'no-store',signal:controller.signal});
 
    if(!response.ok)throw new Error('HTTP '+response.status);
 
@@ -3559,7 +3559,8 @@ function syncSubmissionsFromTable(table) {
   const qSet = new Set();
   const qtcSet = new Set();
 
-  for (let i = 1; i < table.length; i++) {
+  // Iterate backwards from newest row at bottom of sheet to oldest
+  for (let i = table.length - 1; i >= 1; i--) {
     const r = table[i];
     if (!r || !r.length) continue;
     const task_id = String((idI >= 0 ? r[idI] : '') || '').trim();
@@ -3669,10 +3670,11 @@ loadData = function(force) {
 
   const base = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID;
   const cleanQuery = encodeURIComponent('select * where A is not null');
+  const cacheBust = '&_cb=' + Date.now();
   const urls = [
-    base + '/export?format=csv&gid=' + encodeURIComponent(SHEET_GID || '0'),
-    base + '/gviz/tq?tqx=out:csv&headers=1&gid=' + encodeURIComponent(SHEET_GID || '0'),
-    base + '/gviz/tq?tqx=out:csv&headers=1&tq=' + cleanQuery + (SHEET_GID ? '&gid=' + encodeURIComponent(SHEET_GID) : '')
+    base + '/export?format=csv&gid=' + encodeURIComponent(SHEET_GID || '0') + cacheBust,
+    base + '/gviz/tq?tqx=out:csv&headers=1&gid=' + encodeURIComponent(SHEET_GID || '0') + cacheBust,
+    base + '/gviz/tq?tqx=out:csv&headers=1&tq=' + cleanQuery + (SHEET_GID ? '&gid=' + encodeURIComponent(SHEET_GID) : '') + cacheBust
   ];
 
   sheetLoadPromise = (async () => {
@@ -3693,7 +3695,7 @@ loadData = function(force) {
     }
 
     const hash = simpleHash(text);
-    if (hash === _lastCsvHash && rawRows.length) {
+    if (!force && hash === _lastCsvHash && rawRows.length) {
       lastUpdateTs = Date.now();
       updateRelativeTime();
       setTrafficLight('green');

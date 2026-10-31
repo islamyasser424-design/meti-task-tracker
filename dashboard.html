@@ -4729,7 +4729,7 @@ var _quotaBlocked = false;
 var _lastTasksFetchTime = 0;
 var _lastSuccessfulSyncTime = null;
 var _tasksRetryCount = 0;
-var _POLL_INTERVAL = 180000; // 3 min background verification
+var _POLL_INTERVAL = 30000; // 30s background live sync
 
 function showQuotaAlertBanner(msg) {
   var b = document.getElementById("quotaAlertBanner");
@@ -4795,7 +4795,7 @@ function addTaskToLocalState(newTask) {
 }
 
 function fetchLiveData() {
-  fetchLiveDataOnly();
+  fetchLiveDataOnly(true);
 }
 
 function loadMoreRecords() {

@@ -1550,13 +1550,10 @@ function loadData(){
 
 
   const base = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID;
-
+  const cacheBust = '&_cb=' + Date.now();
   const urls = [
-
-    base + '/export?format=csv&gid=' + (SHEET_GID || '0'),
-
-    base + '/gviz/tq?tqx=out:csv&headers=1&gid=' + (SHEET_GID || '0')
-
+    base + '/export?format=csv&gid=' + (SHEET_GID || '0') + cacheBust,
+    base + '/gviz/tq?tqx=out:csv&headers=1&gid=' + (SHEET_GID || '0') + cacheBust
   ];
 
 
@@ -1565,7 +1562,7 @@ function loadData(){
 
   urls.forEach(u => {
 
-    promise = promise.catch(() => fetch(u).then(r => {
+    promise = promise.catch(() => fetch(u, { cache: 'no-store' }).then(r => {
 
       if(!r.ok) throw new Error('HTTP ' + r.status);
 
